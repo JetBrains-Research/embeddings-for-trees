@@ -1,23 +1,28 @@
 import os
 from argparse import ArgumentParser, Namespace
-from shutil import rmtree
-from tarfile import open as tar_open
-from subprocess import run as subprocess_run
-from typing import Tuple, Dict
-from pickle import dump as pkl_dump
 from collections import Counter
-from multiprocessing import Pool, cpu_count
+from pickle import dump as pkl_dump
+from shutil import rmtree
+from subprocess import run as subprocess_run
+from tarfile import open as tar_open
+from tarfile import TarInfo
+from typing import Tuple, Dict
+
+import pandas as pd
+from dgl import DGLGraph
+from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm import tqdm
-from networkx.drawing.nx_pydot import read_dot
-from dgl import DGLGraph
-import pandas as pd
+
+from s3_worker import upload_file
 
 data_folder = 'data'
 holdout_folders = ['training', 'validation', 'test']
 
 dataset_url = 'https://s3.amazonaws.com/code2seq/datasets/{}.tar.gz'
 astminer_cli_path = 'astminer-cli.jar'
+
+s3_bucket_name = 'voudy'
 
 dataset_mapping = {
     'small': 'java-small',
@@ -99,7 +104,7 @@ def convert_ast(ast_path: str, output_path: str, ast_description: pd.DataFrame) 
 
 def convert_project(
         holdout_asts_path: str, holdout_output_path: str, project_name: str,
-        token_to_id: Dict, type_to_id: Dict, n_jobs: int = -1
+        token_to_id: Dict, type_to_id: Dict
 ) -> None:
     project_path = os.path.join(holdout_asts_path, project_name, 'java')
     ast_folder = os.path.join(project_path, 'asts')
@@ -108,25 +113,23 @@ def convert_project(
     description['token_id'] = description['token'].apply(lambda token: token_to_id.get(token, 1))
     description['type_id'] = description['type'].apply(lambda type_all: type_to_id.get(type, 0))
     asts = os.listdir(ast_folder)
-    pool = Pool(cpu_count() if n_jobs == -1 else n_jobs)
     print(f"working with {project_name}...")
-    pool.starmap_async(
-        convert_ast,
-        [(os.path.join(project_path, 'asts', ast),
-          os.path.join(holdout_output_path, f'{project_name}_{ast[:-4]}.pkl'),
-          description[description['dot_file'] == ast].sort_values(by='node_id')) for ast in tqdm(asts)]
-    )
-    pool.close()
+    for ast in tqdm(asts):
+        convert_ast(
+            os.path.join(project_path, 'asts', ast),
+            os.path.join(holdout_output_path, f'{project_name}_{ast[:-4]}.pkl'),
+            description[description['dot_file'] == ast].sort_values(by='node_id')
+        )
 
 
-def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict, type_to_id: Dict, n_jobs: int = -1) -> str:
+def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict, type_to_id: Dict) -> str:
     print(f"Convert asts for {holdout_name} data...")
     holdout_path = os.path.join(data_path, f'{holdout_name}_asts')
     output_holdout_path = os.path.join(data_path, f'{holdout_name}_preprocessed')
     create_folder(output_holdout_path)
     projects = os.listdir(holdout_path)
     for project in tqdm(projects):
-        convert_project(holdout_path, output_holdout_path, project, token_to_id, type_to_id, n_jobs)
+        convert_project(holdout_path, output_holdout_path, project, token_to_id, type_to_id)
     return output_holdout_path
 
 
@@ -193,18 +196,30 @@ def main(args: Namespace) -> None:
     if args.convert:
         token_to_id, type_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
         holdout_preprocessed_paths = {}
-        for holdout in holdout_folders:
+        # for holdout in holdout_folders:
+        for holdout in ['test']:
             holdout_preprocessed_paths[holdout] = convert_holdout(
-                data_path, holdout, token_to_id, type_to_id, args.n_jobs
+                data_path, holdout, token_to_id, type_to_id
             )
     else:
         holdout_preprocessed_paths = {
             holdout: os.path.join(data_path, f'{holdout}_preprocessed') for holdout in holdout_folders
         }
 
+    if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
+        raise RuntimeError("convert ast before uploading or using it via --convert arg")
+
     for holdout, path in holdout_preprocessed_paths.items():
         number_of_functions = len(os.listdir(path))
         print(f"There are {number_of_functions} functions in {holdout} data")
+
+    if args.upload:
+        for holdout, path in holdout_preprocessed_paths.items():
+            tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
+            with tar_open(tar_file_name, 'w:gz') as tar_file:
+                for file in os.listdir(path):
+                    tar_file.addfile(TarInfo(file), open(os.path.join(path, file)))
+            upload_file(tar_file_name, s3_bucket_name)
 
 
 if __name__ == '__main__':
@@ -213,6 +228,6 @@ if __name__ == '__main__':
     arg_parser.add_argument('--download', action='store_true')
     arg_parser.add_argument('--build_ast', action='store_true')
     arg_parser.add_argument('--convert', action='store_true')
-    arg_parser.add_argument('--n-jobs', type=int, default=-1)
+    arg_parser.add_argument('--upload', action='store_true')
 
     main(arg_parser.parse_args())
