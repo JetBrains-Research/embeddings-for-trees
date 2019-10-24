@@ -154,7 +154,6 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         batched_graph = dgl_batch(graphs)
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
             pkl_dump({'bathed_graph': batched_graph, 'labels': labels}, pkl_file)
-        break
     pool.close()
     return output_holdout_path
 
@@ -232,8 +231,7 @@ def main(args: Namespace) -> None:
                 type_to_id = pkl_data['type_to_id']
 
         holdout_preprocessed_paths = {}
-        # for holdout in holdout_folders:
-        for holdout in ['test']:
+        for holdout in holdout_folders:
             holdout_preprocessed_paths[holdout] = convert_holdout(
                 data_path, holdout, token_to_id, type_to_id, args.n_jobs, args.batch_size
             )
@@ -246,7 +244,7 @@ def main(args: Namespace) -> None:
         raise RuntimeError("convert ast before uploading or using it via --convert arg")
 
     for holdout, path in holdout_preprocessed_paths.items():
-        number_of_batches= len(os.listdir(path))
+        number_of_batches = len(os.listdir(path))
         print(f"There are {number_of_batches} batches in {holdout} data")
 
     if args.upload:
