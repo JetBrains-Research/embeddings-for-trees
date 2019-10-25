@@ -252,7 +252,7 @@ def main(args: Namespace) -> None:
             tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
             with tar_open(tar_file_name, 'w:gz') as tar_file:
                 for file in os.listdir(path):
-                    tar_file.addfile(TarInfo(file), open(os.path.join(path, file)))
+                    tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
 
 
