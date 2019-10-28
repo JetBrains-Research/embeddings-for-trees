@@ -17,6 +17,9 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
+import sys
+sys.path.append('.')
+
 from utils.s3_worker import upload_file
 
 data_folder = 'data'
@@ -145,8 +148,8 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 1))
-        current_description['type_id'] = current_description['type'].apply(lambda type_all: type_to_id.get(type, 0))
+        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
+        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
         batch = pool.starmap_async(convert_ast, [(ast, current_description) for ast in current_asts]).get()
         graphs, labels = map(list, zip(*batch))
         batched_graph = dgl_batch(graphs)
