@@ -151,7 +151,7 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         graphs, labels = map(list, zip(*batch))
         batched_graph = dgl_batch(graphs)
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump({'bathed_graph': batched_graph, 'labels': labels}, pkl_file)
+            pkl_dump({'batched_graph': batched_graph, 'labels': labels}, pkl_file)
     pool.close()
     return output_holdout_path
 
@@ -163,6 +163,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
     print("collect vocabulary from training holdout")
     for project in tqdm(projects):
         project_description = pd.read_csv(os.path.join(train_path, project, 'java', 'description.csv'))
+        project_description['token'].fillna('NAN', inplace=True)
         token_vocabulary.update(project_description['token'].values)
         type_vocabulary.update(project_description['type'].values)
     del token_vocabulary['METHOD_NAME']
@@ -180,7 +181,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
     type_to_id = {
         'UNK': 0
     }
-    type_to_id.update([(node_type[0], num + 1) for num, node_type in enumerate(type_vocabulary)])
+    type_to_id.update([(node_type, num + 1) for num, node_type in enumerate(type_vocabulary)])
     return token_to_id, type_to_id
 
 
