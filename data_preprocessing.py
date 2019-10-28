@@ -107,7 +107,7 @@ def convert_ast(ast_path: str, description: pd.DataFrame) -> Tuple[DGLGraph, str
     mask = description['dot_file'] == ast_path
     g_dgl.ndata['token'] = description.loc[mask, 'token_id'].values
     g_dgl.ndata['type'] = description.loc[mask, 'type_id'].values
-    label = description['label'].values[0]
+    label = description.loc[mask, 'label'].values[0]
     return g_dgl, label
 
 
@@ -251,7 +251,7 @@ def main(args: Namespace) -> None:
         for holdout, path in holdout_preprocessed_paths.items():
             tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
             with tar_open(tar_file_name, 'w:gz') as tar_file:
-                for file in os.listdir(path):
+                for file in tqdm(os.listdir(path)):
                     tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
 
