@@ -6,6 +6,7 @@ from pickle import dump as pkl_dump
 from pickle import load as pkl_load
 from shutil import rmtree
 from subprocess import run as subprocess_run
+from sys import path as sys_path
 from tarfile import open as tar_open
 from typing import Tuple, Dict, List
 
@@ -17,8 +18,7 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
-import sys
-sys.path.append('.')
+sys_path.append('.')
 
 from utils.s3_worker import upload_file
 
@@ -78,7 +78,8 @@ def build_project_asts(project_path: str, output_path: str) -> bool:
     completed_process = subprocess_run(
         ['java', '-Xmx15g', '-jar', astminer_cli_path, 'parse',
          '--project', project_path, '--output', output_path,
-         '--storage', 'dot', '--granularity', 'method', '--lang', 'java', '--hide-method-name']
+         '--storage', 'dot', '--granularity', 'method',
+         '--lang', 'java', '--hide-method-name', '--split-tokens']
     )
     if completed_process.returncode != 0:
         print(f"can't build ASTs for project {project_path}, failed with:\n{completed_process.stdout}")
@@ -148,7 +149,9 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
+        current_description['token_id'] = current_description['token'].apply(
+            lambda token: [token_to_id.get(subtoken, 0) for subtoken in token.split('|')]
+        )
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
         batch = pool.starmap_async(convert_ast, [(ast, current_description) for ast in current_asts]).get()
         graphs, labels = map(list, zip(*batch))
@@ -167,7 +170,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
     for project in tqdm(projects):
         project_description = pd.read_csv(os.path.join(train_path, project, 'java', 'description.csv'))
         project_description['token'].fillna('NAN', inplace=True)
-        token_vocabulary.update(project_description['token'].values)
+        project_description['token'].apply(lambda token: token_vocabulary.update(token.split('|')))
         type_vocabulary.update(project_description['type'].values)
     del token_vocabulary['METHOD_NAME']
     del token_vocabulary['NAN']
