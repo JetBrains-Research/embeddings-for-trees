@@ -1,32 +1,30 @@
 import os
 from argparse import ArgumentParser, Namespace
 from collections import Counter
+from multiprocessing import Pool, cpu_count
 from pickle import dump as pkl_dump
 from pickle import load as pkl_load
 from shutil import rmtree
 from subprocess import run as subprocess_run
 from tarfile import open as tar_open
-from tarfile import TarInfo
 from typing import Tuple, Dict, List
-from multiprocessing import Pool, cpu_count, Manager, Queue
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from dgl import DGLGraph
 from dgl import batch as dgl_batch
 from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
-from torch import tensor
 
-from s3_worker import upload_file
+from utils.s3_worker import upload_file
 
 data_folder = 'data'
 vocabulary_name = 'vocabulary.pkl'
 holdout_folders = ['training', 'validation', 'test']
 
 dataset_url = 'https://s3.amazonaws.com/code2seq/datasets/{}.tar.gz'
-astminer_cli_path = 'astminer-cli.jar'
+astminer_cli_path = 'utils/astminer-cli.jar'
 
 s3_bucket_name = 'voudy'
 
@@ -107,7 +105,7 @@ def convert_ast(ast_path: str, description: pd.DataFrame) -> Tuple[DGLGraph, str
     mask = description['dot_file'] == ast_path
     g_dgl.ndata['token'] = description.loc[mask, 'token_id'].values
     g_dgl.ndata['type'] = description.loc[mask, 'type_id'].values
-    label = description['label'].values[0]
+    label = description.loc[mask, 'label'].values[0]
     return g_dgl, label
 
 
@@ -251,7 +249,7 @@ def main(args: Namespace) -> None:
         for holdout, path in holdout_preprocessed_paths.items():
             tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
             with tar_open(tar_file_name, 'w:gz') as tar_file:
-                for file in os.listdir(path):
+                for file in tqdm(os.listdir(path)):
                     tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
 
