@@ -77,7 +77,7 @@ def extract_dataset(file_path: str, extract_path: str, folder_name: str) -> [str
 
 def build_project_asts(project_path: str, output_path: str) -> bool:
     completed_process = subprocess_run(
-        ['java', '-Xmx15g', '-jar', astminer_cli_path, 'parse',
+        ['java', '-Xmx30g', '-jar', astminer_cli_path, 'parse',
          '--project', project_path, '--output', output_path,
          '--storage', 'dot', '--granularity', 'method',
          '--lang', 'java', '--hide-method-name', '--split-tokens']
@@ -104,14 +104,10 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
     return output_folder_path
 
 
-def convert_ast(ast_path: str, description: pd.DataFrame) -> Tuple[DGLGraph, str]:
-    g_nx = read_dot(ast_path)
+def convert_dot_to_dgl(dot_path: str) -> DGLGraph:
+    g_nx = read_dot(dot_path)
     g_dgl = DGLGraph(g_nx)
-    mask = description['dot_file'] == ast_path
-    g_dgl.ndata['token'] = np.vstack(description.loc[mask, 'token_id'])
-    g_dgl.ndata['type'] = description.loc[mask, 'type_id'].values
-    label = description.loc[mask, 'label'].values[0]
-    return g_dgl, label
+    return g_dgl
 
 
 def collect_ast_description(projects_paths: List[str], asts_batch: List[str]) -> pd.DataFrame:
@@ -147,23 +143,26 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
     n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
     pool = Pool(cpu_count() if n_jobs == -1 else n_jobs)
 
-    def tokens_list(token, length=50):
-        res = np.zeros(length) - 1
-        for i, subtoken in enumerate(token.split('|')):
-            res[i] = token_to_id.get(subtoken, 0)
-        return res
-
     for batch_num in tqdm(range(n_batches)):
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(tokens_list)
+        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
-        batch = pool.starmap_async(convert_ast, [(ast, current_description) for ast in current_asts]).get()
-        graphs, labels = map(list, zip(*batch))
-        batched_graph = dgl_batch(graphs)
+
+        batch = pool.map(convert_dot_to_dgl, current_asts)
+        batched_graph = dgl_batch(batch)
+
+        sorted_rank = dict(zip(current_asts, range(len(current_asts))))
+        current_description['sort_rank'] = current_description['dot_file'].map(sorted_rank)
+        current_description.sort_values(['sort_rank', 'node_id'], inplace=True)
+        batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
+        batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
+
+        labels = current_description.groupby('dot_file').first().loc[current_asts]['label'].to_list()
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
             pkl_dump({'batched_graph': batched_graph, 'labels': labels}, pkl_file)
+
     pool.close()
     return output_holdout_path
 
@@ -176,7 +175,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
     for project in tqdm(projects):
         project_description = pd.read_csv(os.path.join(train_path, project, 'java', 'description.csv'))
         project_description['token'].fillna('NAN', inplace=True)
-        project_description['token'].apply(lambda token: token_vocabulary.update(token.split('|')))
+        token_vocabulary.update(project_description['token'].values)
         type_vocabulary.update(project_description['type'].values)
     del token_vocabulary['METHOD_NAME']
     del token_vocabulary['NAN']
