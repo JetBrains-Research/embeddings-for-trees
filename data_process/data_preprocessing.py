@@ -17,6 +17,7 @@ from dgl import batch as dgl_batch
 from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
+from torch import zeros as th_zeros
 
 sys_path.append('.')
 
@@ -107,7 +108,7 @@ def convert_ast(ast_path: str, description: pd.DataFrame) -> Tuple[DGLGraph, str
     g_nx = read_dot(ast_path)
     g_dgl = DGLGraph(g_nx)
     mask = description['dot_file'] == ast_path
-    g_dgl.ndata['token'] = description.loc[mask, 'token_id'].values
+    g_dgl.ndata['token'] = np.vstack(description.loc[mask, 'token_id'])
     g_dgl.ndata['type'] = description.loc[mask, 'type_id'].values
     label = description.loc[mask, 'label'].values[0]
     return g_dgl, label
@@ -145,13 +146,18 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
     np.random.shuffle(asts)
     n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
     pool = Pool(cpu_count() if n_jobs == -1 else n_jobs)
+
+    def tokens_list(token, length=50):
+        res = np.zeros(length) - 1
+        for i, subtoken in enumerate(token.split('|')):
+            res[i] = token_to_id.get(subtoken, 0)
+        return res
+
     for batch_num in tqdm(range(n_batches)):
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(
-            lambda token: [token_to_id.get(subtoken, 0) for subtoken in token.split('|')]
-        )
+        current_description['token_id'] = current_description['token'].apply(tokens_list)
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
         batch = pool.starmap_async(convert_ast, [(ast, current_description) for ast in current_asts]).get()
         graphs, labels = map(list, zip(*batch))
