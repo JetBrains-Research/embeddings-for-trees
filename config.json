@@ -1,0 +1,14 @@
+{
+  "train_batches": "./data/java-small/test_preprocessed",
+  "validation_batches": "./data/java-small/validation_preprocessed",
+  "test_batches": "./data/java-small/test_preprocessed",
+
+  "vocabulary_path": "./data/java-small/vocabulary.pkl",
+  "labels_path": "./data/java-small/labels.pkl",
+
+  "x_size": 256,
+  "h_size": 256,
+  "n_epochs": 10,
+  "lr": 0.01,
+  "weight_decay": 1e-4
+}
