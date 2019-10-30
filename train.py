@@ -6,6 +6,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
+from numpy import cumsum
 
 from data_process.dataset import JavaDataset
 from model.decoder import LinearDecoder
@@ -53,6 +54,9 @@ def train(params: Dict) -> None:
         running_loss = 0.0
         for step, (graph, labels) in tqdm(enumerate(training_set)):
             torch_labels = torch.tensor([label_to_id.get(label, 0) for label in labels]).to(device)
+            mask = torch.zeros(graph.number_of_nodes())
+            idx_of_roots = cumsum([0] + graph.batch_num_nodes)[:-1]
+            mask[idx_of_roots] = 1
 
             embedding_optimizer.zero_grad()
             encoder_optimizer.zero_grad()
@@ -61,8 +65,9 @@ def train(params: Dict) -> None:
             graph_feature_embeds = embedding(graph)
             tree_embeds = encoder(graph_feature_embeds)
             logits = decoder(tree_embeds)
+            root_logits = logits[mask]
 
-            loss = criterion(logits, torch_labels)
+            loss = criterion(root_logits, torch_labels)
             loss.backward()
             embedding_optimizer.step()
             encoder_optimizer.step()
