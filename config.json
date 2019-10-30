@@ -1,5 +1,5 @@
 {
-  "train_batches": "./data/java-small/test_preprocessed",
+  "train_batches": "./data/java-small/train_preprocessed",
   "validation_batches": "./data/java-small/validation_preprocessed",
   "test_batches": "./data/java-small/test_preprocessed",
 
