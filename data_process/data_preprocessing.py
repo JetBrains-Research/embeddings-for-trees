@@ -17,7 +17,6 @@ from dgl import batch as dgl_batch
 from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
-from torch import zeros as th_zeros
 
 sys_path.append('.')
 
@@ -150,16 +149,17 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
 
-        batch = pool.map(convert_dot_to_dgl, current_asts)
-        batched_graph = dgl_batch(batch)
-
-        sorted_rank = dict(zip(current_asts, range(len(current_asts))))
-        current_description['sort_rank'] = current_description['dot_file'].map(sorted_rank)
-        current_description.sort_values(['sort_rank', 'node_id'], inplace=True)
+        async_batch = pool.map_async(convert_dot_to_dgl, current_asts)
+        description_groups = current_description.groupby('dot_file')
+        current_description = pd.concat(
+            [description_groups.get_group(ast).sort_values('node_id') for ast in current_asts],
+            ignore_index=True
+        )
+        batched_graph = dgl_batch(async_batch.get())
         batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
         batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
 
-        labels = current_description.groupby('dot_file').first().loc[current_asts]['label'].to_list()
+        labels = description_groups.first().loc[current_asts]['label'].to_list()
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
             pkl_dump({'batched_graph': batched_graph, 'labels': labels}, pkl_file)
 
