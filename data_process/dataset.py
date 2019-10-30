@@ -10,10 +10,10 @@ from torch.utils.data import Dataset
 
 class JavaDataset(Dataset):
 
-    def __init__(self, dataset_name: str, holdout_name: str, dataset_folder: str = 'data') -> None:
-        self.full_path = path_join(dataset_folder, dataset_name, f'{holdout_name}_preprocessed')
+    def __init__(self, path_to_batches: str) -> None:
+        self.full_path = path_to_batches
         assert path_exists(self.full_path)
-        self.batches = list(filter(lambda filename: filename.split('.')[1] == 'pkl', listdir(self.full_path)))
+        self.batches = list(filter(lambda filename: filename.endswith('.pkl'), listdir(self.full_path)))
 
     def __len__(self) -> int:
         return len(self.batches)
