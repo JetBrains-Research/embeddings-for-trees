@@ -52,7 +52,7 @@ def train(params: Dict) -> None:
     # train loop
     for epoch in range(params['n_epochs']):
         running_loss = 0.0
-        for step, (graph, labels) in tqdm(enumerate(training_set)):
+        for step, (graph, labels) in tqdm(enumerate(training_set), total=len(training_set)):
             torch_labels = torch.tensor([label_to_id.get(label, 0) for label in labels]).to(device)
             mask = torch.zeros(graph.number_of_nodes(), dtype=torch.bool)
             idx_of_roots = cumsum([0] + graph.batch_num_nodes)[:-1]
