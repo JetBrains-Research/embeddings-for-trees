@@ -50,6 +50,7 @@ def train(params: Dict) -> None:
     criterion = nn.CrossEntropyLoss()
 
     # train loop
+    print("starting train loop...")
     for epoch in range(params['n_epochs']):
         running_loss = 0.0
         for step, (graph, labels) in tqdm(enumerate(training_set), total=len(training_set)):
