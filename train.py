@@ -19,8 +19,8 @@ def train(params: Dict) -> None:
     fix_seed()
     device = get_device()
 
-    training_set = JavaDataset(params['train_batches'])
-    validation_set = JavaDataset(params['validation_batches'])
+    training_set = JavaDataset(params['train_batches'], params['batch_size'])
+    validation_set = JavaDataset(params['validation_batches'], params['batch_size'])
 
     with open(params['labels_path'], 'rb') as pkl_file:
         label_to_id = pkl_load(pkl_file)
