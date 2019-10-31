@@ -8,7 +8,7 @@ import torch.nn as nn
 from tqdm.auto import tqdm
 from numpy import cumsum
 
-from data_process.dataset import JavaDataset
+from data_workers.dataset import JavaDataset
 from model.decoder import LinearDecoder
 from model.embedding import TokenEmbedding
 from model.treelstm import TreeLSTM
