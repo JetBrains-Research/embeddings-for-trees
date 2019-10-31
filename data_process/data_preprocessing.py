@@ -144,22 +144,24 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
 
     for batch_num in tqdm(range(n_batches)):
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
+        async_batch = pool.map_async(convert_dot_to_dgl, current_asts)
+
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
         current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
 
-        async_batch = pool.map_async(convert_dot_to_dgl, current_asts)
         description_groups = current_description.groupby('dot_file')
         current_description = pd.concat(
             [description_groups.get_group(ast).sort_values('node_id') for ast in current_asts],
             ignore_index=True
         )
+
+        labels = description_groups.first().loc[current_asts]['label'].to_list()
         batched_graph = dgl_batch(async_batch.get())
         batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
         batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
 
-        labels = description_groups.first().loc[current_asts]['label'].to_list()
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
             pkl_dump({'batched_graph': batched_graph, 'labels': labels}, pkl_file)
 
