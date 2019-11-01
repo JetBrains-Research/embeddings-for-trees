@@ -4,9 +4,7 @@ from collections import Counter
 from multiprocessing import Pool, cpu_count
 from pickle import dump as pkl_dump
 from pickle import load as pkl_load
-from shutil import rmtree
 from subprocess import run as subprocess_run
-from sys import path as sys_path
 from tarfile import open as tar_open
 from typing import Tuple, Dict, List
 
@@ -18,9 +16,8 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
-sys_path.append('.')
-
-from utils.s3_worker import upload_file
+from utils.common import extract_tar_gz, create_folder
+from utils.s3_worker import upload_file, download_file
 
 data_folder = 'data'
 vocabulary_name = 'vocabulary.pkl'
@@ -41,12 +38,6 @@ random_seed = 7
 np.random.seed(random_seed)
 
 
-def create_folder(path: str, is_clean: bool = True) -> None:
-    if is_clean and os.path.exists(path):
-        rmtree(path)
-    os.mkdir(path)
-
-
 def download_dataset(name: str, download_path: str, block_size: int = 1024) -> str:
     r = get(dataset_url.format(name), stream=True)
     assert r.status_code == 200
@@ -62,15 +53,7 @@ def download_dataset(name: str, download_path: str, block_size: int = 1024) -> s
 
 
 def extract_dataset(file_path: str, extract_path: str, folder_name: str) -> [str]:
-    def tqdm_progress(members):
-        extract_progress_bar = tqdm(total=len(list(members.getnames())))
-        for member in members:
-            extract_progress_bar.update()
-            yield member
-        extract_progress_bar.close()
-
-    with tar_open(file_path, 'r:gz') as tarball:
-        tarball.extractall(extract_path, members=tqdm_progress(tarball))
+    extract_tar_gz(file_path, os.path.join(extract_path, folder_name))
     return [os.path.join(extract_path, folder_name, folder) for folder in holdout_folders]
 
 
@@ -201,9 +184,10 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
 def main(args: Namespace) -> None:
     dataset_name = dataset_mapping[args.dataset]
     data_path = os.path.join(data_folder, dataset_name)
+    create_folder(data_folder)
+    create_folder(data_path)
 
     if args.download:
-        create_folder(data_path)
         print(f"download {dataset_name} dataset...")
         tar_file_path = download_dataset(dataset_name, data_folder)
         print(f"extract files from tar archive {tar_file_path}...")
@@ -213,10 +197,9 @@ def main(args: Namespace) -> None:
     else:
         train_path, val_path, test_path = [os.path.join(data_path, folder) for folder in holdout_folders]
 
-    if not all([os.path.exists(holdout_path) for holdout_path in [train_path, val_path, test_path]]):
-        raise RuntimeError("download and extract data before processing it via --download arg")
-
     if args.build_ast:
+        if not all([os.path.exists(holdout_path) for holdout_path in [train_path, val_path, test_path]]):
+            raise RuntimeError("download and extract data before processing it via --download arg")
         if not os.path.exists(astminer_cli_path):
             raise RuntimeError(f"can't find astminer-cli in this location {astminer_cli_path}")
         holdout_ast_paths = {}
@@ -227,10 +210,9 @@ def main(args: Namespace) -> None:
             holdout: os.path.join(data_path, f'{holdout}_asts') for holdout in holdout_folders
         }
 
-    if not all([os.path.exists(path[1]) for path in holdout_ast_paths.items()]):
-        raise RuntimeError("build ast before converting it via --build_ast arg")
-
     if args.convert:
+        if not all([os.path.exists(path[1]) for path in holdout_ast_paths.items()]):
+            raise RuntimeError("build ast before converting it via --build_ast arg")
         vocabulary_path = os.path.join(data_path, vocabulary_name)
         if not os.path.exists(vocabulary_path):
             token_to_id, type_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
@@ -252,20 +234,27 @@ def main(args: Namespace) -> None:
             holdout: os.path.join(data_path, f'{holdout}_preprocessed') for holdout in holdout_folders
         }
 
-    if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
-        raise RuntimeError("convert ast before uploading or using it via --convert arg")
-
-    for holdout, path in holdout_preprocessed_paths.items():
-        number_of_batches = len(os.listdir(path))
-        print(f"There are {number_of_batches} batches in {holdout} data")
-
     if args.upload:
+        if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
+            raise RuntimeError("convert ast before uploading or using it via --convert arg")
         for holdout, path in holdout_preprocessed_paths.items():
             tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
             with tar_open(tar_file_name, 'w:gz') as tar_file:
                 for file in tqdm(os.listdir(path)):
                     tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
+
+    if args.download_preprocessed:
+        for holdout, path in holdout_preprocessed_paths.items():
+            tar_file_name = f'{holdout}_preprocessed.tar.gz'
+            tar_path = os.path.join(data_path, tar_file_name)
+            download_file(tar_path, s3_bucket_name, tar_file_name)
+            create_folder(path)
+            extract_tar_gz(tar_path, path)
+
+    for holdout, path in holdout_preprocessed_paths.items():
+        number_of_batches = len(os.listdir(path))
+        print(f"There are {number_of_batches} batches in {holdout} data")
 
 
 if __name__ == '__main__':
@@ -275,6 +264,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('--build_ast', action='store_true')
     arg_parser.add_argument('--convert', action='store_true')
     arg_parser.add_argument('--upload', action='store_true')
+    arg_parser.add_argument('--download_preprocessed', action='store_true')
     arg_parser.add_argument('--n_jobs', type=int, default=-1)
     arg_parser.add_argument('--batch_size', type=int, default=100)
 

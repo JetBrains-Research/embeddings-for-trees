@@ -10,7 +10,7 @@ from numpy import cumsum
 
 from data_workers.dataset import JavaDataset
 from model.model_factory import ModelFactory
-from utils.pytorch_utils import fix_seed, get_device
+from utils.common import fix_seed, get_device
 
 
 def train(params: Dict) -> None:
