@@ -3,6 +3,8 @@ import torch.nn as nn
 import dgl
 from typing import Dict
 
+from model.encoder import _IEncoder
+
 
 class TreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
@@ -35,9 +37,9 @@ class TreeLSTMCell(nn.Module):
         return {'h': h, 'c': c}
 
 
-class TreeLSTM(nn.Module):
+class TreeLSTM(_IEncoder):
 
-    def __init__(self, x_size: int, h_size: int) -> None:
+    def __init__(self, x_size: int, h_size: int, **kwargs) -> None:
         super().__init__()
         self.h_size = h_size
         self.cell = TreeLSTMCell(x_size, h_size)

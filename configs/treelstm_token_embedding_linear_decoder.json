@@ -1,0 +1,37 @@
+{
+  "paths": {
+    "train_batches": "./data/java-small/training_preprocessed",
+    "validation_batches": "./data/java-small/validation_preprocessed",
+    "test_batches": "./data/java-small/test_preprocessed",
+
+    "vocabulary_path": "./data/java-small/vocabulary.pkl",
+    "labels_path": "./data/java-small/labels.pkl"
+  },
+
+  "embedding": {
+    "name": "TokenEmbedding",
+    "params": {
+      "out_size": 128
+    }
+  },
+
+  "encoder": {
+    "name": "TreeLSTM",
+    "params": {
+      "x_size": 128,
+      "h_size": 128
+    }
+  },
+
+  "decoder": {
+    "name": "LinearDecoder",
+    "params": {
+      "in_size": 128
+    }
+  },
+
+  "batch_size": 32,
+  "n_epochs": 10,
+  "lr": 0.01,
+  "weight_decay": 1e-4
+}
