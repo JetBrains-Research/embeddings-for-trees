@@ -16,6 +16,7 @@ from utils.common import fix_seed, get_device
 def train(params: Dict) -> None:
     fix_seed()
     device = get_device()
+    print(f"using {device} device")
 
     training_set = JavaDataset(params['paths']['train_batches'], params['batch_size'])
     validation_set = JavaDataset(params['paths']['validation_batches'], params['batch_size'])
