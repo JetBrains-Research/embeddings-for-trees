@@ -33,7 +33,7 @@ def train(params: Dict) -> None:
     params['embedding']['params']['token_vocab_size'] = len(token_to_id)
     params['embedding']['params']['type_vocab_size'] = len(type_to_id)
     params['decoder']['params']['out_size'] = len(label_to_id)
-    model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
+    model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'], device)
     model: nn.Module = model_factory.construct_model()
 
     # create optimizers

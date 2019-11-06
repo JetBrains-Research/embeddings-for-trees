@@ -1,5 +1,5 @@
 import torch.nn as nn
-from torch import Tensor
+from torch import Tensor, device
 from typing import Dict
 from dgl import BatchedDGLGraph
 
@@ -36,10 +36,11 @@ class ModelFactory:
         'LinearDecoder': LinearDecoder
     }
 
-    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict):
+    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict, using_device: device):
         self.embedding_info = embedding_info
         self.encoder_info = encoder_info
         self.decoder_info = decoder_info
+        self.device = using_device
 
         self.embedding = self._get_module(self.embedding_info['name'], self._embeddings)
         self.encoder = self._get_module(self.encoder_info['name'], self._encoders)
@@ -52,7 +53,7 @@ class ModelFactory:
 
     def construct_model(self) -> Model:
         return Model(
-            self.embedding(**self.embedding_info['params']),
+            self.embedding(**self.embedding_info['params'], using_device=self.device),
             self.encoder(**self.encoder_info['params']),
             self.decoder(**self.decoder_info['params']),
-        )
+        ).to(self.device)
