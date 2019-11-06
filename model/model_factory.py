@@ -54,6 +54,6 @@ class ModelFactory:
     def construct_model(self) -> Model:
         return Model(
             self.embedding(**self.embedding_info['params'], using_device=self.device),
-            self.encoder(**self.encoder_info['params']),
+            self.encoder(**self.encoder_info['params'], using_device=self.device),
             self.decoder(**self.decoder_info['params']),
         ).to(self.device)

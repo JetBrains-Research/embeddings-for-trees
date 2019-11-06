@@ -39,9 +39,10 @@ class TreeLSTMCell(nn.Module):
 
 class TreeLSTM(_IEncoder):
 
-    def __init__(self, x_size: int, h_size: int, **kwargs) -> None:
+    def __init__(self, x_size: int, h_size: int, using_device: torch.device, **kwargs) -> None:
         super().__init__()
         self.h_size = h_size
+        self.device = using_device
         self.cell = TreeLSTMCell(x_size, h_size)
 
     def forward(self, batch: dgl.BatchedDGLGraph) -> torch.Tensor:
@@ -52,8 +53,8 @@ class TreeLSTM(_IEncoder):
         # set hidden and memory state
         nodes_in_batch = batch.number_of_nodes()
         batch.ndata['iou'] = self.cell.W_iou(batch.ndata['token_embeds']) + self.cell.b_iou
-        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size)
-        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size)
+        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
+        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
         # propagate
         dgl.prop_nodes_topo(batch)
         # compute hidden state of roots

@@ -21,5 +21,5 @@ class TokenEmbedding(_IEmbedding):
         self.token_embedding = nn.Embedding(token_vocab_size, out_size)
 
     def forward(self, graph: BatchedDGLGraph) -> BatchedDGLGraph:
-        graph.ndata['token_embeds'] = self.token_embedding(graph.ndata['token_id']).to(self.device)
+        graph.ndata['token_embeds'] = self.token_embedding(graph.ndata['token_id'].to(self.device)).to(self.device)
         return graph
