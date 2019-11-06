@@ -1,6 +1,6 @@
 import boto3
 from os.path import getsize, basename
-from tqdm import tqdm
+from tqdm.auto import tqdm
 
 # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-uploading-files.html
 

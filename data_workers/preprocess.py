@@ -243,6 +243,8 @@ def main(args: Namespace) -> None:
                 for file in tqdm(os.listdir(path)):
                     tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
+        vocabulary_path = os.path.join(data_path, vocabulary_name)
+        upload_file(vocabulary_path, s3_bucket_name, vocabulary_name)
 
     if args.download_preprocessed:
         for holdout, path in holdout_preprocessed_paths.items():
@@ -251,6 +253,8 @@ def main(args: Namespace) -> None:
             download_file(tar_path, s3_bucket_name, tar_file_name)
             create_folder(path)
             extract_tar_gz(tar_path, path)
+        vocabulary_path = os.path.join(data_path, vocabulary_name)
+        download_file(vocabulary_path, s3_bucket_name, vocabulary_name)
 
     for holdout, path in holdout_preprocessed_paths.items():
         number_of_batches = len(os.listdir(path))
