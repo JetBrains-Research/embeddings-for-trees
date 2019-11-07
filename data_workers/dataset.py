@@ -4,16 +4,17 @@ from os.path import join as path_join
 from pickle import load as pkl_load
 from typing import Tuple, List
 
-from dgl import BatchedDGLGraph, unbatch, batch
+from dgl import BatchedDGLGraph, unbatch, batch, reverse
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
 
 class JavaDataset(Dataset):
 
-    def __init__(self, batched_graphs_path: str, batch_size: int) -> None:
+    def __init__(self, batched_graphs_path: str, batch_size: int, invert_edges: bool = False) -> None:
         self.batched_graphs_path = batched_graphs_path
         self.batch_size = batch_size
+        self.invert_edges = invert_edges
         assert path_exists(self.batched_graphs_path)
 
         self.batched_graph_files = sorted(list(filter(
@@ -51,6 +52,12 @@ class JavaDataset(Dataset):
         with open(path_join(self.batched_graphs_path, batch_basename), 'rb') as pkl_file:
             cur_batched_graph = pkl_load(pkl_file)
         graphs = unbatch(cur_batched_graph['batched_graph'])
-        batched_graph = batch(graphs[batch_slice])
-        labels = cur_batched_graph['labels'][batch_slice]
-        return batched_graph, labels
+
+        graphs_for_batch = graphs[batch_slice]
+        if self.invert_edges:
+            graphs_for_batch = list(map(lambda g: reverse(g, share_ndata=True), graphs_for_batch))
+
+        batched_graph = batch(graphs_for_batch)
+        batched_labels = cur_batched_graph['labels'][batch_slice]
+
+        return batched_graph, batched_labels

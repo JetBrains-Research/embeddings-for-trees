@@ -1,8 +1,8 @@
 {
   "paths": {
-    "train_batches": "./data/java-small/training_preprocessed",
-    "validation_batches": "./data/java-small/validation_preprocessed",
-    "test_batches": "./data/java-small/test_preprocessed",
+    "train_batches": "./data/test_data/train",
+    "validation_batches": "./data/test_data/val",
+    "test_batches": "./data/test_data/test",
 
     "vocabulary_path": "./data/java-small/vocabulary.pkl",
     "labels_path": "./data/java-small/labels.pkl"

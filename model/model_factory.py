@@ -1,12 +1,13 @@
-import torch.nn as nn
-from torch import Tensor, device
 from typing import Dict
-from dgl import BatchedDGLGraph
 
+import torch.nn as nn
+from dgl import BatchedDGLGraph
+from torch import Tensor, device, LongTensor
+
+from model.decoder import _IDecoder, LinearDecoder
 from model.embedding import _IEmbedding, TokenEmbedding
 from model.encoder import _IEncoder
 from model.treelstm import TreeLSTM
-from model.decoder import _IDecoder, LinearDecoder
 
 
 class Model(nn.Module):
@@ -16,11 +17,11 @@ class Model(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, graph: BatchedDGLGraph, root_mask: Tensor) -> Tensor:
+    def forward(self, graph: BatchedDGLGraph, root_indexes: LongTensor) -> Tensor:
         embedded_graph = self.embedding(graph)
         node_hidden_states = self.encoder(embedded_graph)
-        roots_hidden_states = node_hidden_states[root_mask]
-        logits = self.decoder(roots_hidden_states)
+        root_hidden_states = node_hidden_states[root_indexes]
+        logits = self.decoder(root_hidden_states)
         return logits
 
 

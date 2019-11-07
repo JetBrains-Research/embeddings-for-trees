@@ -56,6 +56,6 @@ class TreeLSTM(_IEncoder):
         batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(self.device)
         # propagate
         dgl.prop_nodes_topo(batch)
-        # compute hidden state of roots
+        # get hidden state
         h = batch.ndata.pop('h')
         return h

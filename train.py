@@ -3,11 +3,11 @@ from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
 
+import numpy as np
 import torch
 import torch.nn as nn
-from tqdm.auto import tqdm
 from numpy import cumsum
-import numpy as np
+from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.model_factory import ModelFactory
@@ -19,8 +19,8 @@ def train(params: Dict) -> None:
     device = get_device()
     print(f"using {device} device")
 
-    training_set = JavaDataset(params['paths']['train_batches'], params['batch_size'])
-    validation_set = JavaDataset(params['paths']['validation_batches'], params['batch_size'])
+    training_set = JavaDataset(params['paths']['train_batches'], params['batch_size'], True)
+    validation_set = JavaDataset(params['paths']['validation_batches'], params['batch_size'], True)
 
     with open(params['paths']['labels_path'], 'rb') as pkl_file:
         label_to_id = pkl_load(pkl_file)
@@ -49,18 +49,20 @@ def train(params: Dict) -> None:
     print("starting train loop...")
     for epoch in range(params['n_epochs']):
         running_loss = 0.0
-        idx = np.arange(len(training_set))
-        np.random.shuffle(idx)
-        for step in tqdm(idx, total=len(training_set)):
-            graph, labels = training_set[step]
+        batch_indexes = np.arange(len(training_set))
+        np.random.shuffle(batch_indexes)
+        for batch_id in tqdm(batch_indexes):
+            graph, labels = training_set[batch_id]
             torch_labels = torch.tensor([label_to_id.get(label, 0) for label in labels]).to(device)
-            mask = torch.zeros(graph.number_of_nodes(), dtype=torch.bool)
+
+            mask = torch.zeros(graph.number_of_nodes())
             idx_of_roots = cumsum([0] + graph.batch_num_nodes)[:-1]
             mask[idx_of_roots] = 1
+            root_indexes = torch.nonzero(mask).squeeze(1).to(device)
 
             model.zero_grad()
 
-            root_logits = model(graph, mask)
+            root_logits = model(graph, root_indexes)
 
             loss = criterion(root_logits, torch_labels)
             loss.backward()
