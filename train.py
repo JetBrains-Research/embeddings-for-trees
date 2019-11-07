@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
 from numpy import cumsum
+import numpy as np
 
 from data_workers.dataset import JavaDataset
 from model.model_factory import ModelFactory
@@ -48,7 +49,10 @@ def train(params: Dict) -> None:
     print("starting train loop...")
     for epoch in range(params['n_epochs']):
         running_loss = 0.0
-        for step, (graph, labels) in tqdm(enumerate(training_set), total=len(training_set)):
+        idx = np.arange(len(training_set))
+        np.random.shuffle(idx)
+        for step in tqdm(idx, total=len(training_set)):
+            graph, labels = training_set[step]
             torch_labels = torch.tensor([label_to_id.get(label, 0) for label in labels]).to(device)
             mask = torch.zeros(graph.number_of_nodes(), dtype=torch.bool)
             idx_of_roots = cumsum([0] + graph.batch_num_nodes)[:-1]
@@ -60,6 +64,9 @@ def train(params: Dict) -> None:
 
             loss = criterion(root_logits, torch_labels)
             loss.backward()
+
+            nn.utils.clip_grad_norm_(model.parameters(), 5)
+
             optimizer.step()
 
             running_loss += loss.item()

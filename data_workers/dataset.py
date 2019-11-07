@@ -4,7 +4,7 @@ from os.path import join as path_join
 from pickle import load as pkl_load
 from typing import Tuple, List
 
-from dgl import DGLGraph, unbatch, batch
+from dgl import BatchedDGLGraph, unbatch, batch
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
@@ -46,7 +46,7 @@ class JavaDataset(Dataset):
     def __len__(self) -> int:
         return self.n_batches
 
-    def __getitem__(self, item) -> Tuple[DGLGraph, List[str]]:
+    def __getitem__(self, item) -> Tuple[BatchedDGLGraph, List[str]]:
         batch_basename, batch_slice = self.batch_desc[item]
         with open(path_join(self.batched_graphs_path, batch_basename), 'rb') as pkl_file:
             cur_batched_graph = pkl_load(pkl_file)

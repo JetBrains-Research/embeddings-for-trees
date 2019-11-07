@@ -20,16 +20,13 @@ class TreeLSTMCell(nn.Module):
         return {'h': edges.src['h'], 'c': edges.src['c']}
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        h_sum = torch.sum(nodes.mailbox['h'], 1)
-        f = torch.sigmoid(
-            self.W_f(nodes.data['token_embeds']) + self.U_f(nodes.data['h']) + self.b_f
-        )
+        h_tilda = torch.sum(nodes.mailbox['h'], 1)
+        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['node_f'].unsqueeze(1))
         c = torch.sum(f * nodes.mailbox['c'], 1)
-        iou = self.W_iou(nodes.data['token_embeds']) + self.U_iou(h_sum) + self.b_iou
-        return {'iou': iou, 'c': c}
+        return {'Uh_tilda': self.U_iou(h_tilda), 'c': c}
 
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
-        iou = nodes.data['iou']
+        iou = nodes.data['node_iou'] + nodes.data['Uh_tilda']
         i, o, u = torch.chunk(iou, 3, 1)
         i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
         c = i * u + nodes.data['c']
@@ -52,9 +49,11 @@ class TreeLSTM(_IEncoder):
         batch.register_apply_node_func(self.cell.apply_node_func)
         # set hidden and memory state
         nodes_in_batch = batch.number_of_nodes()
-        batch.ndata['iou'] = self.cell.W_iou(batch.ndata['token_embeds']) + self.cell.b_iou
+        batch.ndata['node_iou'] = self.cell.W_iou(batch.ndata['token_embeds']) + self.cell.b_iou
+        batch.ndata['node_f'] = self.cell.W_f(batch.ndata['token_embeds']) + self.cell.b_f
         batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
         batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
+        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(self.device)
         # propagate
         dgl.prop_nodes_topo(batch)
         # compute hidden state of roots
