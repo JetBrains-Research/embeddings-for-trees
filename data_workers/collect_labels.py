@@ -20,7 +20,7 @@ def main(args: Namespace) -> None:
         'UNK': 0
     }
     label_to_id.update(
-        [(label, num + 1) for num, label in enumerate(labels.most_common(args.n_most_labels - 1))]
+        [(label[0], num + 1) for num, label in enumerate(labels.most_common(args.n_most_labels - 1))]
     )
     with open(args.output, 'wb') as pkl_file:
         pkl_dump(label_to_id, pkl_file)

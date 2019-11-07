@@ -24,6 +24,9 @@ class Model(nn.Module):
         logits = self.decoder(root_hidden_states)
         return logits
 
+    def predict(self, batch: Tensor) -> Tensor:
+        return self.decoder.predict(batch)
+
 
 class ModelFactory:
 

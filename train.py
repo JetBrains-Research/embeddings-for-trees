@@ -49,6 +49,8 @@ def train(params: Dict) -> None:
     print("starting train loop...")
     for epoch in range(params['n_epochs']):
         running_loss = 0.0
+        correct_per_epoch = 0
+        number_of_samples = 0
         batch_indexes = np.arange(len(training_set))
         np.random.shuffle(batch_indexes)
         for batch_id in tqdm(batch_indexes):
@@ -63,6 +65,7 @@ def train(params: Dict) -> None:
             model.zero_grad()
 
             root_logits = model(graph, root_indexes)
+            prediction = model.predict(root_logits)
 
             loss = criterion(root_logits, torch_labels)
             loss.backward()
@@ -72,7 +75,9 @@ def train(params: Dict) -> None:
             optimizer.step()
 
             running_loss += loss.item()
-            print(loss.item())
+            correct_per_epoch += prediction.eq(torch_labels).sum().item()
+            number_of_samples += torch_labels.shape[0]
+            print(loss.item(), correct_per_epoch / number_of_samples)
         print(f"epoch #{epoch} -- loss: {running_loss}")
 
 

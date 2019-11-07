@@ -13,6 +13,9 @@ class _IDecoder(nn.Module):
     def forward(self, batch: torch.Tensor) -> torch.Tensor:
         pass
 
+    def predict(self, batch: torch.Tensor) -> torch.Tensor:
+        pass
+
 
 class LinearDecoder(_IDecoder):
 
@@ -23,3 +26,7 @@ class LinearDecoder(_IDecoder):
     def forward(self, batch: torch.Tensor) -> torch.Tensor:
         logits = self.linear(batch)
         return logits
+
+    def predict(self, batch: torch.Tensor) -> torch.Tensor:
+        _, argmax = torch.max(batch, dim=1)
+        return argmax
