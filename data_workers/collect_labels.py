@@ -14,7 +14,7 @@ def main(args: Namespace) -> None:
     for batch in tqdm(batches):
         with open(path_join(args.path, batch), 'rb') as pkl_file:
             data = pkl_load(pkl_file)
-            labels.update(data['labels'])
+            labels.update(filter(lambda label: isinstance(label, str), data['labels']))
     print(f'total {len(labels)} labels, using {args.n_most_labels} most commons labels')
     label_to_id = {
         'UNK': 0

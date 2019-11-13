@@ -26,12 +26,14 @@
   "decoder": {
     "name": "LinearDecoder",
     "params": {
-      "in_size": 128
+      "in_size": 128,
+      "prediction_threshold": 0.1
     }
   },
 
   "batch_size": 32,
   "n_epochs": 10,
   "lr": 0.01,
-  "weight_decay": 1e-4
+  "weight_decay": 1e-4,
+  "clip_norm": 5
 }

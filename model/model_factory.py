@@ -17,15 +17,15 @@ class Model(nn.Module):
         self.encoder = encoder
         self.decoder = decoder
 
-    def forward(self, graph: BatchedDGLGraph, root_indexes: LongTensor) -> Tensor:
+    def forward(self, graph: BatchedDGLGraph, root_indexes: LongTensor, max_output_length: int) -> Tensor:
         embedded_graph = self.embedding(graph)
         node_hidden_states = self.encoder(embedded_graph)
         root_hidden_states = node_hidden_states[root_indexes]
-        logits = self.decoder(root_hidden_states)
+        logits = self.decoder(root_hidden_states, max_output_length)
         return logits
 
-    def predict(self, batch: Tensor) -> Tensor:
-        return self.decoder.predict(batch)
+    def predict(self, batch: Tensor, pad_token: int) -> Tensor:
+        return self.decoder.predict(batch, pad_token)
 
 
 class ModelFactory:
