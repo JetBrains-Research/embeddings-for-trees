@@ -41,16 +41,14 @@ def create_folder(path: str, is_clean: bool = True) -> None:
 
 
 def split_tokens_to_subtokens(
-        token_to_id: Dict, n_most_common: int = 1_000_000, delimiter: str = '|',
-        required_tokens: List = None
+        token_to_id: Dict, device: torch.device, n_most_common: int = -1,
+        delimiter: str = '|', required_tokens: List = None, return_ids: bool = False
 ) -> Tuple[Dict, Dict]:
     if required_tokens is None:
         required_tokens = ['UNK', 'START', 'END', 'PAD']
     subtoken_counter = Counter()
-    id_to_token = {}
     for token, i in token_to_id.items():
         subtoken_counter.update(token.split(delimiter))
-        id_to_token[i] = token
     for token in required_tokens:
         if token in subtoken_counter:
             del subtoken_counter[token]
@@ -58,11 +56,17 @@ def split_tokens_to_subtokens(
     subtoken_to_id.update(
         [(token, num) for num, token in enumerate(required_tokens)]
     )
+    if n_most_common == -1:
+        n_most_common = len(subtoken_counter)
     subtoken_to_id.update(
         [(label[0], num + len(required_tokens))
          for num, label in enumerate(subtoken_counter.most_common(n_most_common))]
     )
     token_to_subtoken = {}
     for token, i in token_to_id.items():
-        token_to_subtoken[token] = [subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]
+        cur_split = torch.tensor([subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]).to(device)
+        if return_ids:
+            token_to_subtoken[i] = cur_split
+        else:
+            token_to_subtoken[token] = cur_split
     return subtoken_to_id, token_to_subtoken

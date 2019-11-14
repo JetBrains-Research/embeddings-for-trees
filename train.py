@@ -24,15 +24,20 @@ def train(params: Dict) -> None:
 
     with open(params['paths']['labels_path'], 'rb') as pkl_file:
         label_to_id = pkl_load(pkl_file)
-    sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id)
+    sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
 
     with open(params['paths']['vocabulary_path'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
         token_to_id = vocabulary['token_to_id']
         type_to_id = vocabulary['type_to_id']
+    subtoken_to_id, token_to_subtoken = split_tokens_to_subtokens(
+        token_to_id, required_tokens=['UNK', 'METHOD_NAME', 'NAN', 'PAD'], return_ids=True, device=device
+    )
 
     # create models
-    params['embedding']['params']['token_vocab_size'] = len(token_to_id)
+    params['embedding']['params']['token_vocab_size'] = len(subtoken_to_id)
+    params['embedding']['params']['token_to_subtoken'] = token_to_subtoken
+    params['embedding']['params']['padding_index'] = subtoken_to_id['PAD']
     params['embedding']['params']['type_vocab_size'] = len(type_to_id)
     params['decoder']['params']['out_size'] = len(sublabel_to_id)
     model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
@@ -55,18 +60,17 @@ def train(params: Dict) -> None:
         for batch_id in tqdm(range(len(training_set))):
             model.train()
             graph, labels = training_set[batch_id]
+            graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
 
             # Create target tensor [max sequence length, batch size]
             # Each row starts with START token and ends with END token, after it padded with PAD token
-            labels_length = [len(label_to_sublabel[label]) + 2 for label in labels]
-            max_sublabel_length = max(labels_length)
-            torch_labels = torch.stack(
-                [torch.tensor(
-                    [sublabel_to_id['START']] + label_to_sublabel[label] +
-                    [sublabel_to_id['END']] + [sublabel_to_id['PAD']] * (max_sublabel_length - labels_length[i])
-                ) for i, label in enumerate(labels)],
-                dim=1
-            ).to(device)
+            sublabels_length = torch.tensor([label_to_sublabel[label].shape[0] for label in labels])
+            max_sublabel_length = sublabels_length.max()
+            torch_labels = torch.full((max_sublabel_length.item() + 2, len(labels)), sublabel_to_id['PAD'], dtype=torch.long).to(device)
+            torch_labels[0, :] = sublabel_to_id['START']
+            torch_labels[sublabels_length + 1, torch.arange(0, len(labels))] = sublabel_to_id['END']
+            for sample, label in enumerate(labels):
+                torch_labels[1:sublabels_length[sample] + 1, sample] = label_to_sublabel[label]
 
             # Find indexes of roots in batched graph
             mask = torch.zeros(graph.number_of_nodes())
@@ -89,7 +93,6 @@ def train(params: Dict) -> None:
 
             # Calculate metrics
             prediction = model.predict(root_logits)
-            print(prediction)
             epoch_loss += loss.item()
             number_of_samples += torch_labels.shape[0]
             cur_metrics = calculate_per_subtoken_statistic(
@@ -114,4 +117,3 @@ if __name__ == '__main__':
 
     with open(args.config) as config_file:
         train(json_load(config_file))
-

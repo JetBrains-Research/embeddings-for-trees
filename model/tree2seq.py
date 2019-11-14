@@ -5,7 +5,7 @@ import torch.nn as nn
 from dgl import BatchedDGLGraph
 
 from model.decoder import _IDecoder, LinearDecoder
-from model.embedding import _IEmbedding, TokenEmbedding
+from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding
 from model.encoder import _IEncoder
 from model.treelstm import TreeLSTM
 
@@ -60,7 +60,8 @@ class Tree2Seq(nn.Module):
 class ModelFactory:
 
     _embeddings = {
-        'TokenEmbedding': TokenEmbedding
+        'FullTokenEmbedding': FullTokenEmbedding,
+        'SubTokenEmbedding': SubTokenEmbedding
     }
     _encoders = {
         'TreeLSTM': TreeLSTM

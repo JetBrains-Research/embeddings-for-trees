@@ -9,7 +9,7 @@
   },
 
   "embedding": {
-    "name": "TokenEmbedding",
+    "name": "SubTokenEmbedding",
     "params": {
       "out_size": 128
     }
@@ -30,7 +30,7 @@
     }
   },
 
-  "batch_size": 32,
+  "batch_size": 8,
   "n_epochs": 10,
   "lr": 0.01,
   "weight_decay": 1e-4,
