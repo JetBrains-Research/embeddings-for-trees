@@ -9,9 +9,9 @@ from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
-from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK
+from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, convert_tokens_to_subtokens
 from utils.metrics import calculate_metrics
-from utils.training import train_on_batch
+from utils.training import train_on_batch, eval_on_batch
 
 
 def update_epoch_info(old_info: Dict, batch_info: Dict) -> Dict:
@@ -83,6 +83,8 @@ def train(params: Dict) -> None:
     for epoch in range(params['n_epochs']):
         train_epoch_info = None
         eval_epoch_info = None
+
+        # iterate over training set
         for batch_id in tqdm(range(len(training_set))):
             graph, labels = training_set[batch_id]
             graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
@@ -94,6 +96,18 @@ def train(params: Dict) -> None:
             if batch_id % params['verbosity_step'] == 0:
                 print_info(train_epoch_info, f"training batch #{batch_id}")
         print_info(train_epoch_info, f"training epoch #{epoch}")
+
+        # iterate over validation set
+        for batch_id in tqdm(range(len(validation_set))):
+            graph, labels = validation_set[batch_id]
+            graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+            eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
+            batch_info = eval_on_batch(
+                model, criterion, graph, labels,
+                eval_label_to_sublabel, sublabel_to_id, device
+            )
+            eval_epoch_info = update_epoch_info(eval_epoch_info, batch_info)
+        print_info(eval_epoch_info, f"evaluating epoch #{epoch}")
 
 
 if __name__ == '__main__':

@@ -76,3 +76,13 @@ def split_tokens_to_subtokens(
         else:
             token_to_subtoken[token] = cur_split
     return subtoken_to_id, token_to_subtoken
+
+
+def convert_tokens_to_subtokens(
+        tokens: List[str], subtoken_to_id: Dict, device: torch.Tensor, delimiter: str = '|'
+) -> Dict:
+    token_to_subtoken = {}
+    for token in tokens:
+        cur_split = torch.tensor([subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]).to(device)
+        token_to_subtoken[token] = cur_split
+    return token_to_subtoken
