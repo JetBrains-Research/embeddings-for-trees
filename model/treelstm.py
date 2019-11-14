@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import dgl
-from typing import Dict
+from typing import Dict, Tuple
 
 from model.encoder import _IEncoder
 
@@ -36,13 +36,12 @@ class TreeLSTMCell(nn.Module):
 
 class TreeLSTM(_IEncoder):
 
-    def __init__(self, x_size: int, h_size: int, using_device: torch.device, **kwargs) -> None:
+    def __init__(self, x_size: int, h_size: int, **kwargs) -> None:
         super().__init__()
         self.h_size = h_size
-        self.device = using_device
         self.cell = TreeLSTMCell(x_size, h_size)
 
-    def forward(self, batch: dgl.BatchedDGLGraph) -> torch.Tensor:
+    def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         # register function for message passing
         batch.register_message_func(self.cell.message_func)
         batch.register_reduce_func(self.cell.reduce_func)
@@ -51,11 +50,12 @@ class TreeLSTM(_IEncoder):
         nodes_in_batch = batch.number_of_nodes()
         batch.ndata['node_iou'] = self.cell.W_iou(batch.ndata['token_embeds']) + self.cell.b_iou
         batch.ndata['node_f'] = self.cell.W_f(batch.ndata['token_embeds']) + self.cell.b_f
-        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
-        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(self.device)
-        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(self.device)
+        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
+        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
+        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
         # propagate
         dgl.prop_nodes_topo(batch)
-        # get hidden state
+        # get encoded output
         h = batch.ndata.pop('h')
-        return h
+        c = batch.ndata.pop('c')
+        return h, c

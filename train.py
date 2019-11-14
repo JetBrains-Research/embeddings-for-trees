@@ -3,14 +3,13 @@ from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
 
-import numpy as np
 import torch
 import torch.nn as nn
 from numpy import cumsum
 from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
-from model.model_factory import ModelFactory
+from model.tree2seq import ModelFactory, Tree2Seq
 from utils.common import fix_seed, get_device, split_tokens_to_subtokens
 from utils.metrics import calculate_per_subtoken_statistic, calculate_metrics
 
@@ -35,9 +34,9 @@ def train(params: Dict) -> None:
     # create models
     params['embedding']['params']['token_vocab_size'] = len(token_to_id)
     params['embedding']['params']['type_vocab_size'] = len(type_to_id)
-    params['decoder']['params']['label_to_id'] = sublabel_to_id
-    model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'], device)
-    model: nn.Module = model_factory.construct_model()
+    params['decoder']['params']['out_size'] = len(sublabel_to_id)
+    model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
+    model: Tree2Seq = model_factory.construct_model(device)
 
     # create optimizer
     optimizer = torch.optim.RMSprop(
@@ -50,22 +49,23 @@ def train(params: Dict) -> None:
     # train loop
     print("starting train loop...")
     for epoch in range(params['n_epochs']):
-        running_loss = 0.0
+        epoch_loss = 0.0
         true_positive = false_positive = false_negative = 0
         number_of_samples = 0
         for batch_id in tqdm(range(len(training_set))):
             model.train()
             graph, labels = training_set[batch_id]
 
-            # Create target tensor [BATCH_SIZE, MAX_SUBLABELS_LENGTH]
+            # Create target tensor [max sequence length, batch size]
             # Each row starts with START token and ends with END token, after it padded with PAD token
             labels_length = [len(label_to_sublabel[label]) + 2 for label in labels]
             max_sublabel_length = max(labels_length)
-            torch_labels = torch.cat(
-                [torch.tensor([
+            torch_labels = torch.stack(
+                [torch.tensor(
                     [sublabel_to_id['START']] + label_to_sublabel[label] +
                     [sublabel_to_id['END']] + [sublabel_to_id['PAD']] * (max_sublabel_length - labels_length[i])
-                ]) for i, label in enumerate(labels)]
+                ) for i, label in enumerate(labels)],
+                dim=1
             ).to(device)
 
             # Find indexes of roots in batched graph
@@ -76,22 +76,25 @@ def train(params: Dict) -> None:
 
             # Model step
             model.zero_grad()
-            root_logits = model(graph, root_indexes, max_sublabel_length)
+            root_logits = model(graph, root_indexes, torch_labels, device)
+            root_logits = root_logits[1:]
+            torch_labels = torch_labels[1:]
             loss = criterion(
-                root_logits[:, :, 1:],
-                torch_labels[:, 1:]
+                root_logits.view(-1, root_logits.shape[-1]),
+                torch_labels.view(-1)
             )
             loss.backward()
             nn.utils.clip_grad_norm_(model.parameters(), params['clip_norm'])
             optimizer.step()
 
             # Calculate metrics
-            prediction = model.predict(root_logits, sublabel_to_id['PAD'])
-            running_loss += loss.item()
+            prediction = model.predict(root_logits)
+            print(prediction)
+            epoch_loss += loss.item()
             number_of_samples += torch_labels.shape[0]
             cur_metrics = calculate_per_subtoken_statistic(
                 torch_labels, prediction,
-                [sublabel_to_id['UNK'], sublabel_to_id['PAD'], sublabel_to_id['START'], sublabel_to_id['END']]
+                [sublabel_to_id['UNK'], sublabel_to_id['PAD'], sublabel_to_id['END']]
             )
             true_positive += cur_metrics[0]
             false_positive += cur_metrics[1]
@@ -100,7 +103,7 @@ def train(params: Dict) -> None:
 
         precision, recall, f1_score = calculate_metrics(true_positive, false_positive, false_negative)
         print(f"epoch #{epoch} -- "
-              f"loss: {running_loss / number_of_samples}, "
+              f"loss: {epoch_loss / number_of_samples}, "
               f"precision: {precision}, recall: {recall}, f1: {f1_score}")
 
 

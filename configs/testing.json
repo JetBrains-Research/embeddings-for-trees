@@ -26,8 +26,7 @@
   "decoder": {
     "name": "LinearDecoder",
     "params": {
-      "in_size": 128,
-      "prediction_threshold": 0.1
+      "in_size": 128
     }
   },
 

@@ -10,5 +10,5 @@ class _IEncoder(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, graph: dgl.BatchedDGLGraph) -> torch.Tensor:
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
         pass
