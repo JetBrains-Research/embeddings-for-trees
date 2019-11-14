@@ -1,10 +1,11 @@
-from torch import Tensor
-from typing import Tuple, List
+from typing import List, Dict
+
+import torch
 
 
-def calculate_per_subtoken_statistic(
-        original_tokens: Tensor, predicted_tokens: Tensor, skipping_tokens: List
-) -> Tuple[int, int, int]:
+def calculate_batch_statistics(
+        original_tokens: torch.Tensor, predicted_tokens: torch.Tensor, skipping_tokens: List
+) -> Dict:
     """Calculate The TP, FP, and FN for given tensors with original and predicted tokens.
     Each tensor is a 2d matrix, where each row contain information about corresponding subtokens.
 
@@ -30,17 +31,22 @@ def calculate_per_subtoken_statistic(
             if subtoken not in predicted_token:
                 false_negative += 1
 
-    return true_positive, false_positive, false_negative
+    return {
+        'true_positive': true_positive,
+        'false_positive': false_positive,
+        'false_negative': false_negative
+    }
 
 
-def calculate_metrics(true_positive: int, false_positive: int, false_negative: int) -> Tuple[float, float, float]:
+def calculate_metrics(statistics: Dict) -> Dict:
     """Calculate precision, recall, and f1 based on a TP, FP, FN
 
-    :param true_positive:
-    :param false_positive:
-    :param false_negative:
-    :return: metrics for given statistic
+    :param statistics: dict with statistics
+    :return: metrics for given statistics
     """
+    true_positive = statistics['true_positive']
+    false_positive = statistics['false_positive']
+    false_negative = statistics['false_negative']
     if true_positive + false_positive > 0:
         precision = true_positive / (true_positive + false_positive)
     else:
@@ -53,4 +59,8 @@ def calculate_metrics(true_positive: int, false_positive: int, false_negative: i
         f1_score = 2 * precision * recall / (precision + recall)
     else:
         f1_score = 0.0
-    return precision, recall, f1_score
+    return {
+        'precision': precision,
+        'recall': recall,
+        'f1_score': f1_score
+    }

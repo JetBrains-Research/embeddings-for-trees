@@ -5,13 +5,37 @@ from typing import Dict
 
 import torch
 import torch.nn as nn
-from numpy import cumsum
 from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
-from utils.common import fix_seed, get_device, split_tokens_to_subtokens
-from utils.metrics import calculate_per_subtoken_statistic, calculate_metrics
+from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK
+from utils.metrics import calculate_metrics
+from utils.training import train_on_batch
+
+
+def update_epoch_info(old_info: Dict, batch_info: Dict) -> Dict:
+    """Updating epoch info based on batch info,
+    if epoch info is None use only batch info (init)
+
+    :param old_info: dict with epoch info or None
+    :param batch_info: batch info
+    :return: new epoch info
+    """
+    if old_info is None:
+        return batch_info
+    for key in ['loss', 'batch_count']:
+        old_info[key] += batch_info[key]
+    for statistic in ['true_positive', 'false_positive', 'false_negative']:
+        old_info['statistics'][statistic] += batch_info['statistics'][statistic]
+    return old_info
+
+
+def print_info(info: Dict, prefix: str):
+    metrics = calculate_metrics(info['statistics'])
+    print(f"{prefix}:\n"
+          f"loss: {info['loss'] / info['batch_count']}\n"
+          f"{', '.join(f'{key}: {value}' for key, value in metrics.items())}")
 
 
 def train(params: Dict) -> None:
@@ -22,22 +46,25 @@ def train(params: Dict) -> None:
     training_set = JavaDataset(params['paths']['train_batches'], params['batch_size'], True)
     validation_set = JavaDataset(params['paths']['validation_batches'], params['batch_size'], True)
 
+    print('processing labels...')
     with open(params['paths']['labels_path'], 'rb') as pkl_file:
         label_to_id = pkl_load(pkl_file)
     sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
 
+    print('processing vocabulary...')
     with open(params['paths']['vocabulary_path'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
         token_to_id = vocabulary['token_to_id']
         type_to_id = vocabulary['type_to_id']
     subtoken_to_id, token_to_subtoken = split_tokens_to_subtokens(
-        token_to_id, required_tokens=['UNK', 'METHOD_NAME', 'NAN', 'PAD'], return_ids=True, device=device
+        token_to_id, required_tokens=[UNK, PAD, 'METHOD_NAME', 'NAN'], return_ids=True, device=device
     )
 
+    print('initializing model set up...')
     # create models
     params['embedding']['params']['token_vocab_size'] = len(subtoken_to_id)
     params['embedding']['params']['token_to_subtoken'] = token_to_subtoken
-    params['embedding']['params']['padding_index'] = subtoken_to_id['PAD']
+    params['embedding']['params']['padding_index'] = subtoken_to_id[PAD]
     params['embedding']['params']['type_vocab_size'] = len(type_to_id)
     params['decoder']['params']['out_size'] = len(sublabel_to_id)
     model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
@@ -49,65 +76,24 @@ def train(params: Dict) -> None:
     )
 
     # define loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id['PAD']).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id[PAD]).to(device)
 
     # train loop
-    print("starting train loop...")
+    print("ok, let's train it")
     for epoch in range(params['n_epochs']):
-        epoch_loss = 0.0
-        true_positive = false_positive = false_negative = 0
-        number_of_samples = 0
+        train_epoch_info = None
+        eval_epoch_info = None
         for batch_id in tqdm(range(len(training_set))):
-            model.train()
             graph, labels = training_set[batch_id]
             graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-
-            # Create target tensor [max sequence length, batch size]
-            # Each row starts with START token and ends with END token, after it padded with PAD token
-            sublabels_length = torch.tensor([label_to_sublabel[label].shape[0] for label in labels])
-            max_sublabel_length = sublabels_length.max()
-            torch_labels = torch.full((max_sublabel_length.item() + 2, len(labels)), sublabel_to_id['PAD'], dtype=torch.long).to(device)
-            torch_labels[0, :] = sublabel_to_id['START']
-            torch_labels[sublabels_length + 1, torch.arange(0, len(labels))] = sublabel_to_id['END']
-            for sample, label in enumerate(labels):
-                torch_labels[1:sublabels_length[sample] + 1, sample] = label_to_sublabel[label]
-
-            # Find indexes of roots in batched graph
-            mask = torch.zeros(graph.number_of_nodes())
-            idx_of_roots = cumsum([0] + graph.batch_num_nodes)[:-1]
-            mask[idx_of_roots] = 1
-            root_indexes = torch.nonzero(mask).squeeze(1).to(device)
-
-            # Model step
-            model.zero_grad()
-            root_logits = model(graph, root_indexes, torch_labels, device)
-            root_logits = root_logits[1:]
-            torch_labels = torch_labels[1:]
-            loss = criterion(
-                root_logits.view(-1, root_logits.shape[-1]),
-                torch_labels.view(-1)
+            batch_info = train_on_batch(
+                model, criterion, optimizer, graph, labels,
+                label_to_sublabel, sublabel_to_id, params, device
             )
-            loss.backward()
-            nn.utils.clip_grad_norm_(model.parameters(), params['clip_norm'])
-            optimizer.step()
-
-            # Calculate metrics
-            prediction = model.predict(root_logits)
-            epoch_loss += loss.item()
-            number_of_samples += torch_labels.shape[0]
-            cur_metrics = calculate_per_subtoken_statistic(
-                torch_labels, prediction,
-                [sublabel_to_id['UNK'], sublabel_to_id['PAD'], sublabel_to_id['END']]
-            )
-            true_positive += cur_metrics[0]
-            false_positive += cur_metrics[1]
-            false_negative += cur_metrics[2]
-            print(loss.item(), calculate_metrics(*cur_metrics))
-
-        precision, recall, f1_score = calculate_metrics(true_positive, false_positive, false_negative)
-        print(f"epoch #{epoch} -- "
-              f"loss: {epoch_loss / number_of_samples}, "
-              f"precision: {precision}, recall: {recall}, f1: {f1_score}")
+            train_epoch_info = update_epoch_info(train_epoch_info, batch_info)
+            if batch_id % params['verbosity_step'] == 0:
+                print_info(train_epoch_info, f"training batch #{batch_id}")
+        print_info(train_epoch_info, f"training epoch #{epoch}")
 
 
 if __name__ == '__main__':

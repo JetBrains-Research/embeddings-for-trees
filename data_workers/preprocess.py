@@ -16,7 +16,7 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
-from utils.common import extract_tar_gz, create_folder
+from utils.common import extract_tar_gz, create_folder, UNK
 from utils.s3_worker import upload_file, download_file
 
 data_folder = 'data'
@@ -167,7 +167,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
     print(f"found {len(token_vocabulary)} tokens, using {n_most_common_tokens} from it")
     print(f"found {len(type_vocabulary)} types, using all of them")
     token_to_id = {
-        'UNK': 0,
+        UNK: 0,
         'METHOD_NAME': 1,
         'NAN': 2
     }
@@ -175,7 +175,7 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
         [(token[0], num + 3) for num, token in enumerate(token_vocabulary.most_common(n_most_common_tokens))]
     )
     type_to_id = {
-        'UNK': 0
+        UNK: 0
     }
     type_to_id.update([(node_type, num + 1) for num, node_type in enumerate(type_vocabulary)])
     return token_to_id, type_to_id

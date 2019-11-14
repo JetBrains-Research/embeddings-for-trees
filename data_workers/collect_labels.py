@@ -7,6 +7,8 @@ from pickle import load as pkl_load
 
 from tqdm.auto import tqdm
 
+from utils.common import UNK
+
 
 def main(args: Namespace) -> None:
     labels = Counter()
@@ -17,7 +19,7 @@ def main(args: Namespace) -> None:
             labels.update(filter(lambda label: isinstance(label, str), data['labels']))
     print(f'total {len(labels)} labels, using {args.n_most_labels} most commons labels')
     label_to_id = {
-        'UNK': 0
+        UNK: 0
     }
     label_to_id.update(
         [(label[0], num + 1) for num, label in enumerate(labels.most_common(args.n_most_labels - 1))]

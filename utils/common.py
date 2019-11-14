@@ -10,6 +10,12 @@ import torch
 from tqdm.auto import tqdm
 
 
+SOS = '<SOS>'
+EOS = '<EOS>'
+PAD = '<PAD>'
+UNK = '<UNK>'
+
+
 def get_device() -> torch.device:
     # CUDA for PyTorch
     use_cuda = torch.cuda.is_available()
@@ -45,7 +51,7 @@ def split_tokens_to_subtokens(
         delimiter: str = '|', required_tokens: List = None, return_ids: bool = False
 ) -> Tuple[Dict, Dict]:
     if required_tokens is None:
-        required_tokens = ['UNK', 'START', 'END', 'PAD']
+        required_tokens = [UNK, SOS, EOS, PAD]
     subtoken_counter = Counter()
     for token, i in token_to_id.items():
         subtoken_counter.update(token.split(delimiter))
