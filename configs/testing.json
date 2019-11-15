@@ -24,9 +24,10 @@
   },
 
   "decoder": {
-    "name": "LinearDecoder",
+    "name": "LSTMDecoder",
     "params": {
-      "in_size": 128
+      "embedding_size": 128,
+      "hidden_size": 128
     }
   },
 

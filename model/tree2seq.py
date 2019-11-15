@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from dgl import BatchedDGLGraph
 
-from model.decoder import _IDecoder, LinearDecoder
+from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding
 from model.encoder import _IEncoder
 from model.treelstm import TreeLSTM
@@ -29,14 +29,17 @@ class Tree2Seq(nn.Module):
         :return: [length of the longest sequence, batch size, number of classes] logits for each element in sequence
         """
         embedded_graph = self.embedding(graph)
+        # [number of nodes, hidden state]
         node_hidden_states, node_memory_cells = self.encoder(embedded_graph, device)
-        root_hidden_states = node_hidden_states[root_indexes]
-        root_memory_cells = node_memory_cells[root_indexes]
+        # [1, batch size, hidden state] (LSTM input requires)
+        root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
+        root_memory_cells = node_memory_cells[root_indexes].unsqueeze(0)
 
         max_length, batch_size = ground_truth.shape
+        # [length of the longest sequence, batch size, number of classes]
         outputs = torch.zeros(max_length, batch_size, self.decoder.out_size).to(device)
 
-        current_input = ground_truth[0:]
+        current_input = ground_truth[0]
         for step in range(1, max_length):
             output, root_hidden_states, root_memory_cells =\
                 self.decoder(current_input, root_hidden_states, root_memory_cells)
@@ -67,7 +70,8 @@ class ModelFactory:
         'TreeLSTM': TreeLSTM
     }
     _decoders = {
-        'LinearDecoder': LinearDecoder
+        'LinearDecoder': LinearDecoder,
+        'LSTMDecoder': LSTMDecoder
     }
 
     def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict):

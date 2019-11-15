@@ -67,6 +67,7 @@ def train(params: Dict) -> None:
     params['embedding']['params']['padding_index'] = subtoken_to_id[PAD]
     params['embedding']['params']['type_vocab_size'] = len(type_to_id)
     params['decoder']['params']['out_size'] = len(sublabel_to_id)
+    params['decoder']['params']['padding_index'] = sublabel_to_id[PAD]
     model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
     model: Tree2Seq = model_factory.construct_model(device)
 
