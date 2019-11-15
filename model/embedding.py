@@ -13,7 +13,7 @@ class _IEmbedding(nn.Module):
     def __init__(self) -> None:
         super().__init__()
 
-    def forward(self, graph: BatchedDGLGraph) -> BatchedDGLGraph:
+    def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
         return graph
 
 
@@ -23,7 +23,7 @@ class FullTokenEmbedding(_IEmbedding):
         self.padding_index = padding_index
         self.token_embedding = nn.Embedding(token_vocab_size, out_size, padding_idx=self.padding_index)
 
-    def forward(self, graph: BatchedDGLGraph) -> BatchedDGLGraph:
+    def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
         graph.ndata['token_embeds'] = self.token_embedding(graph.ndata['token_id'])
         return graph
 
@@ -38,14 +38,17 @@ class SubTokenEmbedding(_IEmbedding):
         self.padding_index = padding_index
         self.subtoken_embedding = nn.Embedding(self.vocab_size, self.out_size, padding_idx=self.padding_index)
 
-    def forward(self, graph: BatchedDGLGraph) -> BatchedDGLGraph:
+    def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
         number_of_nodes = graph.number_of_nodes()
         subtoken_lengths = torch.tensor([
             self.token_to_subtoken[token.item()].shape[0] for token in graph.ndata['token_id']
         ])
         max_subtoken_length = subtoken_lengths.max()
 
-        subtokens = torch.full((number_of_nodes, max_subtoken_length.item()), self.padding_index, dtype=torch.long)
+        subtokens = torch.full(
+            (number_of_nodes, max_subtoken_length.item()),
+            self.padding_index, dtype=torch.long, device=device
+        )
         for node in range(number_of_nodes):
             token_id = graph.nodes[node].data['token_id'].item()
             subtokens[node, :subtoken_lengths[node]] = self.token_to_subtoken[token_id]

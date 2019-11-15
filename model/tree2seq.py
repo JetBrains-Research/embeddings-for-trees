@@ -28,7 +28,7 @@ class Tree2Seq(nn.Module):
         :param device: torch device
         :return: [length of the longest sequence, batch size, number of classes] logits for each element in sequence
         """
-        embedded_graph = self.embedding(graph)
+        embedded_graph = self.embedding(graph, device)
         # [number of nodes, hidden state]
         node_hidden_states, node_memory_cells = self.encoder(embedded_graph, device)
         # [1, batch size, hidden state] (LSTM input requires)
