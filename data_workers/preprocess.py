@@ -210,19 +210,21 @@ def main(args: Namespace) -> None:
             holdout: os.path.join(data_path, f'{holdout}_asts') for holdout in holdout_folders
         }
 
+    vocabulary_path = os.path.join(data_path, vocabulary_name)
+    if args.collect_vocabulary:
+        token_to_id, type_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
+        with open(vocabulary_path, 'wb') as pkl_file:
+            pkl_dump({'token_to_id': token_to_id, 'type_to_id': type_to_id}, pkl_file)
+
     if args.convert:
         if not all([os.path.exists(path[1]) for path in holdout_ast_paths.items()]):
             raise RuntimeError("build ast before converting it via --build_ast arg")
-        vocabulary_path = os.path.join(data_path, vocabulary_name)
         if not os.path.exists(vocabulary_path):
-            token_to_id, type_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
-            with open(vocabulary_path, 'wb') as pkl_file:
-                pkl_dump({'token_to_id': token_to_id, 'type_to_id': type_to_id}, pkl_file)
-        else:
-            with open(vocabulary_path, 'rb') as pkl_file:
-                pkl_data = pkl_load(pkl_file)
-                token_to_id = pkl_data['token_to_id']
-                type_to_id = pkl_data['type_to_id']
+            raise RuntimeError("collect vocabulary before converting it via --build_ast arg")
+        with open(vocabulary_path, 'rb') as pkl_file:
+            pkl_data = pkl_load(pkl_file)
+            token_to_id = pkl_data['token_to_id']
+            type_to_id = pkl_data['type_to_id']
 
         holdout_preprocessed_paths = {}
         for holdout in holdout_folders:
@@ -266,6 +268,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('dataset', choices=list(dataset_mapping.keys()))
     arg_parser.add_argument('--download', action='store_true')
     arg_parser.add_argument('--build_ast', action='store_true')
+    arg_parser.add_argument('--collect_vocabulary', action='store_true')
     arg_parser.add_argument('--convert', action='store_true')
     arg_parser.add_argument('--upload', action='store_true')
     arg_parser.add_argument('--download_preprocessed', action='store_true')
