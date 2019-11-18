@@ -52,9 +52,9 @@ def download_dataset(name: str, download_path: str, block_size: int = 1024) -> s
     return file_path
 
 
-def extract_dataset(file_path: str, extract_path: str, folder_name: str) -> [str]:
-    extract_tar_gz(file_path, os.path.join(extract_path, folder_name))
-    return [os.path.join(extract_path, folder_name, folder) for folder in holdout_folders]
+def extract_dataset(file_path: str, extract_path: str, dataset_name: str) -> [str]:
+    extract_tar_gz(file_path, extract_path)
+    return [os.path.join(extract_path, dataset_name, folder) for folder in holdout_folders]
 
 
 def build_project_asts(project_path: str, output_path: str) -> bool:
