@@ -131,8 +131,8 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
 
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
-        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
+        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id[token])
+        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id[cur_type])
 
         description_groups = current_description.groupby('dot_file')
         current_description = pd.concat(
@@ -152,7 +152,7 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
     return output_holdout_path
 
 
-def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -> Tuple[Dict, Dict]:
+def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
     token_vocabulary = Counter()
     type_vocabulary = Counter()
     projects = os.listdir(train_path)
@@ -164,20 +164,16 @@ def collect_vocabulary(train_path: str, n_most_common_tokens: int = 1_000_000) -
         type_vocabulary.update(project_description['type'].values)
     del token_vocabulary['METHOD_NAME']
     del token_vocabulary['NAN']
-    print(f"found {len(token_vocabulary)} tokens, using {n_most_common_tokens} from it")
-    print(f"found {len(type_vocabulary)} types, using all of them")
-    token_to_id = {
-        UNK: 0,
-        'METHOD_NAME': 1,
-        'NAN': 2
-    }
+    print(f"found {len(token_vocabulary)} tokens")
+    print(f"found {len(type_vocabulary)} types")
+    token_to_id = dict()
     token_to_id.update(
-        [(token[0], num + 3) for num, token in enumerate(token_vocabulary.most_common(n_most_common_tokens))]
+        [(token, num) for num, token in enumerate(token_vocabulary)]
     )
-    type_to_id = {
-        UNK: 0
-    }
-    type_to_id.update([(node_type, num + 1) for num, node_type in enumerate(type_vocabulary)])
+    type_to_id = dict()
+    type_to_id.update(
+        [(node_type, num) for num, node_type in enumerate(type_vocabulary)]
+    )
     return token_to_id, type_to_id
 
 
