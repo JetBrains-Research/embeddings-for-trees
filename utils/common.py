@@ -43,7 +43,8 @@ def extract_tar_gz(tar_path: str, extract_path: str) -> None:
 def create_folder(path: str, is_clean: bool = True) -> None:
     if is_clean and exists(path):
         rmtree(path)
-    mkdir(path)
+    if not exists(path):
+        mkdir(path)
 
 
 def split_tokens_to_subtokens(
