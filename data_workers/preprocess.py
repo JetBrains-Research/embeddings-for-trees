@@ -82,6 +82,15 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
         create_folder(output_project_path)
         if build_project_asts(project_path, output_project_path):
             successful_builds += 1
+            desc_path = os.path.join(output_project_path, 'java', 'description.csv')
+            project_description = pd.read_csv(desc_path)
+            bad_labels_mask = project_description['label'].isna()
+            filenames = project_description[bad_labels_mask]['dot_file'].unique()
+            for filename in filenames:
+                filepath = os.path.join(output_project_path, 'java', 'asts', filename)
+                os.remove(filepath)
+            project_description.drop(bad_labels_mask.index, inplace=True)
+            project_description.to_csv(desc_path, index=False)
     print(f"create asts for {successful_builds}/{len(projects)} {holdout_name} projects")
     return output_folder_path
 
