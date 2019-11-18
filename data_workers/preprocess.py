@@ -16,7 +16,7 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
-from utils.common import extract_tar_gz, create_folder, UNK
+from utils.common import extract_tar_gz, create_folder
 from utils.s3_worker import upload_file, download_file
 
 data_folder = 'data'
@@ -180,8 +180,8 @@ def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
 def main(args: Namespace) -> None:
     dataset_name = dataset_mapping[args.dataset]
     data_path = os.path.join(data_folder, dataset_name)
-    create_folder(data_folder)
-    create_folder(data_path)
+    create_folder(data_folder, is_clean=False)
+    create_folder(data_path, is_clean=False)
 
     if args.download:
         print(f"download {dataset_name} dataset...")
