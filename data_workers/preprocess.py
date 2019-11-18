@@ -89,7 +89,7 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
             for filename in filenames:
                 filepath = os.path.join(output_project_path, 'java', 'asts', filename)
                 os.remove(filepath)
-            project_description.drop(bad_labels_mask.index, inplace=True)
+            project_description.dropna(subset=['label'], inplace=True)
             project_description.to_csv(desc_path, index=False)
     print(f"create asts for {successful_builds}/{len(projects)} {holdout_name} projects")
     return output_folder_path
