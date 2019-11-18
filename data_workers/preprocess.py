@@ -171,8 +171,6 @@ def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
         project_description['token'].fillna('NAN', inplace=True)
         token_vocabulary.update(project_description['token'].values)
         type_vocabulary.update(project_description['type'].values)
-    del token_vocabulary['METHOD_NAME']
-    del token_vocabulary['NAN']
     print(f"found {len(token_vocabulary)} tokens")
     print(f"found {len(type_vocabulary)} types")
     token_to_id = dict()
