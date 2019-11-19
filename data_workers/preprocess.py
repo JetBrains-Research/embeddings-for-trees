@@ -16,7 +16,7 @@ from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
-from utils.common import extract_tar_gz, create_folder
+from utils.common import extract_tar_gz, create_folder, UNK
 from utils.s3_worker import upload_file, download_file
 
 data_folder = 'data'
@@ -140,8 +140,8 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
 
         current_description = collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id[token])
-        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id[cur_type])
+        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
+        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
 
         description_groups = current_description.groupby('dot_file')
         current_description = pd.concat(
@@ -173,13 +173,17 @@ def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
         type_vocabulary.update(project_description['type'].values)
     print(f"found {len(token_vocabulary)} tokens")
     print(f"found {len(type_vocabulary)} types")
-    token_to_id = dict()
+    token_to_id = {
+        UNK: 0
+    }
     token_to_id.update(
-        [(token, num) for num, token in enumerate(token_vocabulary)]
+        [(token, num + 1) for num, token in enumerate(token_vocabulary)]
     )
-    type_to_id = dict()
+    type_to_id = {
+        UNK: 0
+    }
     type_to_id.update(
-        [(node_type, num) for num, node_type in enumerate(type_vocabulary)]
+        [(node_type, num + 1) for num, node_type in enumerate(type_vocabulary)]
     )
     return token_to_id, type_to_id
 
