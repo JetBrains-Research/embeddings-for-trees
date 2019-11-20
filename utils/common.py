@@ -80,7 +80,7 @@ def split_tokens_to_subtokens(
 
 
 def convert_tokens_to_subtokens(
-        tokens: List[str], subtoken_to_id: Dict, device: torch.Tensor, delimiter: str = '|'
+        tokens: List[str], subtoken_to_id: Dict, device: torch.device, delimiter: str = '|'
 ) -> Dict:
     token_to_subtoken = {}
     for token in tokens:
