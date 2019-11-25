@@ -15,12 +15,15 @@ class _IDecoder(nn.Module):
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Predict next token based on previous state and previous token
+        """Make decoder step for given token id and previous states
 
-        :param input_token_id: [Batch size] -- previous token's ids
-        :param root_hidden_states: [Batch size, hidden state] -- hidden states from an encoder or previous steps
-        :param root_memory_cells: [Batch size, hidden state] -- memory cells from an encoder or previous steps
-        :return: [Batch size, number of classes] -- logits for each token in batch
+        :param input_token_id: [batch size]
+        :param root_hidden_states: [1, batch size, hidden state]
+        :param root_memory_cells: [1, batch size, hidden state]
+        :return: Tuple[
+            output: [batch size, number of classes]
+            new hidden state, new memory cell
+        ]
         """
         raise NotImplementedError
 
@@ -54,16 +57,6 @@ class LSTMDecoder(_IDecoder):
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Make LSTM step for given token id and previous states
-
-        :param input_token_id: [batch size]
-        :param root_hidden_states: [1, batch size, hidden state]
-        :param root_memory_cells: [1, batch size, hidden state]
-        :return: Tuple[
-            output: [batch size, number of classes]
-            new hidden state, new memory cell
-        ]
-        """
         # [1, batch size, embedding size]
         embedded = self.embedding(
             input_token_id.unsqueeze(0)

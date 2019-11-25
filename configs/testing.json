@@ -24,10 +24,16 @@
   },
 
   "decoder": {
-    "name": "LSTMDecoder",
+    "name": "LSTMAttentionDecoder",
     "params": {
       "embedding_size": 128,
       "hidden_size": 128
+    },
+    "attention": {
+      "name": "LuongConcatAttention",
+      "params": {
+        "hidden_size": 128
+      }
     }
   },
 

@@ -1,9 +1,11 @@
-from typing import Dict
+from typing import Dict, Union
 
 import torch
 import torch.nn as nn
 from dgl import BatchedDGLGraph
 
+from model.attention import LuongConcatAttention
+from model.attention_decoder import LSTMAttentionDecoder, _IAttentionDecoder
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding
 from model.encoder import _IEncoder
@@ -11,11 +13,13 @@ from model.treelstm import TreeLSTM
 
 
 class Tree2Seq(nn.Module):
-    def __init__(self, embedding: _IEmbedding, encoder: _IEncoder, decoder: _IDecoder) -> None:
+    def __init__(self, embedding: _IEmbedding, encoder: _IEncoder,
+                 decoder: Union[_IDecoder, _IAttentionDecoder], using_attention: bool) -> None:
         super().__init__()
         self.embedding = embedding
         self.encoder = encoder
         self.decoder = decoder
+        self.using_attention = using_attention
 
     def forward(self,
                 graph: BatchedDGLGraph, root_indexes: torch.LongTensor,
@@ -39,10 +43,28 @@ class Tree2Seq(nn.Module):
         # [length of the longest sequence, batch size, number of classes]
         outputs = torch.zeros(max_length, batch_size, self.decoder.out_size).to(device)
 
+        encoder_outputs = None
+        if self.using_attention:
+            start_of_tree = root_indexes.tolist()
+            end_of_tree = start_of_tree[1:] + [node_hidden_states.shape[0]]
+            hidden_states_per_tree = [
+                node_hidden_states[start:end] for start, end in zip(start_of_tree, end_of_tree)
+            ]
+            number_of_nodes = [tree_hs.shape[0] for tree_hs in hidden_states_per_tree]
+            max_number_of_nodes = max(number_of_nodes)
+            encoder_outputs = torch.zeros(batch_size, max_number_of_nodes, self.decoder.hidden_size).to(device)
+            for num, (tree_hs, tree_sz) in enumerate(zip(hidden_states_per_tree, number_of_nodes)):
+                encoder_outputs[num, :tree_sz] = tree_hs
+
         current_input = ground_truth[0]
         for step in range(1, max_length):
-            output, root_hidden_states, root_memory_cells =\
-                self.decoder(current_input, root_hidden_states, root_memory_cells)
+
+            if self.using_attention:
+                output, root_hidden_states, root_memory_cells = \
+                    self.decoder(current_input, root_hidden_states, root_memory_cells, encoder_outputs)
+            else:
+                output, root_hidden_states, root_memory_cells = \
+                    self.decoder(current_input, root_hidden_states, root_memory_cells)
 
             outputs[step] = output
             current_input = ground_truth[step]
@@ -61,7 +83,6 @@ class Tree2Seq(nn.Module):
 
 
 class ModelFactory:
-
     _embeddings = {
         'FullTokenEmbedding': FullTokenEmbedding,
         'SubTokenEmbedding': SubTokenEmbedding
@@ -71,7 +92,11 @@ class ModelFactory:
     }
     _decoders = {
         'LinearDecoder': LinearDecoder,
-        'LSTMDecoder': LSTMDecoder
+        'LSTMDecoder': LSTMDecoder,
+        'LSTMAttentionDecoder': LSTMAttentionDecoder
+    }
+    _attentions = {
+        'LuongConcatAttention': LuongConcatAttention
     }
 
     def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict):
@@ -81,6 +106,11 @@ class ModelFactory:
 
         self.embedding = self._get_module(self.embedding_info['name'], self._embeddings)
         self.encoder = self._get_module(self.encoder_info['name'], self._encoders)
+
+        self.using_attention = 'attention' in self.decoder_info
+        if self.using_attention:
+            self.attention_info = self.decoder_info['attention']
+            self.attention = self._get_module(self.attention_info['name'], self._attentions)
         self.decoder = self._get_module(self.decoder_info['name'], self._decoders)
 
     @staticmethod
@@ -90,8 +120,14 @@ class ModelFactory:
         return modules_dict[module_name]
 
     def construct_model(self, device: torch.device) -> Tree2Seq:
+        if self.using_attention:
+            attention_part = self.attention(**self.attention_info['params'])
+            decoder_part = self.decoder(**self.decoder_info['params'], attention=attention_part)
+        else:
+            decoder_part = self.decoder(**self.decoder_info['params'])
         return Tree2Seq(
             self.embedding(**self.embedding_info['params']),
             self.encoder(**self.encoder_info['params']),
-            self.decoder(**self.decoder_info['params']),
+            decoder_part,
+            self.using_attention
         ).to(device)
