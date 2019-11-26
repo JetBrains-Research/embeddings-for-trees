@@ -30,7 +30,7 @@ class _IAttentionDecoder(nn.Module):
 
 class LSTMAttentionDecoder(_IAttentionDecoder):
     def __init__(self, embedding_size: int, hidden_size: int, out_size: int,
-                 padding_index: int, attention: _IAttention):
+                 padding_index: int, attention: _IAttention, dropout_prob: float = 0.):
         super().__init__()
         # because of concatenating weighted hidden states and embedding of input token
         assert embedding_size == hidden_size
@@ -42,6 +42,7 @@ class LSTMAttentionDecoder(_IAttentionDecoder):
         self.lstm = nn.LSTM(self.hidden_size + self.embedding_size, self.hidden_size)
         self.linear = nn.Linear(self.hidden_size, self.out_size)
         self.attention = attention
+        self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor, encoder_hidden_states: torch.Tensor)\
