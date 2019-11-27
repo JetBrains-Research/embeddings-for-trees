@@ -11,15 +11,15 @@
   "embedding": {
     "name": "SubTokenEmbedding",
     "params": {
-      "out_size": 128
+      "out_size": 64
     }
   },
 
   "encoder": {
     "name": "TreeLSTM",
     "params": {
-      "x_size": 128,
-      "h_size": 128,
+      "x_size": 64,
+      "h_size": 64,
       "dropout_prob": 0.5
     }
   },
@@ -27,14 +27,14 @@
   "decoder": {
     "name": "LSTMAttentionDecoder",
     "params": {
-      "embedding_size": 128,
-      "hidden_size": 128,
+      "embedding_size": 64,
+      "hidden_size": 64,
       "dropout_prob": 0.5
     },
     "attention": {
       "name": "LuongConcatAttention",
       "params": {
-        "hidden_size": 128
+        "hidden_size": 64
       }
     }
   },
@@ -45,5 +45,8 @@
   "weight_decay": 1e-4,
   "clip_norm": 5,
 
-  "verbosity_step": 10
+  "logging_step": 10,
+  "logging_folder": "logs",
+  "checkpoint_step": 1,
+  "checkpoints_folder": "checkpoints"
 }

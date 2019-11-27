@@ -1,4 +1,5 @@
 from argparse import ArgumentParser
+from copy import deepcopy
 from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
@@ -10,11 +11,12 @@ from tqdm.auto import tqdm
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
 from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, convert_tokens_to_subtokens
+from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_BATCH
 from utils.metrics import calculate_metrics
 from utils.training import train_on_batch, eval_on_batch
 
 
-def update_epoch_info(old_info: Dict, batch_info: Dict) -> Dict:
+def accumulate_info(old_info: Dict, batch_info: Dict) -> Dict:
     """Updating epoch info based on batch info,
     if epoch info is None use only batch info (init)
 
@@ -24,18 +26,18 @@ def update_epoch_info(old_info: Dict, batch_info: Dict) -> Dict:
     """
     if old_info is None:
         return batch_info
-    for key in ['loss', 'batch_count']:
-        old_info[key] += batch_info[key]
+    old_info['loss'] += batch_info['loss']
     for statistic in ['true_positive', 'false_positive', 'false_negative']:
         old_info['statistics'][statistic] += batch_info['statistics'][statistic]
     return old_info
 
 
-def print_info(info: Dict, prefix: str):
-    metrics = calculate_metrics(info['statistics'])
-    print(f"{prefix}:\n"
-          f"loss: {info['loss'] / info['batch_count']}\n"
-          f"{', '.join(f'{key}: {value}' for key, value in metrics.items())}")
+def acc_info_to_state_dict(accumulated_info: Dict, logging_step: int) -> Dict:
+    state_dict = {
+        'loss': accumulated_info['loss'] / logging_step
+    }
+    state_dict.update(calculate_metrics(accumulated_info['statistics']))
+    return state_dict
 
 
 def train(params: Dict) -> None:
@@ -60,15 +62,16 @@ def train(params: Dict) -> None:
         token_to_id, required_tokens=[UNK, PAD, 'METHOD_NAME', 'NAN'], return_ids=True, device=device
     )
 
-    print('initializing model set up...')
+    print('model initializing...')
     # create models
-    params['embedding']['params']['token_vocab_size'] = len(subtoken_to_id)
-    params['embedding']['params']['token_to_subtoken'] = token_to_subtoken
-    params['embedding']['params']['padding_index'] = subtoken_to_id[PAD]
-    params['embedding']['params']['type_vocab_size'] = len(type_to_id)
-    params['decoder']['params']['out_size'] = len(sublabel_to_id)
-    params['decoder']['params']['padding_index'] = sublabel_to_id[PAD]
-    model_factory = ModelFactory(params['embedding'], params['encoder'], params['decoder'])
+    extended_params = deepcopy(params)
+    extended_params['embedding']['params']['token_vocab_size'] = len(subtoken_to_id)
+    extended_params['embedding']['params']['token_to_subtoken'] = token_to_subtoken
+    extended_params['embedding']['params']['padding_index'] = subtoken_to_id[PAD]
+    extended_params['embedding']['params']['type_vocab_size'] = len(type_to_id)
+    extended_params['decoder']['params']['out_size'] = len(sublabel_to_id)
+    extended_params['decoder']['params']['padding_index'] = sublabel_to_id[PAD]
+    model_factory = ModelFactory(extended_params['embedding'], extended_params['encoder'], extended_params['decoder'])
     model: Tree2Seq = model_factory.construct_model(device)
 
     # create optimizer
@@ -79,10 +82,17 @@ def train(params: Dict) -> None:
     # define loss function
     criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id[PAD]).to(device)
 
+    # init logging class
+    logger = None
+    if args.logging == FileLogger.name:
+        logger = FileLogger(params, params['logging_folder'], params['checkpoints_folder'])
+    elif args.logging == WandBLogger.name:
+        logger = WandBLogger('treeLSTM', params, model, params['checkpoints_folder'])
+
     # train loop
     print("ok, let's train it")
     for epoch in range(params['n_epochs']):
-        train_epoch_info = None
+        train_acc_info = None
         eval_epoch_info = None
 
         # iterate over training set
@@ -93,10 +103,11 @@ def train(params: Dict) -> None:
                 model, criterion, optimizer, graph, labels,
                 label_to_sublabel, sublabel_to_id, params, device
             )
-            train_epoch_info = update_epoch_info(train_epoch_info, batch_info)
-            if batch_id % params['verbosity_step'] == 0:
-                print_info(train_epoch_info, f"training batch #{batch_id}")
-        print_info(train_epoch_info, f"training epoch #{epoch}")
+            train_acc_info = accumulate_info(train_acc_info, batch_info)
+            if batch_id % params['logging_step'] == 0:
+                state_dict = acc_info_to_state_dict(train_acc_info, params['logging_step'] if batch_id != 0 else 1)
+                logger.log(state_dict, epoch, batch_id)
+                train_acc_info = None
 
         # iterate over validation set
         for batch_id in tqdm(range(len(validation_set))):
@@ -107,13 +118,18 @@ def train(params: Dict) -> None:
                 model, criterion, graph, labels,
                 eval_label_to_sublabel, sublabel_to_id, device
             )
-            eval_epoch_info = update_epoch_info(eval_epoch_info, batch_info)
-        print_info(eval_epoch_info, f"evaluating epoch #{epoch}")
+            eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
+        state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
+        logger.log(state_dict, epoch, FULL_BATCH, False)
+
+        if epoch % params['checkpoint_step'] == 0:
+            logger.save_model(model, epoch)
 
 
 if __name__ == '__main__':
     arg_parse = ArgumentParser()
     arg_parse.add_argument('--config', type=str, required=True, help='path to config json')
+    arg_parse.add_argument('--logging', choices=get_possible_loggers(), required=True)
     args = arg_parse.parse_args()
 
     with open(args.config) as config_file:

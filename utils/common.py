@@ -25,6 +25,7 @@ def get_device() -> torch.device:
 
 def fix_seed(seed: int = 7) -> None:
     torch.manual_seed(seed)
+    torch.backends.cudnn.deterministic = True
     np.random.seed(seed)
 
 

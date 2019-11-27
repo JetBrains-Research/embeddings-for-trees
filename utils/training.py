@@ -67,7 +67,6 @@ def train_on_batch(
     prediction = model.predict(root_logits)
     batch_train_info = {
         'loss': loss.item(),
-        'batch_count': 1,
         'statistics':
             calculate_batch_statistics(
                 ground_truth, prediction, [sublabel_to_id[token] for token in [PAD, UNK, EOS]]
@@ -88,18 +87,17 @@ def eval_on_batch(
     # Model step
     with torch.no_grad():
         root_logits = model(graph, root_indexes, ground_truth, device)
-    root_logits = root_logits[1:]
-    ground_truth = ground_truth[1:]
-    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+        root_logits = root_logits[1:]
+        ground_truth = ground_truth[1:]
+        loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
 
-    # Calculate metrics
-    prediction = model.predict(root_logits)
-    batch_train_info = {
-        'loss': loss.item(),
-        'batch_count': 1,
-        'statistics':
-            calculate_batch_statistics(
-                ground_truth, prediction, [sublabel_to_id[token] for token in [PAD, UNK, EOS]]
-            )
-    }
-    return batch_train_info
+        # Calculate metrics
+        prediction = model.predict(root_logits)
+        batch_eval_info = {
+            'loss': loss.item(),
+            'statistics':
+                calculate_batch_statistics(
+                    ground_truth, prediction, [sublabel_to_id[token] for token in [PAD, UNK, EOS]]
+                )
+        }
+        return batch_eval_info
