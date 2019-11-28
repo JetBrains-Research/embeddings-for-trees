@@ -110,6 +110,19 @@ def train(params: Dict, logging: str) -> None:
                 state_dict = acc_info_to_state_dict(train_acc_info, params['logging_step'] if batch_id != 0 else 1)
                 logger.log(state_dict, epoch, batch_id)
                 train_acc_info = None
+            if batch_id % 100 == 0:
+                for batch_val_id in tqdm(range(len(validation_set))):
+                    graph, labels = validation_set[batch_val_id]
+                    graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+                    eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
+                    batch_info = eval_on_batch(
+                        model, criterion, graph, labels,
+                        eval_label_to_sublabel, sublabel_to_id, device
+                    )
+                    eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
+                state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
+                logger.log(state_dict, epoch, FULL_BATCH, False)
+
 
         # iterate over validation set
         for batch_id in tqdm(range(len(validation_set))):
