@@ -24,18 +24,28 @@
   },
 
   "decoder": {
-    "name": "LSTMDecoder",
+    "name": "LSTMAttentionDecoder",
     "params": {
       "embedding_size": 128,
-      "hidden_size": 128
+      "hidden_size": 128,
+      "dropout_prob": 0.5
+    },
+    "attention": {
+      "name": "LuongConcatAttention",
+      "params": {
+        "hidden_size": 128
+      }
     }
   },
 
-  "batch_size": 8,
+  "batch_size": 128,
   "n_epochs": 10,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
 
-  "verbosity_step": 10
+  "logging_step": 10,
+  "logging_folder": "logs",
+  "checkpoint_step": 10,
+  "checkpoints_folder": "checkpoints"
 }
