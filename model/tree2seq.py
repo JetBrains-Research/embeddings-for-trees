@@ -43,25 +43,16 @@ class Tree2Seq(nn.Module):
         # [length of the longest sequence, batch size, number of classes]
         outputs = torch.zeros(max_length, batch_size, self.decoder.out_size).to(device)
 
-        encoder_outputs = None
-        if self.using_attention:
-            start_of_tree = root_indexes.tolist()
-            end_of_tree = start_of_tree[1:] + [node_hidden_states.shape[0]]
-            hidden_states_per_tree = [
-                node_hidden_states[start:end] for start, end in zip(start_of_tree, end_of_tree)
-            ]
-            number_of_nodes = [tree_hs.shape[0] for tree_hs in hidden_states_per_tree]
-            max_number_of_nodes = max(number_of_nodes)
-            encoder_outputs = torch.zeros(batch_size, max_number_of_nodes, self.decoder.hidden_size).to(device)
-            for num, (tree_hs, tree_sz) in enumerate(zip(hidden_states_per_tree, number_of_nodes)):
-                encoder_outputs[num, :tree_sz] = tree_hs
+        tree_sizes = [(root_indexes[i] - root_indexes[i - 1]).item() for i in range(1, batch_size)]
+        tree_sizes.append(node_hidden_states.shape[0] - root_indexes[-1].item())
 
         current_input = ground_truth[0]
         for step in range(1, max_length):
 
             if self.using_attention:
                 output, root_hidden_states, root_memory_cells = \
-                    self.decoder(current_input, root_hidden_states, root_memory_cells, encoder_outputs)
+                    self.decoder(current_input, root_hidden_states, root_memory_cells,
+                                 node_hidden_states, tree_sizes)
             else:
                 output, root_hidden_states, root_memory_cells = \
                     self.decoder(current_input, root_hidden_states, root_memory_cells)

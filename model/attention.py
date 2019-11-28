@@ -1,17 +1,24 @@
+from typing import List
+
+import numpy as np
 import torch
 import torch.nn as nn
+
+from utils.common import segment_sizes_to_slices
 
 
 class _IAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, prev_hidden_state: torch.Tensor, encoder_output: torch.Tensor) -> torch.Tensor:
+    def forward(self, prev_hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
+            -> torch.Tensor:
         """ Compute attention weights based on previous decoder state and encoder output
 
-        :param prev_hidden_state: [batch size, hidden size]
-        :param encoder_output: [batch size, max number of nodes, hidden size]
-        :return: attention weights [batch size, max number of nodes]
+        :param prev_hidden_states: [batch size, hidden size]
+        :param encoder_output: [number of nodes in batch, hidden size]
+        :param tree_sizes: [batch size]
+        :return: attention weights [number of nodes in batch, 1]
         """
         raise NotImplementedError
 
@@ -21,26 +28,30 @@ class LuongConcatAttention(_IAttention):
         super().__init__()
         self.hidden_size = hidden_size
         self.linear = nn.Linear(2 * self.hidden_size, self.hidden_size)
-        self.v = nn.Parameter(torch.rand(1, self.hidden_size), requires_grad=True)
+        self.v = nn.Parameter(torch.rand(self.hidden_size, 1), requires_grad=True)
 
-    def forward(self, prev_hidden_state: torch.Tensor, encoder_output: torch.Tensor) -> torch.Tensor:
-        batch_size, max_nodes_number = encoder_output.shape[:2]
+    def forward(self, prev_hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
+            -> torch.Tensor:
+        # [number of nodes in batch, hidden size]
+        repeated_hidden_states = torch.cat(
+            [prev_hidden_state.expand(tree_size, -1)
+             for prev_hidden_state, tree_size in zip(prev_hidden_states, tree_sizes)],
+            dim=0
+        )
 
-        # [batch size, max number of nodes, hidden size]
-        repeated_hidden_state = prev_hidden_state.unsqueeze(1).expand(-1, max_nodes_number, -1)
-
-        # [batch size, max number of nodes, hidden size]
+        # [number of nodes in batch, hidden size]
         energy = torch.tanh(self.linear(
-            torch.cat((repeated_hidden_state, encoder_output), dim=2)
+            torch.cat((repeated_hidden_states, encoder_output), dim=1)
         ))
 
-        # [batch size, hidden size, max number of nodes]
-        energy = energy.permute(0, 2, 1)
+        # [number of nodes in batch, 1]
+        scores = torch.matmul(energy, self.v)
 
-        # [batch size, 1, hidden size]
-        v = self.v.expand(batch_size, -1).unsqueeze(1)
+        # [number of nodes in batch, 1]
+        attentions = torch.cat(
+            [nn.functional.softmax(scores[tree_slice], dim=0)
+             for tree_slice in segment_sizes_to_slices(tree_sizes)],
+            dim=0
+        )
 
-        # [batch size, max number of nodes]
-        attention = torch.bmm(v, energy).squeeze(1)
-
-        return nn.functional.softmax(attention, dim=1)
+        return attentions

@@ -1,9 +1,10 @@
-from typing import Tuple
+from typing import Tuple, List
 
 import torch
 import torch.nn as nn
 
 from model.attention import _IAttention
+from utils.common import segment_sizes_to_slices
 
 
 class _IAttentionDecoder(nn.Module):
@@ -12,14 +13,15 @@ class _IAttentionDecoder(nn.Module):
         super().__init__()
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
-                root_memory_cells: torch.Tensor, encoder_hidden_states: torch.Tensor)\
+                root_memory_cells: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Make decoder step with attention mechanism for given token id and previous states
 
         :param input_token_id: [batch size]
         :param root_hidden_states: [1, batch size, hidden size]
         :param root_memory_cells: [1, batch size, hidden size]
-        :param encoder_hidden_states: [batch size, max number of nodes, hidden size]
+        :param encoder_output: [number of nodes in batch, hidden size]
+        :param tree_sizes: [batch size]
         :return: Tuple[
             output: [batch size, number of classes]
             new hidden state, new memory cell
@@ -45,21 +47,26 @@ class LSTMAttentionDecoder(_IAttentionDecoder):
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
-                root_memory_cells: torch.Tensor, encoder_hidden_states: torch.Tensor)\
+                root_memory_cells: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
             -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         # [1, batch size, embedding size]
         embedded = self.embedding(input_token_id.unsqueeze(0))
 
-        # [batch size, max number of nodes]
-        attention = self.attention(root_hidden_states.squeeze(0), encoder_hidden_states)
-        # [batch size, 1, max number of nodes]
-        attention = attention.unsqueeze(1)
+        # [number of nodes in batch, 1]
+        attention = self.attention(root_hidden_states.squeeze(0), encoder_output, tree_sizes)
 
-        # [1, batch size, hidden size]
-        weighted_hidden_states = torch.bmm(attention, encoder_hidden_states).permute(1, 0, 2)
+        # [number of nodes in batch, hidden_size]
+        weighted_hidden_states = encoder_output * attention
+
+        # [1, batch size, hidden_size]
+        attended_hidden_states = torch.cat(
+            [torch.sum(weighted_hidden_states[tree_slice], dim=0, keepdim=True)
+             for tree_slice in segment_sizes_to_slices(tree_sizes)],
+            dim=0
+        ).unsqueeze(0)
 
         # [1, batch size, hidden size + embedding size]
-        lstm_input = torch.cat((embedded, weighted_hidden_states), dim=2)
+        lstm_input = torch.cat((embedded, attended_hidden_states), dim=2)
 
         # output: [1, batch size, hidden size]
         output, (new_hidden_states, new_memory_cells) = self.lstm(lstm_input, (root_hidden_states, root_memory_cells))

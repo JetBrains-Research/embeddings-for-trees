@@ -88,3 +88,9 @@ def convert_tokens_to_subtokens(
         cur_split = torch.tensor([subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]).to(device)
         token_to_subtoken[token] = cur_split
     return token_to_subtoken
+
+
+def segment_sizes_to_slices(sizes: List) -> List:
+    cum_sums = np.cumsum(sizes)
+    start_of_segments = np.append([0], cum_sums[:-1])
+    return [slice(start, end) for start, end in zip(start_of_segments, cum_sums)]
