@@ -40,7 +40,7 @@ def acc_info_to_state_dict(accumulated_info: Dict, logging_step: int) -> Dict:
     return state_dict
 
 
-def train(params: Dict) -> None:
+def train(params: Dict, logging: str) -> None:
     fix_seed()
     device = get_device()
     print(f"using {device} device")
@@ -84,9 +84,9 @@ def train(params: Dict) -> None:
 
     # init logging class
     logger = None
-    if args.logging == FileLogger.name:
+    if logging == FileLogger.name:
         logger = FileLogger(params, params['logging_folder'], params['checkpoints_folder'])
-    elif args.logging == WandBLogger.name:
+    elif logging == WandBLogger.name:
         logger = WandBLogger('treeLSTM', params, model, params['checkpoints_folder'])
 
     # train loop
@@ -133,4 +133,4 @@ if __name__ == '__main__':
     args = arg_parse.parse_args()
 
     with open(args.config) as config_file:
-        train(json_load(config_file))
+        train(json_load(config_file), args.logging)
