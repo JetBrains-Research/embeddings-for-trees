@@ -11,7 +11,7 @@ from tqdm.auto import tqdm
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
 from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, convert_tokens_to_subtokens
-from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_BATCH
+from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_BATCH, TerminalLogger
 from utils.metrics import calculate_metrics
 from utils.training import train_on_batch, eval_on_batch
 
@@ -84,7 +84,9 @@ def train(params: Dict, logging: str) -> None:
 
     # init logging class
     logger = None
-    if logging == FileLogger.name:
+    if logging == TerminalLogger.name:
+        logger = TerminalLogger(params['checkpoints_folder'])
+    elif logging == FileLogger.name:
         logger = FileLogger(params, params['logging_folder'], params['checkpoints_folder'])
     elif logging == WandBLogger.name:
         logger = WandBLogger('treeLSTM', params, model, params['checkpoints_folder'])

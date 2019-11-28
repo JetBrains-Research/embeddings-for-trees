@@ -15,6 +15,7 @@ FULL_BATCH = 'full_batch'
 
 def get_possible_loggers():
     return [
+        TerminalLogger.name,
         FileLogger.name,
         WandBLogger.name
     ]
@@ -65,10 +66,32 @@ class WandBLogger(_ILogger):
         return checkpoint_path
 
 
-class FileLogger(_ILogger):
+class TerminalLogger(_ILogger):
+
+    name = 'terminal'
+    _dividing_line = '=' * 100 + '\n'
+
+    def __init__(self, checkpoints_folder: str):
+        super().__init__(checkpoints_folder)
+
+    def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
+        print(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
+
+    def _create_log_message(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool) -> str:
+        log_info = f"{'train' if is_train else 'validation'} {epoch_num}.{batch_num}:\n" + \
+                   ', '.join(f'{key}: {value}' for key, value in state_dict.items()) + \
+                   '\n' + self._dividing_line
+        if batch_num == 0:
+            log_info = self._dividing_line + log_info
+        return log_info
+
+    def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
+        return super().save_model(model, epoch_num)
+
+
+class FileLogger(TerminalLogger):
 
     name = 'file'
-    _dividing_line = '=' * 100 + '\n'
 
     def __init__(self, config: Dict, logging_folder: str, checkpoints_folder: str):
         super().__init__(checkpoints_folder)
@@ -79,12 +102,7 @@ class FileLogger(_ILogger):
 
     def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
         with open(self.file_path, 'a') as logging_file:
-            if batch_num == 0:
-                logging_file.write(self._dividing_line)
-            log_info = f"{'train' if is_train else 'validation'} {epoch_num}.{batch_num}:\n" +\
-                       ', '.join(f'{key}: {value}' for key, value in state_dict.items()) + '\n'
-            logging_file.write(log_info)
-            logging_file.write(self._dividing_line)
+            logging_file.write(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
 
     def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
         return super().save_model(model, epoch_num)
