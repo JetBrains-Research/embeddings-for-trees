@@ -40,6 +40,21 @@ def acc_info_to_state_dict(accumulated_info: Dict, logging_step: int) -> Dict:
     return state_dict
 
 
+def evaluate(validation_set: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
+             sublabel_to_id: Dict, device: torch.device) -> Dict:
+    eval_epoch_info = None
+    for batch_id in tqdm(range(len(validation_set))):
+        graph, labels = validation_set[batch_id]
+        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+        eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
+        batch_info = eval_on_batch(
+            model, criterion, graph, labels,
+            eval_label_to_sublabel, sublabel_to_id, device
+        )
+        eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
+    return eval_epoch_info
+
+
 def train(params: Dict, logging: str) -> None:
     fix_seed()
     device = get_device()
@@ -95,7 +110,6 @@ def train(params: Dict, logging: str) -> None:
     print("ok, let's train it")
     for epoch in range(params['n_epochs']):
         train_acc_info = None
-        eval_epoch_info = None
 
         # iterate over training set
         for batch_id in tqdm(range(len(training_set))):
@@ -110,30 +124,13 @@ def train(params: Dict, logging: str) -> None:
                 state_dict = acc_info_to_state_dict(train_acc_info, params['logging_step'] if batch_id != 0 else 1)
                 logger.log(state_dict, epoch, batch_id)
                 train_acc_info = None
-            if batch_id % 100 == 0:
-                for batch_val_id in tqdm(range(len(validation_set))):
-                    graph, labels = validation_set[batch_val_id]
-                    graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-                    eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
-                    batch_info = eval_on_batch(
-                        model, criterion, graph, labels,
-                        eval_label_to_sublabel, sublabel_to_id, device
-                    )
-                    eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
+            if batch_id % params['evaluation_step'] == 0:
+                eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
                 state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
                 logger.log(state_dict, epoch, FULL_BATCH, False)
 
-
         # iterate over validation set
-        for batch_id in tqdm(range(len(validation_set))):
-            graph, labels = validation_set[batch_id]
-            graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-            eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
-            batch_info = eval_on_batch(
-                model, criterion, graph, labels,
-                eval_label_to_sublabel, sublabel_to_id, device
-            )
-            eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
+        eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
         state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
         logger.log(state_dict, epoch, FULL_BATCH, False)
 
