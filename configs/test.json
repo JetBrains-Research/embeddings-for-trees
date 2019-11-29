@@ -45,6 +45,8 @@
   "weight_decay": 1e-4,
   "clip_norm": 5,
 
+  "evaluation_step": 10,
+
   "logging_step": 10,
   "logging_folder": "logs",
   "checkpoint_step": 1,
