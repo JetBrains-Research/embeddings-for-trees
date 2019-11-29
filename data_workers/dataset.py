@@ -24,6 +24,9 @@ class JavaDataset(Dataset):
         self.batch_desc = {}
         self.n_batches = 0
 
+        self.loaded_batch_basename = None
+        self.loaded_batched_graph = None
+
         # iterate over pkl files to aggregate information about batches
         print(f"prepare the {batched_graphs_path} dataset...")
         for batched_graph_file in tqdm(self.batched_graph_files):
@@ -49,15 +52,20 @@ class JavaDataset(Dataset):
 
     def __getitem__(self, item) -> Tuple[BatchedDGLGraph, List[str]]:
         batch_basename, batch_slice = self.batch_desc[item]
-        with open(path_join(self.batched_graphs_path, batch_basename), 'rb') as pkl_file:
-            cur_batched_graph = pkl_load(pkl_file)
-        graphs = unbatch(cur_batched_graph['batched_graph'])
+
+        # read file only if previous wasn't the same
+        if self.loaded_batch_basename != batch_basename:
+            with open(path_join(self.batched_graphs_path, batch_basename), 'rb') as pkl_file:
+                self.loaded_batched_graph = pkl_load(pkl_file)
+            self.loaded_batch_basename = batch_basename
+
+        graphs = unbatch(self.loaded_batched_graph['batched_graph'])
 
         graphs_for_batch = graphs[batch_slice]
         if self.invert_edges:
             graphs_for_batch = list(map(lambda g: reverse(g, share_ndata=True), graphs_for_batch))
 
         batched_graph = batch(graphs_for_batch)
-        batched_labels = cur_batched_graph['labels'][batch_slice]
+        batched_labels = self.loaded_batched_graph['labels'][batch_slice]
 
         return batched_graph, batched_labels
