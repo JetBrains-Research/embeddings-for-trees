@@ -4,7 +4,6 @@ from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
 
-import numpy as np
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
@@ -92,7 +91,7 @@ def train(params: Dict, logging: str) -> None:
 
     # create optimizer
     optimizer = torch.optim.RMSprop(
-        model.parameters(), lr=params['lr'], weight_decay=params['weight_decay'],
+        model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
     )
 
     # define loss function
@@ -106,10 +105,6 @@ def train(params: Dict, logging: str) -> None:
         logger = FileLogger(params, params['logging_folder'], params['checkpoints_folder'])
     elif logging == WandBLogger.name:
         logger = WandBLogger('treeLSTM', params, model, params['checkpoints_folder'])
-
-    def lambda_rd(_):
-        return 0.01 * np.random.random_sample()
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda_rd)
 
     # train loop
     print("ok, let's train it")
@@ -133,8 +128,6 @@ def train(params: Dict, logging: str) -> None:
                 eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
                 state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
                 logger.log(state_dict, epoch, FULL_BATCH, False)
-            scheduler.step()
-            print(scheduler.get_lr())
 
         # iterate over validation set
         eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
