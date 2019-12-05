@@ -94,3 +94,7 @@ def segment_sizes_to_slices(sizes: List) -> List:
     cum_sums = np.cumsum(sizes)
     start_of_segments = np.append([0], cum_sums[:-1])
     return [slice(start, end) for start, end in zip(start_of_segments, cum_sums)]
+
+
+def is_current_step_match(current_step: int, template: int) -> bool:
+    return template != -1 and current_step % template == 0

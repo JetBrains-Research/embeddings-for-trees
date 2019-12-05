@@ -1,11 +1,10 @@
 {
   "paths": {
-    "train_batches": "./data/java-small/training_preprocessed",
-    "validation_batches": "./data/java-small/validation_preprocessed",
-    "test_batches": "./data/java-small/test_preprocessed",
+    "train": "./data/java-small/training_preprocessed",
+    "validate": "./data/java-small/validation_preprocessed",
 
-    "vocabulary_path": "./data/java-small/vocabulary.pkl",
-    "labels_path": "./data/java-small/labels.pkl"
+    "vocabulary": "./data/java-small/vocabulary.pkl",
+    "labels": "./data/java-small/labels.pkl"
   },
 
   "embedding": {

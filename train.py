@@ -10,10 +10,10 @@ from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
-from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK
+from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, is_current_step_match
 from utils.learning_info import LearningInfo
-from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_BATCH, TerminalLogger
-from utils.training import train_on_batch, evaluate
+from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_DATASET, TerminalLogger
+from utils.training import train_on_batch, evaluate_dataset
 
 
 def train(params: Dict, logging: str) -> None:
@@ -21,16 +21,16 @@ def train(params: Dict, logging: str) -> None:
     device = get_device()
     print(f"using {device} device")
 
-    training_set = JavaDataset(params['paths']['train_batches'], params['batch_size'], True)
-    validation_set = JavaDataset(params['paths']['validation_batches'], params['batch_size'], True)
+    training_set = JavaDataset(params['paths']['train'], params['batch_size'], True)
+    validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], True)
 
     print('processing labels...')
-    with open(params['paths']['labels_path'], 'rb') as pkl_file:
+    with open(params['paths']['labels'], 'rb') as pkl_file:
         label_to_id = pkl_load(pkl_file)
     sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
 
     print('processing vocabulary...')
-    with open(params['paths']['vocabulary_path'], 'rb') as pkl_file:
+    with open(params['paths']['vocabulary'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
         token_to_id = vocabulary['token_to_id']
         type_to_id = vocabulary['type_to_id']
@@ -51,7 +51,7 @@ def train(params: Dict, logging: str) -> None:
     model: Tree2Seq = model_factory.construct_model(device)
 
     # create optimizer
-    optimizer = torch.optim.RMSprop(
+    optimizer = torch.optim.Adam(
         model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
     )
 
@@ -81,19 +81,19 @@ def train(params: Dict, logging: str) -> None:
                 label_to_sublabel, sublabel_to_id, params, device
             )
             train_acc_info.accumulate_info(batch_info)
-            if batch_id % params['logging_step'] == 0:
+            if is_current_step_match(batch_id, params['logging_step']):
                 logger.log(train_acc_info.get_state_dict(), epoch, batch_id)
                 train_acc_info = LearningInfo()
-            if batch_id % params['evaluation_step'] == 0:
-                eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
-                logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_BATCH, False)
+            if is_current_step_match(batch_id, params['evaluation_step']):
+                eval_epoch_info = evaluate_dataset(validation_set, model, criterion, sublabel_to_id, device)
+                logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
 
         # iterate over validation set
-        eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
-        logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_BATCH, False)
+        eval_epoch_info = evaluate_dataset(validation_set, model, criterion, sublabel_to_id, device)
+        logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
 
-        if epoch % params['checkpoint_step'] == 0:
-            logger.save_model(model, epoch)
+        if is_current_step_match(epoch, params['checkpoint_step']):
+            logger.save_model(model, epoch, extended_params)
 
 
 if __name__ == '__main__':

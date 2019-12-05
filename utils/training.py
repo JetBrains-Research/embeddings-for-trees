@@ -106,8 +106,8 @@ def eval_on_batch(
         return batch_eval_info
 
 
-def evaluate(dataset: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
-             sublabel_to_id: Dict, device: torch.device) -> LearningInfo:
+def evaluate_dataset(dataset: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
+                     sublabel_to_id: Dict, device: torch.device) -> LearningInfo:
     eval_epoch_info = LearningInfo()
     for batch_id in tqdm(range(len(dataset))):
         graph, labels = dataset[batch_id]

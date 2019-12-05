@@ -10,7 +10,7 @@ from model.tree2seq import Tree2Seq
 from utils.common import create_folder
 
 
-FULL_BATCH = 'full_batch'
+FULL_DATASET = 'full_dataset'
 
 
 def get_possible_loggers():
@@ -33,9 +33,12 @@ class _ILogger:
     def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
         raise NotImplementedError
 
-    def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
-        saving_path = join_path(self.checkpoints_folder, f'epoch_{epoch_num}.h5')
-        torch.save(model.state_dict(), saving_path)
+    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
+        saving_path = join_path(self.checkpoints_folder, f'epoch_{epoch_num}.pt')
+        torch.save({
+            'state_dict': model.state_dict(),
+            'configuration': params
+        }, saving_path)
         return saving_path
 
 
@@ -60,8 +63,8 @@ class WandBLogger(_ILogger):
         wandb.log(state_dict, step=self.step)
         self.step += 1
 
-    def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
-        checkpoint_path = super().save_model(model, epoch_num)
+    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
+        checkpoint_path = super().save_model(model, epoch_num, params)
         wandb.save(checkpoint_path)
         return checkpoint_path
 
@@ -85,8 +88,8 @@ class TerminalLogger(_ILogger):
             log_info = self._dividing_line + log_info
         return log_info
 
-    def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
-        return super().save_model(model, epoch_num)
+    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
+        return super().save_model(model, epoch_num, params)
 
 
 class FileLogger(TerminalLogger):
@@ -104,5 +107,5 @@ class FileLogger(TerminalLogger):
         with open(self.file_path, 'a') as logging_file:
             logging_file.write(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
 
-    def save_model(self, model: Tree2Seq, epoch_num: int) -> str:
-        return super().save_model(model, epoch_num)
+    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
+        return super().save_model(model, epoch_num, params)
