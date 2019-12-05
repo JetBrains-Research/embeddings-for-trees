@@ -40,12 +40,12 @@
   },
 
   "batch_size": 8,
-  "n_epochs": 10,
+  "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
 
-  "evaluation_step": 10,
+  "evaluation_step": 50,
 
   "logging_step": 10,
   "logging_folder": "logs",

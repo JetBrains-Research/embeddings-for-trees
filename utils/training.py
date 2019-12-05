@@ -4,10 +4,13 @@ import dgl
 import torch
 import torch.nn as nn
 from numpy import cumsum
+from tqdm.auto import tqdm
 
+from data_workers.dataset import JavaDataset
 from model.tree2seq import Tree2Seq
+from utils.learning_info import LearningInfo
 from utils.metrics import calculate_batch_statistics
-from utils.common import SOS, EOS, UNK, PAD
+from utils.common import SOS, EOS, UNK, PAD, convert_tokens_to_subtokens
 
 
 def convert_labels(labels: List[str], label_to_sublabel: Dict, sublabel_to_id: Dict) -> torch.Tensor:
@@ -101,3 +104,18 @@ def eval_on_batch(
                 )
         }
         return batch_eval_info
+
+
+def evaluate(dataset: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
+             sublabel_to_id: Dict, device: torch.device) -> LearningInfo:
+    eval_epoch_info = LearningInfo()
+    for batch_id in tqdm(range(len(dataset))):
+        graph, labels = dataset[batch_id]
+        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+        eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
+        batch_info = eval_on_batch(
+            model, criterion, graph, labels,
+            eval_label_to_sublabel, sublabel_to_id, device
+        )
+        eval_epoch_info.accumulate_info(batch_info)
+    return eval_epoch_info

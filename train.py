@@ -10,49 +10,10 @@ from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
-from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, convert_tokens_to_subtokens
+from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK
+from utils.learning_info import LearningInfo
 from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_BATCH, TerminalLogger
-from utils.metrics import calculate_metrics
-from utils.training import train_on_batch, eval_on_batch
-
-
-def accumulate_info(old_info: Dict, batch_info: Dict) -> Dict:
-    """Updating epoch info based on batch info,
-    if epoch info is None use only batch info (init)
-
-    :param old_info: dict with epoch info or None
-    :param batch_info: batch info
-    :return: new epoch info
-    """
-    if old_info is None:
-        return batch_info
-    old_info['loss'] += batch_info['loss']
-    for statistic in ['true_positive', 'false_positive', 'false_negative']:
-        old_info['statistics'][statistic] += batch_info['statistics'][statistic]
-    return old_info
-
-
-def acc_info_to_state_dict(accumulated_info: Dict, logging_step: int) -> Dict:
-    state_dict = {
-        'loss': accumulated_info['loss'] / logging_step
-    }
-    state_dict.update(calculate_metrics(accumulated_info['statistics']))
-    return state_dict
-
-
-def evaluate(validation_set: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
-             sublabel_to_id: Dict, device: torch.device) -> Dict:
-    eval_epoch_info = None
-    for batch_id in tqdm(range(len(validation_set))):
-        graph, labels = validation_set[batch_id]
-        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-        eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
-        batch_info = eval_on_batch(
-            model, criterion, graph, labels,
-            eval_label_to_sublabel, sublabel_to_id, device
-        )
-        eval_epoch_info = accumulate_info(eval_epoch_info, batch_info)
-    return eval_epoch_info
+from utils.training import train_on_batch, evaluate
 
 
 def train(params: Dict, logging: str) -> None:
@@ -109,7 +70,7 @@ def train(params: Dict, logging: str) -> None:
     # train loop
     print("ok, let's train it")
     for epoch in range(params['n_epochs']):
-        train_acc_info = None
+        train_acc_info = LearningInfo()
 
         # iterate over training set
         for batch_id in tqdm(range(len(training_set))):
@@ -119,20 +80,17 @@ def train(params: Dict, logging: str) -> None:
                 model, criterion, optimizer, graph, labels,
                 label_to_sublabel, sublabel_to_id, params, device
             )
-            train_acc_info = accumulate_info(train_acc_info, batch_info)
+            train_acc_info.accumulate_info(batch_info)
             if batch_id % params['logging_step'] == 0:
-                state_dict = acc_info_to_state_dict(train_acc_info, params['logging_step'] if batch_id != 0 else 1)
-                logger.log(state_dict, epoch, batch_id)
-                train_acc_info = None
+                logger.log(train_acc_info.get_state_dict(), epoch, batch_id)
+                train_acc_info = LearningInfo()
             if batch_id % params['evaluation_step'] == 0:
                 eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
-                state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
-                logger.log(state_dict, epoch, FULL_BATCH, False)
+                logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_BATCH, False)
 
         # iterate over validation set
         eval_epoch_info = evaluate(validation_set, model, criterion, sublabel_to_id, device)
-        state_dict = acc_info_to_state_dict(eval_epoch_info, len(validation_set))
-        logger.log(state_dict, epoch, FULL_BATCH, False)
+        logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_BATCH, False)
 
         if epoch % params['checkpoint_step'] == 0:
             logger.save_model(model, epoch)
