@@ -87,8 +87,9 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
             # remove asts with nan labels
             project_description = pd.read_csv(desc_path)
             bad_labels_mask = project_description['label'].isna()
-            filenames = project_description[bad_labels_mask]['source_file'].unique()
-            print(f"remove {filenames} for {project} project")
+            filenames = project_description[bad_labels_mask]['dot_file'].unique()
+            source_files = project_description[bad_labels_mask]['source_file'].unique()
+            print(f"remove functions from {source_files} for {project} project")
             for filename in filenames:
                 filepath = os.path.join(output_project_path, 'java', 'asts', filename)
                 os.remove(filepath)
