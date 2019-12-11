@@ -250,23 +250,23 @@ def main(args: Namespace) -> None:
         if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
             raise RuntimeError("convert ast before uploading or using it via --convert arg")
         for holdout, path in holdout_preprocessed_paths.items():
-            tar_file_name = os.path.join(data_path, f'{holdout}_preprocessed.tar.gz')
+            tar_file_name = os.path.join(data_path, f'{dataset_name}_{holdout}_preprocessed.tar.gz')
             with tar_open(tar_file_name, 'w:gz') as tar_file:
                 for file in tqdm(os.listdir(path)):
                     tar_file.add(os.path.join(path, file), file)
             upload_file(tar_file_name, s3_bucket_name)
         vocabulary_path = os.path.join(data_path, vocabulary_name)
-        upload_file(vocabulary_path, s3_bucket_name, vocabulary_name)
+        upload_file(vocabulary_path, s3_bucket_name, f'{dataset_name}_{vocabulary_name}')
 
     if args.download_preprocessed:
         for holdout, path in holdout_preprocessed_paths.items():
-            tar_file_name = f'{holdout}_preprocessed.tar.gz'
+            tar_file_name = f'{dataset_name}_{holdout}_preprocessed.tar.gz'
             tar_path = os.path.join(data_path, tar_file_name)
             download_file(tar_path, s3_bucket_name, tar_file_name)
             create_folder(path)
             extract_tar_gz(tar_path, path)
         vocabulary_path = os.path.join(data_path, vocabulary_name)
-        download_file(vocabulary_path, s3_bucket_name, vocabulary_name)
+        download_file(vocabulary_path, s3_bucket_name, f'{dataset_name}_{vocabulary_name}')
 
     for holdout, path in holdout_preprocessed_paths.items():
         number_of_batches = len(os.listdir(path))
