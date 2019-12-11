@@ -87,7 +87,7 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
             # remove asts with nan labels
             project_description = pd.read_csv(desc_path)
             bad_labels_mask = project_description['label'].isna()
-            filenames = project_description[bad_labels_mask]['dot_file'].unique()
+            filenames = project_description[bad_labels_mask]['source_file'].unique()
             print(f"remove {filenames} for {project} project")
             for filename in filenames:
                 filepath = os.path.join(output_project_path, 'java', 'asts', filename)
@@ -153,12 +153,13 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
         )
 
         labels = description_groups.first().loc[current_asts]['label'].to_list()
+        paths = description_groups.first().loc[current_asts]['source_file'].to_list()
         batched_graph = dgl_batch(async_batch.get())
         batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
         batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
 
         with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump({'batched_graph': batched_graph, 'labels': labels}, pkl_file)
+            pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
 
     pool.close()
     return output_holdout_path
