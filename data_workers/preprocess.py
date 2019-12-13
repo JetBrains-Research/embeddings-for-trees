@@ -1,21 +1,18 @@
 import os
 from argparse import ArgumentParser, Namespace
 from collections import Counter
-from multiprocessing import Pool, cpu_count
 from pickle import dump as pkl_dump
 from pickle import load as pkl_load
 from subprocess import run as subprocess_run
 from tarfile import open as tar_open
-from typing import Tuple, Dict, List
+from typing import Tuple, Dict
 
 import numpy as np
 import pandas as pd
-from dgl import DGLGraph
-from dgl import batch as dgl_batch
-from networkx.drawing.nx_pydot import read_dot
 from requests import get
 from tqdm.auto import tqdm
 
+from data_workers.convert import convert_holdout
 from utils.common import extract_tar_gz, create_folder, UNK
 from utils.s3_worker import upload_file, download_file
 
@@ -99,73 +96,6 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
     return output_folder_path
 
 
-def convert_dot_to_dgl(dot_path: str) -> DGLGraph:
-    g_nx = read_dot(dot_path)
-    g_dgl = DGLGraph(g_nx)
-    return g_dgl
-
-
-def collect_ast_description(projects_paths: List[str], asts_batch: List[str]) -> pd.DataFrame:
-    asts_per_project = {
-        project_path: [ast for ast in asts_batch if ast.startswith(project_path)] for project_path in projects_paths
-    }
-    asts_description = pd.DataFrame()
-    for project_path, asts in asts_per_project.items():
-        if len(asts) == 0:
-            continue
-        project_description = pd.read_csv(os.path.join(project_path, 'description.csv'))
-        ast_names = [os.path.basename(ast) for ast in asts]
-        mask = project_description['dot_file'].isin(ast_names)
-        project_description.loc[mask, 'dot_file'] = project_description.loc[mask, 'dot_file'].apply(
-            lambda dot_file: os.path.join(project_path, 'asts', dot_file)
-        )
-        asts_description = pd.concat([asts_description, project_description[mask]], ignore_index=True)
-    return asts_description
-
-
-def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
-                    type_to_id: Dict, n_jobs: int, batch_size: int) -> str:
-    print(f"Convert asts for {holdout_name} data...")
-    holdout_path = os.path.join(data_path, f'{holdout_name}_asts')
-    output_holdout_path = os.path.join(data_path, f'{holdout_name}_preprocessed')
-    create_folder(output_holdout_path)
-    projects_paths = [os.path.join(holdout_path, project, 'java') for project in os.listdir(holdout_path)]
-    asts = [os.path.join(project_path, 'asts', ast)
-            for project_path in projects_paths
-            for ast in os.listdir(os.path.join(project_path, 'asts'))
-            ]
-    np.random.shuffle(asts)
-    n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
-    pool = Pool(cpu_count() if n_jobs == -1 else n_jobs)
-
-    for batch_num in tqdm(range(n_batches)):
-        current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
-        async_batch = pool.map_async(convert_dot_to_dgl, current_asts)
-
-        current_description = collect_ast_description(projects_paths, current_asts)
-        current_description['token'].fillna(value='NAN', inplace=True)
-        current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
-        current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
-
-        description_groups = current_description.groupby('dot_file')
-        current_description = pd.concat(
-            [description_groups.get_group(ast).sort_values('node_id') for ast in current_asts],
-            ignore_index=True
-        )
-
-        labels = description_groups.first().loc[current_asts]['label'].to_list()
-        paths = description_groups.first().loc[current_asts]['source_file'].to_list()
-        batched_graph = dgl_batch(async_batch.get())
-        batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
-        batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
-
-        with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
-
-    pool.close()
-    return output_holdout_path
-
-
 def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
     token_vocabulary = Counter()
     type_vocabulary = Counter()
@@ -241,7 +171,7 @@ def main(args: Namespace) -> None:
         holdout_preprocessed_paths = {}
         for holdout in holdout_folders:
             holdout_preprocessed_paths[holdout] = convert_holdout(
-                data_path, holdout, token_to_id, type_to_id, args.n_jobs, args.batch_size
+                data_path, holdout, token_to_id, type_to_id, args.n_jobs, args.batch_size, args.high_memory
             )
     else:
         holdout_preprocessed_paths = {
@@ -286,5 +216,6 @@ if __name__ == '__main__':
     arg_parser.add_argument('--download_preprocessed', action='store_true')
     arg_parser.add_argument('--n_jobs', type=int, default=-1)
     arg_parser.add_argument('--batch_size', type=int, default=100)
+    arg_parser.add_argument('--high_memory', action='store_true')
 
     main(arg_parser.parse_args())
