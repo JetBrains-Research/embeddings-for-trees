@@ -1,11 +1,11 @@
 import os
 from multiprocessing import Pool, cpu_count
 from pickle import dump as pkl_dump
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Callable
 
 import numpy as np
 import pandas as pd
-from dgl import DGLGraph
+from dgl import DGLGraph, BatchedDGLGraph
 from dgl import batch as dgl_batch
 from networkx.drawing.nx_pydot import read_dot
 from tqdm.auto import tqdm
@@ -67,14 +67,37 @@ def _async_transform_keys(df_chunk, token_to_id, type_to_id):
     return df_chunk
 
 
-def _convert_high_memory(project_paths: List[str], output_holdout_path, shuffled_asts: List[str],
+def prepare_batch(current_description: pd.DataFrame, current_names: List[str],
+                  batched_graph_callback: Callable[[], List[DGLGraph]]) -> Tuple:
+    description_groups = current_description.groupby('dot_file')
+    current_description = pd.concat(
+        [description_groups.get_group(ast).sort_values('node_id') for ast in current_names],
+        ignore_index=True
+    )
+
+    labels = description_groups.first().loc[current_names]['label'].to_list()
+    paths = description_groups.first().loc[current_names]['source_file'].to_list()
+    batched_graph = dgl_batch(batched_graph_callback())
+    batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
+    batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
+    return batched_graph, labels, paths
+
+
+def save_batch(batched_graph: BatchedDGLGraph, labels: List[str], paths: List[str],
+               output_path: str, batch_num: int) -> None:
+    with open(os.path.join(output_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
+        pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
+
+
+def _convert_high_memory(project_paths: List[str], asts: List[str], asts_order: np.array, output_path: str,
                          token_to_id: Dict, type_to_id: Dict, n_jobs: int, batch_size: int) -> None:
     n_jobs = cpu_count() if n_jobs == -1 else n_jobs
     print(f"Read all asts...")
     with Pool(n_jobs) as pool:
-        results = pool.imap(_convert_dot_to_dgl, shuffled_asts)
-        graphs = np.array([graph for graph in tqdm(results, total=len(shuffled_asts))])
-    graphs_names = np.array(shuffled_asts)
+        results = pool.imap(_convert_dot_to_dgl, asts)
+        graphs = np.array([graph for graph in tqdm(results, total=len(asts))])
+    asts = np.array(asts)[asts_order]
+    graphs = graphs[asts_order]
 
     print(f"Prepare asts description...")
     full_descriptions = _collect_all_descriptions(project_paths)
@@ -89,42 +112,26 @@ def _convert_high_memory(project_paths: List[str], output_holdout_path, shuffled
             pool.starmap(_async_transform_keys, chunks)
         )
 
-    indexes = np.arange(len(graphs_names))
-    np.random.shuffle(indexes)
-    graphs = graphs[indexes]
-    graphs_names = graphs_names[indexes]
-
-    n_batches = len(graphs_names) // batch_size + (1 if len(graphs_names) % batch_size > 0 else 0)
+    n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
     for batch_num in tqdm(range(n_batches)):
-        current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(graphs_names)))
-        batched_graph = dgl_batch(graphs[current_slice])
-        current_names = graphs_names[current_slice]
+        current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(asts)))
+        current_names = asts[current_slice]
 
         desc_mask = full_descriptions['dot_file'].isin(current_names)
         current_description = full_descriptions[desc_mask]
 
-        description_groups = current_description.groupby('dot_file')
-        current_description = pd.concat(
-            [description_groups.get_group(ast).sort_values('node_id') for ast in current_names],
-            ignore_index=True
-        )
-
-        labels = description_groups.first().loc[current_names]['label'].to_list()
-        paths = description_groups.first().loc[current_names]['source_file'].to_list()
-        batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
-        batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
-
-        with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
+        batched_graph, labels, paths = prepare_batch(current_description, current_names, lambda: graphs[current_slice])
+        save_batch(batched_graph, labels, paths, output_path, batch_num)
 
 
-def _convert_small_memory(projects_paths: List[str], output_holdout_path: str, shuffled_asts: List[str],
+def _convert_small_memory(projects_paths: List[str], asts: List[str], asts_order: np.array, output_path: str,
                           token_to_id: Dict, type_to_id: Dict, n_jobs: int, batch_size: int) -> None:
-    n_batches = len(shuffled_asts) // batch_size + (1 if len(shuffled_asts) % batch_size > 0 else 0)
+    n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
     pool = Pool(cpu_count() if n_jobs == -1 else n_jobs)
+    asts = np.array(asts)[asts_order]
 
     for batch_num in tqdm(range(n_batches)):
-        current_asts = shuffled_asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(shuffled_asts))]
+        current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
         async_batch = pool.map_async(_convert_dot_to_dgl, current_asts)
 
         current_description = _collect_ast_description(projects_paths, current_asts)
@@ -132,20 +139,8 @@ def _convert_small_memory(projects_paths: List[str], output_holdout_path: str, s
         current_description['token_id'] = current_description['token'].apply(lambda token: token_to_id.get(token, 0))
         current_description['type_id'] = current_description['type'].apply(lambda cur_type: type_to_id.get(cur_type, 0))
 
-        description_groups = current_description.groupby('dot_file')
-        current_description = pd.concat(
-            [description_groups.get_group(ast).sort_values('node_id') for ast in current_asts],
-            ignore_index=True
-        )
-
-        labels = description_groups.first().loc[current_asts]['label'].to_list()
-        paths = description_groups.first().loc[current_asts]['source_file'].to_list()
-        batched_graph = dgl_batch(async_batch.get())
-        batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
-        batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
-
-        with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
+        batched_graph, labels, paths = prepare_batch(current_description, current_asts, lambda: async_batch.get())
+        save_batch(batched_graph, labels, paths, output_path, batch_num)
 
     pool.close()
 
@@ -160,12 +155,13 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
     asts = [os.path.join(project_path, 'asts', ast)
             for project_path in projects_paths
             for ast in os.listdir(os.path.join(project_path, 'asts'))
-            ]
-    np.random.shuffle(asts)
+            ][:200]
+    random_index_permutation = np.random.permutation(len(asts))
 
     _convert_func = _convert_small_memory
     if is_high_memory:
         _convert_func = _convert_high_memory
-    _convert_func(projects_paths, output_holdout_path, asts[:200], token_to_id, type_to_id, n_jobs, batch_size)
+    _convert_func(projects_paths, asts, random_index_permutation, output_holdout_path,
+                  token_to_id, type_to_id, n_jobs, batch_size)
 
     return output_holdout_path
