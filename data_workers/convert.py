@@ -155,7 +155,7 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
     asts = [os.path.join(project_path, 'asts', ast)
             for project_path in projects_paths
             for ast in os.listdir(os.path.join(project_path, 'asts'))
-            ][:200]
+            ]
     random_index_permutation = np.random.permutation(len(asts))
 
     _convert_func = _convert_small_memory
