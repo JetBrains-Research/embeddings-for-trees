@@ -59,7 +59,9 @@ def build_project_asts(project_path: str, output_path: str) -> bool:
         ['java', '-Xmx30g', '-jar', astminer_cli_path, 'parse',
          '--project', project_path, '--output', output_path,
          '--storage', 'dot', '--granularity', 'method',
-         '--lang', 'java', '--hide-method-name', '--split-tokens']
+         '--lang', 'java', '--hide-method-name', '--split-tokens',
+         '--filter-modifiers', 'abstract', '--filter-annotations', 'Override',
+         '--remove-constructors', '--remove-nodes', 'Javadoc']
     )
     if completed_process.returncode != 0:
         print(f"can't build ASTs for project {project_path}, failed with:\n{completed_process.stdout}")
