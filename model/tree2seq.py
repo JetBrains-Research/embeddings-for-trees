@@ -22,13 +22,14 @@ class Tree2Seq(nn.Module):
         self.using_attention = using_attention
 
     def forward(self,
-                graph: BatchedDGLGraph, root_indexes: torch.LongTensor,
-                ground_truth: torch.Tensor, device: torch.device) -> torch.Tensor:
+                graph: BatchedDGLGraph, root_indexes: torch.LongTensor, ground_truth: torch.Tensor,
+                teacher_force: float, device: torch.device) -> torch.Tensor:
         """
 
         :param graph: the batched graph with function's asts
         :param root_indexes: indexes of roots in the batched graph
         :param ground_truth: [length of the longest sequence, batch size]
+        :param teacher_force: probability of teacher forcing, 0 means use previous output
         :param device: torch device
         :return: [length of the longest sequence, batch size, number of classes] logits for each element in sequence
         """
@@ -58,7 +59,7 @@ class Tree2Seq(nn.Module):
                     self.decoder(current_input, root_hidden_states, root_memory_cells)
 
             outputs[step] = output
-            current_input = ground_truth[step]
+            current_input = ground_truth[step] if torch.rand(1) < teacher_force else output.argmax(dim=1)
 
         return outputs
 
