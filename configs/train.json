@@ -38,13 +38,13 @@
   },
 
   "batch_size": 128,
-  "n_epochs": 10,
+  "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
   "teacher_force": 0.5,
 
-  "evaluation_step": 1000,
+  "evaluation_step": 1500,
 
   "logging_step": 10,
   "logging_folder": "logs",
