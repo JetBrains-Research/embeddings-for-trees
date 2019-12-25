@@ -42,6 +42,7 @@
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
+  "teacher_force": 0.5,
 
   "evaluation_step": 1000,
 
