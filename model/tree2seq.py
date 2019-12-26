@@ -59,7 +59,8 @@ class Tree2Seq(nn.Module):
                     self.decoder(current_input, root_hidden_states, root_memory_cells)
 
             outputs[step] = output
-            current_input = ground_truth[step] if torch.rand(1) < teacher_force else output.argmax(dim=1)
+            # current_input = ground_truth[step] if torch.rand(1) < teacher_force else output.argmax(dim=1)
+            current_input = ground_truth[step]
 
         return outputs
 
