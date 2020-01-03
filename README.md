@@ -1,2 +1,2 @@
 # treeLSTM
-solve code summarization task with TreeLSTM 
+solve code representation task with TreeLSTM 
