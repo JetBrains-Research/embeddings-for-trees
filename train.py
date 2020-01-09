@@ -79,7 +79,7 @@ def train(params: Dict, logging: str) -> None:
         for batch_id in tqdm(range(len(training_set))):
             graph, labels = training_set[batch_id]
             graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-            graph.ndata['type_id'] = graph.ndata['type_id'].to(device)  
+            graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
             batch_info = train_on_batch(
                 model, criterion, optimizer, graph, labels,
                 label_to_sublabel, sublabel_to_id, params, device

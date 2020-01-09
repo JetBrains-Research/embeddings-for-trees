@@ -112,6 +112,7 @@ def evaluate_dataset(dataset: JavaDataset, model: Tree2Seq, criterion: nn.module
     for batch_id in tqdm(range(len(dataset))):
         graph, labels = dataset[batch_id]
         graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+        graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
         eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
         batch_info = eval_on_batch(
             model, criterion, graph, labels,
