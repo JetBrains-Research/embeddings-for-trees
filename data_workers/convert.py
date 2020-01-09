@@ -13,7 +13,7 @@ from tqdm.auto import tqdm
 from utils.common import create_folder
 
 
-def _convert_dot_to_dgl(dot_path: str) -> DGLGraph:
+def convert_dot_to_dgl(dot_path: str) -> DGLGraph:
     g_nx = read_dot(dot_path)
     g_dgl = DGLGraph(g_nx)
     return g_dgl
@@ -40,7 +40,7 @@ def _collect_ast_description(projects_paths: List[str], asts_batch: List[str]) -
 def _convert_full_project(project_path: str) -> Tuple[List[DGLGraph], List[str]]:
     asts_folder = os.path.join(project_path, 'asts')
     asts = [os.path.join(asts_folder, ast) for ast in os.listdir(asts_folder)][:200]
-    graphs = [_convert_dot_to_dgl(ast) for ast in asts]
+    graphs = [convert_dot_to_dgl(ast) for ast in asts]
     return graphs, asts
 
 
@@ -94,7 +94,7 @@ def _convert_high_memory(project_paths: List[str], asts: List[str], asts_order: 
     n_jobs = cpu_count() if n_jobs == -1 else n_jobs
     print(f"Read all asts...")
     with Pool(n_jobs) as pool:
-        results = pool.imap(_convert_dot_to_dgl, asts)
+        results = pool.imap(convert_dot_to_dgl, asts)
         graphs = np.array([graph for graph in tqdm(results, total=len(asts))])
     asts = np.array(asts)[asts_order]
     graphs = graphs[asts_order]
@@ -132,7 +132,7 @@ def _convert_small_memory(projects_paths: List[str], asts: List[str], asts_order
 
     for batch_num in tqdm(range(n_batches)):
         current_asts = asts[batch_num * batch_size: min((batch_num + 1) * batch_size, len(asts))]
-        async_batch = pool.map_async(_convert_dot_to_dgl, current_asts)
+        async_batch = pool.map_async(convert_dot_to_dgl, current_asts)
 
         current_description = _collect_ast_description(projects_paths, current_asts)
         current_description['token'].fillna(value='NAN', inplace=True)

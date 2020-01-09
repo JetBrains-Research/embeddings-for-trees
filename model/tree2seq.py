@@ -123,3 +123,13 @@ class ModelFactory:
             decoder_part,
             self.using_attention
         ).to(device)
+
+
+def load_model(path_to_model: str, device: torch.device) -> Tree2Seq:
+    print("loading model...")
+    checkpoint = torch.load(path_to_model, map_location=device)
+    configuration = checkpoint['configuration']
+    model_factory = ModelFactory(configuration['embedding'], configuration['encoder'], configuration['decoder'])
+    model: Tree2Seq = model_factory.construct_model(device)
+    model.load_state_dict(checkpoint['state_dict'])
+    return model

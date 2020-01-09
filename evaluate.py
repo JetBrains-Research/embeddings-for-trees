@@ -1,16 +1,14 @@
 from argparse import ArgumentParser
 from json import load as json_load
-from typing import Dict
 from pickle import load as pkl_load
+from typing import Dict
 
-import torch
 import torch.nn as nn
-from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import ModelFactory, Tree2Seq
+from model.tree2seq import load_model
 from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD
-from utils.logging import get_possible_loggers, TerminalLogger, FileLogger, WandBLogger, FULL_DATASET
+from utils.logging import get_possible_loggers
 from utils.training import evaluate_dataset
 
 
@@ -26,12 +24,7 @@ def evaluate(params: Dict, logging: str) -> None:
         label_to_id = pkl_load(pkl_file)
     sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
 
-    print("loading model...")
-    checkpoint = torch.load(params['paths']['model'], map_location=device)
-    configuration = checkpoint['configuration']
-    model_factory = ModelFactory(configuration['embedding'], configuration['encoder'], configuration['decoder'])
-    model: Tree2Seq = model_factory.construct_model(device)
-    model.load_state_dict(checkpoint['state_dict'])
+    model = load_model(params['paths']['model'], device)
 
     # define loss function
     criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id[PAD]).to(device)

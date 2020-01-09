@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from tqdm.auto import tqdm
 
-
 SOS = '<SOS>'
 EOS = '<EOS>'
 PAD = '<PAD>'
