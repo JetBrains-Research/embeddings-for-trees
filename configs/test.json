@@ -8,14 +8,14 @@
   },
 
   "embedding": {
-    "name": "SubTokenEmbedding",
+    "name": "SubTokenTypeEmbedding",
     "params": {
       "out_size": 64
     }
   },
 
   "encoder": {
-    "name": "TreeLSTM",
+    "name": "TokenTypeTreeLSTM",
     "params": {
       "x_size": 64,
       "h_size": 64,
@@ -43,6 +43,7 @@
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
+  "teacher_force": 0.5,
 
   "evaluation_step": -1,
 

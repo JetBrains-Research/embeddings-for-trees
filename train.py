@@ -37,14 +37,17 @@ def train(params: Dict, logging: str) -> None:
     subtoken_to_id, token_to_subtoken = split_tokens_to_subtokens(
         token_to_id, required_tokens=[UNK, PAD, 'METHOD_NAME', 'NAN'], return_ids=True, device=device
     )
+    type_to_id[UNK] = len(type_to_id)
+    type_to_id[PAD] = len(type_to_id)
 
     print('model initializing...')
     # create models
     extended_params = deepcopy(params)
     extended_params['embedding']['params']['token_vocab_size'] = len(subtoken_to_id)
     extended_params['embedding']['params']['token_to_subtoken'] = token_to_subtoken
-    extended_params['embedding']['params']['padding_index'] = subtoken_to_id[PAD]
+    extended_params['embedding']['params']['token_padding_index'] = subtoken_to_id[PAD]
     extended_params['embedding']['params']['type_vocab_size'] = len(type_to_id)
+    extended_params['embedding']['params']['type_padding_index'] = type_to_id[PAD]
     extended_params['decoder']['params']['out_size'] = len(sublabel_to_id)
     extended_params['decoder']['params']['padding_index'] = sublabel_to_id[PAD]
     model_factory = ModelFactory(extended_params['embedding'], extended_params['encoder'], extended_params['decoder'])
