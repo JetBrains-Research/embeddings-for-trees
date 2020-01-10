@@ -5,9 +5,9 @@
     "vocabulary": "./data/java-small/vocabulary.pkl",
     "labels": "./data/java-small/labels.pkl",
 
-    "model": "checkpoints/2019_12_05_16:30:11/epoch_0.pt"
+    "model": "epoch_0.pt"
   },
 
 
-  "batch_size": 8
+  "batch_size": 200
 }

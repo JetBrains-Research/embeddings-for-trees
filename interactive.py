@@ -13,8 +13,8 @@ from utils.common import fix_seed, get_device, SOS, EOS, split_tokens_to_subtoke
 TMP_FOLDER = '.tmp'
 astminer_cli_path = 'utils/astminer-cli.jar'
 
-vocab_path = 'data/java-small/java-small_vocabulary.pkl'
-labels_path = 'data/java-small/java-small_labels.pkl'
+vocab_path = 'data/java-small/vocabulary.pkl'
+labels_path = 'data/java-small/labels.pkl'
 
 
 def build_ast(path_to_function: str) -> bool:

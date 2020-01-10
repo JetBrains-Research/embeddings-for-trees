@@ -9,6 +9,8 @@ from model.encoder import _IEncoder
 class TreeLSTMCell(nn.Module):
     def __init__(self, x_size, h_size):
         super(TreeLSTMCell, self).__init__()
+        self.x_size = x_size
+        self.h_size = h_size
         self.W_iou = nn.Linear(x_size, 3 * h_size, bias=False)
         self.U_iou = nn.Linear(h_size, 3 * h_size, bias=False)
         self.b_iou = nn.Parameter(torch.zeros(1, 3 * h_size), requires_grad=True)
@@ -33,6 +35,26 @@ class TreeLSTMCell(nn.Module):
         h = o * torch.tanh(c)
         return {'h': h, 'c': c}
 
+    def process_batch(self, batch: dgl.BatchedDGLGraph, input: torch.Tensor, device: torch.device)\
+            -> Tuple[torch.Tensor, torch.Tensor]:
+        # register function for message passing
+        batch.register_message_func(self.message_func)
+        batch.register_reduce_func(self.reduce_func)
+        batch.register_apply_node_func(self.apply_node_func)
+
+        nodes_in_batch = batch.number_of_nodes()
+        batch.ndata['node_iou'] = self.W_iou(input) + self.b_iou
+        batch.ndata['node_f'] = self.W_f(input) + self.b_f
+        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
+        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
+        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
+        # propagate
+        dgl.prop_nodes_topo(batch)
+        # get encoded output
+        h = batch.ndata.pop('h')
+        c = batch.ndata.pop('c')
+        return h, c
+
 
 class TokenTreeLSTM(_IEncoder):
 
@@ -43,24 +65,8 @@ class TokenTreeLSTM(_IEncoder):
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
-        # register function for message passing
-        batch.register_message_func(self.cell.message_func)
-        batch.register_reduce_func(self.cell.reduce_func)
-        batch.register_apply_node_func(self.cell.apply_node_func)
-        # set hidden and memory state
-        nodes_in_batch = batch.number_of_nodes()
         dropout_tokens = self.dropout(batch.ndata['token_embeds'])
-        batch.ndata['node_iou'] = self.cell.W_iou(dropout_tokens) + self.cell.b_iou
-        batch.ndata['node_f'] = self.cell.W_f(dropout_tokens) + self.cell.b_f
-        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
-        # propagate
-        dgl.prop_nodes_topo(batch)
-        # get encoded output
-        h = batch.ndata.pop('h')
-        c = batch.ndata.pop('c')
-        return h, c
+        return self.cell.process_batch(batch, dropout_tokens, device)
 
 
 class TokenTypeTreeLSTM(_IEncoder):
@@ -68,26 +74,16 @@ class TokenTypeTreeLSTM(_IEncoder):
     def __init__(self, x_size: int, h_size: int, dropout_prob: float = 0.) -> None:
         super().__init__()
         self.h_size = h_size
-        self.cell = TreeLSTMCell(2 * x_size, h_size)
+        self.cell = TreeLSTMCell(h_size, h_size)
         self.dropout = nn.Dropout(dropout_prob)
+        self.linear = nn.Linear(2 * x_size, h_size)
+        self.tanh = nn.Tanh()
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
-        # register function for message passing
-        batch.register_message_func(self.cell.message_func)
-        batch.register_reduce_func(self.cell.reduce_func)
-        batch.register_apply_node_func(self.cell.apply_node_func)
-        # set hidden and memory state
-        nodes_in_batch = batch.number_of_nodes()
-        features = torch.cat([batch.ndata['token_embeds'], batch.ndata['type_embeds']], 1)
+        features = self.tanh(
+            self.linear(
+                torch.cat([batch.ndata['token_embeds'], batch.ndata['type_embeds']], 1)
+            )
+        )
         dropout_tokens = self.dropout(features)
-        batch.ndata['node_iou'] = self.cell.W_iou(dropout_tokens) + self.cell.b_iou
-        batch.ndata['node_f'] = self.cell.W_f(dropout_tokens) + self.cell.b_f
-        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
-        # propagate
-        dgl.prop_nodes_topo(batch)
-        # get encoded output
-        h = batch.ndata.pop('h')
-        c = batch.ndata.pop('c')
-        return h, c
+        return self.cell.process_batch(batch, dropout_tokens, device)

@@ -57,9 +57,9 @@ class WandBLogger(_ILogger):
         group = 'train' if is_train else 'validation'
         state_dict = {f'{group}/{key}': value for key, value in state_dict.items()}
         state_dict['epoch'] = epoch_num
-        if not is_train:
+        # if not is_train:
             # set step for validation the same as last for training or zero
-            self.step = max(0, self.step - 1)
+            # self.step = max(0, self.step - 1)
         wandb.log(state_dict, step=self.step)
         self.step += 1
 
