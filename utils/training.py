@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 import dgl
 import torch
@@ -81,7 +81,7 @@ def train_on_batch(
 def eval_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph, labels: List[str],
         label_to_sublabel: Dict, sublabel_to_id: Dict, device: torch.device
-) -> Dict:
+) -> Tuple[Dict, torch.Tensor]:
     model.eval()
 
     ground_truth = convert_labels(labels, label_to_sublabel, sublabel_to_id).to(device)
@@ -103,7 +103,7 @@ def eval_on_batch(
                     ground_truth, prediction, [sublabel_to_id[token] for token in [PAD, UNK, EOS]]
                 )
         }
-        return batch_eval_info
+        return batch_eval_info, prediction
 
 
 def evaluate_dataset(dataset: JavaDataset, model: Tree2Seq, criterion: nn.modules.loss,
@@ -114,7 +114,7 @@ def evaluate_dataset(dataset: JavaDataset, model: Tree2Seq, criterion: nn.module
         graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
         graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
         eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
-        batch_info = eval_on_batch(
+        batch_info, _ = eval_on_batch(
             model, criterion, graph, labels,
             eval_label_to_sublabel, sublabel_to_id, device
         )

@@ -55,7 +55,7 @@ def _collect_all_descriptions(project_paths: List[str]) -> pd.DataFrame:
     return asts_description
 
 
-def _async_transform_keys(df_chunk, token_to_id, type_to_id):
+def transform_keys(df_chunk, token_to_id, type_to_id):
     keys = ['token', 'type']
     new_keys = ['token_id', 'type_id']
     funcs = [
@@ -109,7 +109,7 @@ def _convert_high_memory(project_paths: List[str], asts: List[str], asts_order: 
     ]
     with Pool(n_jobs) as pool:
         full_descriptions = pd.concat(
-            pool.starmap(_async_transform_keys, chunks)
+            pool.starmap(transform_keys, chunks)
         )
 
     n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)

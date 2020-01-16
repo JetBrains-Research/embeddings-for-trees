@@ -35,7 +35,7 @@ class TreeLSTMCell(nn.Module):
         h = o * torch.tanh(c)
         return {'h': h, 'c': c}
 
-    def process_batch(self, batch: dgl.BatchedDGLGraph, input: torch.Tensor, device: torch.device)\
+    def process_batch(self, batch: dgl.BatchedDGLGraph, features: torch.Tensor, device: torch.device)\
             -> Tuple[torch.Tensor, torch.Tensor]:
         # register function for message passing
         batch.register_message_func(self.message_func)
@@ -43,8 +43,8 @@ class TreeLSTMCell(nn.Module):
         batch.register_apply_node_func(self.apply_node_func)
 
         nodes_in_batch = batch.number_of_nodes()
-        batch.ndata['node_iou'] = self.W_iou(input) + self.b_iou
-        batch.ndata['node_f'] = self.W_f(input) + self.b_f
+        batch.ndata['node_iou'] = self.W_iou(features) + self.b_iou
+        batch.ndata['node_f'] = self.W_f(features) + self.b_f
         batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
         batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
         batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
