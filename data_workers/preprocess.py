@@ -77,6 +77,7 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
     create_folder(output_folder_path)
     successful_builds = 0
     for project in tqdm(projects):
+        print(f"working with {project} project")
         project_path = os.path.join(data_path, holdout_name, project)
         output_project_path = os.path.join(output_folder_path, project)
         create_folder(output_project_path)
@@ -99,9 +100,10 @@ def build_holdout_asts(data_path: str, holdout_name: str) -> str:
     return output_folder_path
 
 
-def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
+def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict, Dict]:
     token_vocabulary = Counter()
     type_vocabulary = Counter()
+    label_vocabulary = Counter()
     projects = os.listdir(train_path)
     print("collect vocabulary from training holdout")
     for project in tqdm(projects):
@@ -109,21 +111,19 @@ def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict]:
         project_description['token'].fillna('NAN', inplace=True)
         token_vocabulary.update(project_description['token'].values)
         type_vocabulary.update(project_description['type'].values)
+        label_vocabulary.update(project_description['label'].values)
     print(f"found {len(token_vocabulary)} tokens")
     print(f"found {len(type_vocabulary)} types")
-    token_to_id = {
-        UNK: 0
-    }
-    token_to_id.update(
-        [(token, num + 1) for num, token in enumerate(token_vocabulary)]
-    )
-    type_to_id = {
-        UNK: 0
-    }
-    type_to_id.update(
-        [(node_type, num + 1) for num, node_type in enumerate(type_vocabulary)]
-    )
-    return token_to_id, type_to_id
+    print(f"found {len(label_vocabulary)} labels")
+    token_to_id = {UNK: 0}
+    type_to_id = {UNK: 0}
+    label_to_id = {UNK: 0}
+    for id_dict, counter in \
+            [(token_to_id, token_vocabulary), (type_to_id, type_vocabulary), (label_to_id, label_vocabulary)]:
+        id_dict.update(
+            [(token, num + 1) for num, token in enumerate(counter)]
+        )
+    return token_to_id, type_to_id, label_to_id
 
 
 def main(args: Namespace) -> None:
@@ -157,9 +157,9 @@ def main(args: Namespace) -> None:
 
     vocabulary_path = os.path.join(data_path, vocabulary_name)
     if args.collect_vocabulary:
-        token_to_id, type_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
+        token_to_id, type_to_id, label_to_id = collect_vocabulary(os.path.join(data_path, f'{holdout_folders[0]}_asts'))
         with open(vocabulary_path, 'wb') as pkl_file:
-            pkl_dump({'token_to_id': token_to_id, 'type_to_id': type_to_id}, pkl_file)
+            pkl_dump({'token_to_id': token_to_id, 'type_to_id': type_to_id, 'label_to_id': label_to_id}, pkl_file)
 
     if args.convert:
         if not all([os.path.exists(path[1]) for path in holdout_ast_paths.items()]):
@@ -203,9 +203,10 @@ def main(args: Namespace) -> None:
         vocabulary_path = os.path.join(data_path, vocabulary_name)
         download_file(vocabulary_path, s3_bucket_name, f'{dataset_name}_{vocabulary_name}')
 
-    for holdout, path in holdout_preprocessed_paths.items():
-        number_of_batches = len(os.listdir(path))
-        print(f"There are {number_of_batches} batches in {holdout} data")
+    if all([os.path.exists(holdout_path) for _, holdout_path in holdout_preprocessed_paths.items()]):
+        for holdout, path in holdout_preprocessed_paths.items():
+            number_of_batches = len(os.listdir(path))
+            print(f"There are {number_of_batches} batches in {holdout} data")
 
 
 if __name__ == '__main__':
