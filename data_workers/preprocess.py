@@ -184,14 +184,16 @@ def main(args: Namespace) -> None:
     if args.upload:
         if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
             raise RuntimeError("convert ast before uploading or using it via --convert arg")
-        for holdout, path in holdout_preprocessed_paths.items():
-            tar_file_name = os.path.join(data_path, f'{dataset_name}_{holdout}_preprocessed.tar.gz')
-            with tar_open(tar_file_name, 'w:gz') as tar_file:
-                for file in tqdm(os.listdir(path)):
-                    tar_file.add(os.path.join(path, file), file)
-            upload_file(tar_file_name, s3_bucket_name)
-        vocabulary_path = os.path.join(data_path, vocabulary_name)
-        upload_file(vocabulary_path, s3_bucket_name, f'{dataset_name}_{vocabulary_name}')
+        tar_file_name = f'{dataset_name}_{args.tar_suffix}.tar.gz'
+        completed_process = subprocess_run(
+            ['tar', '-czf', tar_file_name, vocabulary_name] +
+            [f'{holdout}_preprocessed' for holdout in holdout_folders],
+            cwd=data_path
+        )
+        if completed_process.returncode != 0:
+            print(f"can't create tar for preprocessed data, failed with\n{completed_process.stdout}")
+        else:
+            upload_file(os.path.join(data_path, tar_file_name), s3_bucket_name, tar_file_name)
 
     if args.download_preprocessed:
         for holdout, path in holdout_preprocessed_paths.items():
@@ -221,5 +223,6 @@ if __name__ == '__main__':
     arg_parser.add_argument('--n_jobs', type=int, default=-1)
     arg_parser.add_argument('--batch_size', type=int, default=100)
     arg_parser.add_argument('--high_memory', action='store_true')
+    arg_parser.add_argument('--tar_suffix', type=str, default='default')
 
     main(arg_parser.parse_args())
