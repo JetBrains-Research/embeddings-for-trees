@@ -7,8 +7,10 @@ from utils.common import segment_sizes_to_slices
 
 
 class _IAttention(nn.Module):
-    def __init__(self):
+    def __init__(self, h_enc: int, h_dec: int) -> None:
         super().__init__()
+        self.h_enc = h_enc
+        self.h_dec = h_dec
 
     def forward(self, prev_hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
             -> torch.Tensor:
@@ -24,9 +26,7 @@ class _IAttention(nn.Module):
 
 class LuongConcatAttention(_IAttention):
     def __init__(self, h_enc: int, h_dec: int) -> None:
-        super().__init__()
-        self.h_enc = h_enc
-        self.h_dec = h_dec
+        super().__init__(h_enc, h_dec)
         self.linear = nn.Linear(self.h_dec + self.h_enc, self.h_enc)
         self.v = nn.Parameter(torch.rand(self.h_enc, 1), requires_grad=True)
 

@@ -1,5 +1,4 @@
 from argparse import ArgumentParser
-from copy import deepcopy
 from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
@@ -10,7 +9,7 @@ from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
-from utils.common import fix_seed, get_device, split_tokens_to_subtokens, PAD, UNK, is_current_step_match
+from utils.common import fix_seed, get_device, is_current_step_match
 from utils.learning_info import LearningInfo
 from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_DATASET, TerminalLogger
 from utils.training import train_on_batch, evaluate_dataset
@@ -24,12 +23,6 @@ def train(params: Dict, logging: str) -> None:
     training_set = JavaDataset(params['paths']['train'], params['batch_size'], True)
     validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], True)
 
-    print('processing labels...')
-    with open(params['paths']['labels'], 'rb') as pkl_file:
-        label_to_id = pkl_load(pkl_file)
-    sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
-
-    print('processing vocabulary...')
     with open(params['paths']['vocabulary'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
         token_to_id = vocabulary['token_to_id']
@@ -37,13 +30,9 @@ def train(params: Dict, logging: str) -> None:
         label_to_id = vocabulary['label_to_id']
 
     print('model initializing...')
-    # create models
-    extended_params = deepcopy(params)
-    extended_params['decoder']['params']['out_size'] = len(sublabel_to_id)
-    extended_params['decoder']['params']['padding_index'] = sublabel_to_id[PAD]
-
+    # create model
     model_factory = ModelFactory(
-        extended_params['embedding'], extended_params['encoder'], extended_params['decoder'],
+        params['embedding'], params['encoder'], params['decoder'],
         params['hidden_states'], token_to_id, type_to_id, label_to_id
     )
     model: Tree2Seq = model_factory.construct_model(device)
@@ -54,7 +43,7 @@ def train(params: Dict, logging: str) -> None:
     )
 
     # define loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id[PAD]).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
 
     # init logging class
     logger = None
@@ -76,23 +65,22 @@ def train(params: Dict, logging: str) -> None:
             graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
             graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
             batch_info = train_on_batch(
-                model, criterion, optimizer, graph, labels,
-                label_to_sublabel, sublabel_to_id, params, device
+                model, criterion, optimizer, graph, labels, params, device
             )
             train_acc_info.accumulate_info(batch_info)
             if is_current_step_match(batch_id, params['logging_step']):
                 logger.log(train_acc_info.get_state_dict(), epoch, batch_id)
                 train_acc_info = LearningInfo()
             if is_current_step_match(batch_id, params['evaluation_step']):
-                eval_epoch_info = evaluate_dataset(validation_set, model, criterion, sublabel_to_id, device)
+                eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
                 logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
 
         # iterate over validation set
-        eval_epoch_info = evaluate_dataset(validation_set, model, criterion, sublabel_to_id, device)
+        eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
         logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
 
         if is_current_step_match(epoch, params['checkpoint_step']):
-            logger.save_model(model, epoch, extended_params)
+            logger.save_model(model, epoch, model_factory.save_configuration())
 
 
 if __name__ == '__main__':

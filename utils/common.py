@@ -2,8 +2,7 @@ from os import mkdir
 from os.path import exists
 from shutil import rmtree
 from tarfile import open as tar_open
-from typing import Dict, List, Tuple
-from collections import Counter
+from typing import List
 
 import numpy as np
 import torch
@@ -47,48 +46,6 @@ def create_folder(path: str, is_clean: bool = True) -> None:
         rmtree(path)
     if not exists(path):
         mkdir(path)
-
-
-def split_tokens_to_subtokens(
-        token_to_id: Dict, device: torch.device, n_most_common: int = -1,
-        delimiter: str = '|', required_tokens: List = None, return_ids: bool = False
-) -> Tuple[Dict, Dict]:
-    if required_tokens is None:
-        required_tokens = [UNK, SOS, EOS, PAD]
-    subtoken_counter = Counter()
-    for token, i in token_to_id.items():
-        subtoken_counter.update(token.split(delimiter))
-    for token in required_tokens:
-        if token in subtoken_counter:
-            del subtoken_counter[token]
-    subtoken_to_id = {}
-    subtoken_to_id.update(
-        [(token, num) for num, token in enumerate(required_tokens)]
-    )
-    if n_most_common == -1:
-        n_most_common = len(subtoken_counter)
-    subtoken_to_id.update(
-        [(label[0], num + len(required_tokens))
-         for num, label in enumerate(subtoken_counter.most_common(n_most_common))]
-    )
-    token_to_subtoken = {}
-    for token, i in token_to_id.items():
-        cur_split = torch.tensor([subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]).to(device)
-        if return_ids:
-            token_to_subtoken[i] = cur_split
-        else:
-            token_to_subtoken[token] = cur_split
-    return subtoken_to_id, token_to_subtoken
-
-
-def convert_tokens_to_subtokens(
-        tokens: List[str], subtoken_to_id: Dict, device: torch.device, delimiter: str = '|'
-) -> Dict:
-    token_to_subtoken = {}
-    for token in tokens:
-        cur_split = torch.tensor([subtoken_to_id.get(tok, 0) for tok in token.split(delimiter)]).to(device)
-        token_to_subtoken[token] = cur_split
-    return token_to_subtoken
 
 
 def segment_sizes_to_slices(sizes: List) -> List:

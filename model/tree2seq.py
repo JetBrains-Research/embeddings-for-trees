@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, Union, Tuple, List
 
 import torch
 import torch.nn as nn
@@ -10,6 +10,7 @@ from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding
 from model.encoder import _IEncoder
 from model.treelstm import TokenTreeLSTM, TokenTypeTreeLSTM
+from utils.common import PAD, EOS, SOS
 
 
 class Tree2Seq(nn.Module):
@@ -22,23 +23,25 @@ class Tree2Seq(nn.Module):
         self.using_attention = using_attention
 
     def forward(self,
-                graph: BatchedDGLGraph, root_indexes: torch.LongTensor, ground_truth: torch.Tensor,
-                teacher_force: float, device: torch.device) -> torch.Tensor:
+                graph: BatchedDGLGraph, root_indexes: torch.LongTensor, labels: List[str],
+                teacher_force: float, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         """
 
         :param graph: the batched graph with function's asts
         :param root_indexes: indexes of roots in the batched graph
-        :param ground_truth: [length of the longest sequence, batch size]
+        :param labels: [batch size]
         :param teacher_force: probability of teacher forcing, 0 means use previous output
         :param device: torch device
-        :return: [length of the longest sequence, batch size, number of classes] logits for each element in sequence
+        :return: logits and ground truth in the same manner
         """
-        embedded_graph = self.embedding(graph)
+        embedded_graph = self.embedding(graph, device)
         # [number of nodes, hidden state]
         node_hidden_states, node_memory_cells = self.encoder(embedded_graph, device)
         # [1, batch size, hidden state] (LSTM input requires)
         root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
         root_memory_cells = node_memory_cells[root_indexes].unsqueeze(0)
+
+        ground_truth = self.decoder.convert_labels(labels, device)
 
         max_length, batch_size = ground_truth.shape
         # [length of the longest sequence, batch size, number of classes]
@@ -61,7 +64,7 @@ class Tree2Seq(nn.Module):
             outputs[step] = output
             current_input = ground_truth[step] if torch.rand(1) < teacher_force else output.argmax(dim=1)
 
-        return outputs
+        return outputs, ground_truth
 
     @staticmethod
     def predict(logits: torch.Tensor) -> torch.Tensor:
@@ -127,18 +130,18 @@ class ModelFactory:
                 **self.attention_info['params']
             )
             decoder_part = self.decoder(
-                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
-                **self.decoder_info['params'], attention=attention_part
+                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'], attention=attention_part,
+                label_to_id=self.label_to_id, **self.decoder_info['params'],
             )
         else:
             decoder_part = self.decoder(
                 h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
-                **self.decoder_info['params']
+                label_to_id=self.label_to_id, **self.decoder_info['params']
             )
         return Tree2Seq(
             self.embedding(
                 h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
-                type_to_id=self.type_to_id, device=device, **self.embedding_info['params']
+                type_to_id=self.type_to_id, **self.embedding_info['params']
             ),
             self.encoder(
                 h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
@@ -148,12 +151,23 @@ class ModelFactory:
             self.using_attention
         ).to(device)
 
+    def save_configuration(self) -> Dict:
+        return {
+            'embedding_info': self.embedding_info,
+            'encoder_info': self.encoder_info,
+            'decoder_info': self.decoder_info,
+            'hidden_states': self.hidden_states,
+            'token_to_id': self.token_to_id,
+            'type_to_id': self.type_to_id,
+            'label_to_id': self.label_to_id
+        }
+
 
 def load_model(path_to_model: str, device: torch.device) -> Tree2Seq:
     print("loading model...")
     checkpoint = torch.load(path_to_model, map_location=device)
     configuration = checkpoint['configuration']
-    model_factory = ModelFactory(configuration['embedding'], configuration['encoder'], configuration['decoder'])
+    model_factory = ModelFactory(**configuration)
     model: Tree2Seq = model_factory.construct_model(device)
     model.load_state_dict(checkpoint['state_dict'])
     return model

@@ -1,16 +1,27 @@
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 import torch
 import torch.nn as nn
 
 from model.attention import _IAttention
-from utils.common import segment_sizes_to_slices
+from utils.common import segment_sizes_to_slices, PAD, UNK
+from utils.token_processing import convert_label_to_sublabels, get_dict_of_subtokens
 
 
 class _IAttentionDecoder(nn.Module):
 
-    def __init__(self):
+    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict, attention: _IAttention):
         super().__init__()
+        self.h_enc = h_enc
+        self.h_dec = h_dec
+        self.label_to_id = label_to_id
+        self.attention = attention
+
+        if UNK not in self.label_to_id:
+            self.label_to_id[UNK] = len(self.label_to_id)
+
+        self.out_size = len(self.label_to_id)
+        self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
@@ -29,16 +40,17 @@ class _IAttentionDecoder(nn.Module):
         """
         raise NotImplementedError
 
+    def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
+        raise NotImplementedError
+
 
 class LSTMAttentionDecoder(_IAttentionDecoder):
-    def __init__(self, h_enc: int, h_dec: int, out_size: int,
-                 padding_index: int, attention: _IAttention, dropout_prob: float = 0.):
-        super().__init__()
-        self.h_enc = h_enc
-        self.h_dec = h_dec
-        self.out_size = out_size
+    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict, attention: _IAttention,
+                 dropout_prob: float = 0.):
+        self.sublabel_to_id = get_dict_of_subtokens(label_to_id)
+        super().__init__(h_enc, h_dec, self.sublabel_to_id, attention)
 
-        self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=padding_index)
+        self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=self.pad_index)
         self.lstm = nn.LSTM(self.h_dec + self.h_enc, self.h_dec)
         self.linear = nn.Linear(self.h_dec, self.out_size)
         self.attention = attention
@@ -73,3 +85,6 @@ class LSTMAttentionDecoder(_IAttentionDecoder):
         logits = self.linear(output.squeeze(0))
 
         return logits, new_hidden_states, new_memory_cells
+
+    def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
+        return convert_label_to_sublabels(labels, self.sublabel_to_id, device)

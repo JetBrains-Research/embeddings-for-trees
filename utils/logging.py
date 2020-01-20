@@ -33,11 +33,11 @@ class _ILogger:
     def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
         raise NotImplementedError
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
+    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
         saving_path = join_path(self.checkpoints_folder, f'epoch_{epoch_num}.pt')
         torch.save({
             'state_dict': model.state_dict(),
-            'configuration': params
+            'configuration': configuration
         }, saving_path)
         return saving_path
 
@@ -57,14 +57,14 @@ class WandBLogger(_ILogger):
         group = 'train' if is_train else 'validation'
         state_dict = {f'{group}/{key}': value for key, value in state_dict.items()}
         state_dict['epoch'] = epoch_num
-        # if not is_train:
+        if not is_train:
             # set step for validation the same as last for training or zero
-            # self.step = max(0, self.step - 1)
+            self.step = max(0, self.step - 1)
         wandb.log(state_dict, step=self.step)
         self.step += 1
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
-        checkpoint_path = super().save_model(model, epoch_num, params)
+    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
+        checkpoint_path = super().save_model(model, epoch_num, configuration)
         wandb.save(checkpoint_path)
         return checkpoint_path
 
@@ -88,8 +88,8 @@ class TerminalLogger(_ILogger):
             log_info = self._dividing_line + log_info
         return log_info
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
-        return super().save_model(model, epoch_num, params)
+    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
+        return super().save_model(model, epoch_num, configuration)
 
 
 class FileLogger(TerminalLogger):
@@ -107,5 +107,5 @@ class FileLogger(TerminalLogger):
         with open(self.file_path, 'a') as logging_file:
             logging_file.write(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, params: Dict) -> str:
-        return super().save_model(model, epoch_num, params)
+    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
+        return super().save_model(model, epoch_num, configuration)
