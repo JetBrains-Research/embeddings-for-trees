@@ -33,7 +33,7 @@ class Tree2Seq(nn.Module):
         :param device: torch device
         :return: [length of the longest sequence, batch size, number of classes] logits for each element in sequence
         """
-        embedded_graph = self.embedding(graph, device)
+        embedded_graph = self.embedding(graph)
         # [number of nodes, hidden state]
         node_hidden_states, node_memory_cells = self.encoder(embedded_graph, device)
         # [1, batch size, hidden state] (LSTM input requires)
@@ -93,10 +93,15 @@ class ModelFactory:
         'LuongConcatAttention': LuongConcatAttention
     }
 
-    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict):
+    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict,
+                 token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
         self.embedding_info = embedding_info
         self.encoder_info = encoder_info
         self.decoder_info = decoder_info
+
+        self.token_to_id = token_to_id
+        self.type_to_id = type_to_id
+        self.label_to_id = label_to_id
 
         self.embedding = self._get_module(self.embedding_info['name'], self._embeddings)
         self.encoder = self._get_module(self.encoder_info['name'], self._encoders)
@@ -120,7 +125,9 @@ class ModelFactory:
         else:
             decoder_part = self.decoder(**self.decoder_info['params'])
         return Tree2Seq(
-            self.embedding(**self.embedding_info['params']),
+            self.embedding(
+                **self.embedding_info['params'], token_to_id=self.token_to_id, type_to_id=self.type_to_id, device=device
+            ),
             self.encoder(**self.encoder_info['params']),
             decoder_part,
             self.using_attention

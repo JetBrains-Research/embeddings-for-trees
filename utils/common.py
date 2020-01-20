@@ -13,6 +13,8 @@ SOS = '<SOS>'
 EOS = '<EOS>'
 PAD = '<PAD>'
 UNK = '<UNK>'
+NAN = 'NAN'
+METHOD_NAME = 'METHOD_NAME'
 
 
 def get_device() -> torch.device:
