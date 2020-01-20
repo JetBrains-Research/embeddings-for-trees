@@ -2,12 +2,8 @@
   "paths": {
     "evaluate": "./data/java-small/test_preprocessed",
 
-    "vocabulary": "./data/java-small/vocabulary.pkl",
-    "labels": "./data/java-small/labels.pkl",
-
     "model": "epoch_0.pt"
   },
-
 
   "batch_size": 200
 }

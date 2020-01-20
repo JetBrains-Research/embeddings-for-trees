@@ -3,38 +3,35 @@
     "train": "./data/test_data/train",
     "validate": "./data/test_data/val",
 
-    "vocabulary": "./data/java-small/vocabulary.pkl",
-    "labels": "./data/java-small/labels.pkl"
+    "vocabulary": "./data/java-small/vocabulary.pkl"
+  },
+
+  "hidden_states": {
+    "embedding": 64,
+    "encoder": 64,
+    "decoder": 64
   },
 
   "embedding": {
     "name": "SubTokenTypeEmbedding",
-    "params": {
-      "out_size": 64
-    }
+    "params": {}
   },
 
   "encoder": {
     "name": "TokenTypeTreeLSTM",
     "params": {
-      "x_size": 64,
-      "h_size": 64,
-      "dropout_prob": 0.5
+      "dropout_prob": 0.2
     }
   },
 
   "decoder": {
     "name": "LSTMAttentionDecoder",
     "params": {
-      "embedding_size": 64,
-      "hidden_size": 64,
-      "dropout_prob": 0.5
+      "dropout_prob": 0.2
     },
     "attention": {
       "name": "LuongConcatAttention",
-      "params": {
-        "hidden_size": 64
-      }
+      "params": {}
     }
   },
 
