@@ -31,18 +31,16 @@ class _IAttentionDecoder(nn.Module):
 
 
 class LSTMAttentionDecoder(_IAttentionDecoder):
-    def __init__(self, embedding_size: int, hidden_size: int, out_size: int,
+    def __init__(self, h_enc: int, h_dec: int, out_size: int,
                  padding_index: int, attention: _IAttention, dropout_prob: float = 0.):
         super().__init__()
-        # because of concatenating weighted hidden states and embedding of input token
-        assert embedding_size == hidden_size
-        self.embedding_size = embedding_size
-        self.hidden_size = hidden_size
+        self.h_enc = h_enc
+        self.h_dec = h_dec
         self.out_size = out_size
 
-        self.embedding = nn.Embedding(self.out_size, self.embedding_size, padding_idx=padding_index)
-        self.lstm = nn.LSTM(self.hidden_size + self.embedding_size, self.hidden_size)
-        self.linear = nn.Linear(self.hidden_size, self.out_size)
+        self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=padding_index)
+        self.lstm = nn.LSTM(self.h_dec + self.h_enc, self.h_dec)
+        self.linear = nn.Linear(self.h_dec, self.out_size)
         self.attention = attention
         self.dropout = nn.Dropout(dropout_prob)
 

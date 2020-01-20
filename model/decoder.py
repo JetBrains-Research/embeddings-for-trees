@@ -8,7 +8,7 @@ class _IDecoder(nn.Module):
     """Interface for decoder block in Tree2Seq model
     """
 
-    out_size = None
+    h_dec = None
 
     def __init__(self):
         super().__init__()
@@ -30,11 +30,11 @@ class _IDecoder(nn.Module):
 
 class LinearDecoder(_IDecoder):
 
-    def __init__(self, in_size: int, out_size: int) -> None:
+    def __init__(self, h_enc: int, h_dec: int) -> None:
         super().__init__()
-        self.out_size = out_size
-        self.linear = nn.Linear(in_size, out_size, bias=False)
-        self.bias = nn.Parameter(torch.zeros((1, out_size)), requires_grad=True)
+        self.h_dec = h_dec
+        self.linear = nn.Linear(h_enc, h_dec, bias=False)
+        self.bias = nn.Parameter(torch.zeros((1, h_dec)), requires_grad=True)
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -44,16 +44,23 @@ class LinearDecoder(_IDecoder):
 
 class LSTMDecoder(_IDecoder):
 
-    def __init__(self, embedding_size: int, hidden_size: int, out_size: int,
+    def __init__(self, h_enc: int, h_dec: int, out_size: int,
                  padding_index: int):
+        """
+
+        :param h_enc: size of hidden state of encoder, so it's equal to size of hidden state of lstm cell
+        :param h_dec: size of lstm input/output, so labels embedding size equal to it
+        :param out_size: size of label vocabulary
+        :param padding_index:
+        """
         super().__init__()
-        self.embedding_size = embedding_size
-        self.hidden_size = hidden_size
+        self.h_enc = h_enc
+        self.h_dec = h_dec
         self.out_size = out_size
 
-        self.embedding = nn.Embedding(self.out_size, self.embedding_size, padding_idx=padding_index)
-        self.lstm = nn.LSTM(self.embedding_size, self.hidden_size)
-        self.linear = nn.Linear(self.hidden_size, self.out_size)
+        self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=padding_index)
+        self.lstm = nn.LSTM(self.h_dec, self.h_enc)
+        self.linear = nn.Linear(self.h_dec, self.out_size)
 
     def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
                 root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:

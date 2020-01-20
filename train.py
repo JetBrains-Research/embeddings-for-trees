@@ -44,7 +44,7 @@ def train(params: Dict, logging: str) -> None:
 
     model_factory = ModelFactory(
         extended_params['embedding'], extended_params['encoder'], extended_params['decoder'],
-        token_to_id, type_to_id, label_to_id
+        params['hidden_states'], token_to_id, type_to_id, label_to_id
     )
     model: Tree2Seq = model_factory.construct_model(device)
 

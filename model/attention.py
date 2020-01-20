@@ -23,22 +23,23 @@ class _IAttention(nn.Module):
 
 
 class LuongConcatAttention(_IAttention):
-    def __init__(self, hidden_size: int) -> None:
+    def __init__(self, h_enc: int, h_dec: int) -> None:
         super().__init__()
-        self.hidden_size = hidden_size
-        self.linear = nn.Linear(2 * self.hidden_size, self.hidden_size)
-        self.v = nn.Parameter(torch.rand(self.hidden_size, 1), requires_grad=True)
+        self.h_enc = h_enc
+        self.h_dec = h_dec
+        self.linear = nn.Linear(self.h_dec + self.h_enc, self.h_enc)
+        self.v = nn.Parameter(torch.rand(self.h_enc, 1), requires_grad=True)
 
     def forward(self, prev_hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
             -> torch.Tensor:
-        # [number of nodes in batch, hidden size]
+        # [number of nodes in batch, h_dec]
         repeated_hidden_states = torch.cat(
             [prev_hidden_state.expand(tree_size, -1)
              for prev_hidden_state, tree_size in zip(prev_hidden_states, tree_sizes)],
             dim=0
         )
 
-        # [number of nodes in batch, hidden size]
+        # [number of nodes in batch, h_enc]
         energy = torch.tanh(self.linear(
             torch.cat((repeated_hidden_states, encoder_output), dim=1)
         ))

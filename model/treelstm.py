@@ -58,10 +58,10 @@ class TreeLSTMCell(nn.Module):
 
 class TokenTreeLSTM(_IEncoder):
 
-    def __init__(self, x_size: int, h_size: int, dropout_prob: float = 0.) -> None:
+    def __init__(self, h_emb: int, h_enc: int, dropout_prob: float = 0.) -> None:
         super().__init__()
-        self.h_size = h_size
-        self.cell = TreeLSTMCell(x_size, h_size)
+        self.h_enc = h_enc
+        self.cell = TreeLSTMCell(h_emb, h_enc)
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -71,12 +71,12 @@ class TokenTreeLSTM(_IEncoder):
 
 class TokenTypeTreeLSTM(_IEncoder):
 
-    def __init__(self, x_size: int, h_size: int, dropout_prob: float = 0.) -> None:
+    def __init__(self, h_emb: int, h_enc: int, dropout_prob: float = 0.) -> None:
         super().__init__()
-        self.h_size = h_size
-        self.cell = TreeLSTMCell(h_size, h_size)
+        self.h_enc = h_enc
+        self.cell = TreeLSTMCell(h_enc, h_enc)
         self.dropout = nn.Dropout(dropout_prob)
-        self.linear = nn.Linear(2 * x_size, h_size)
+        self.linear = nn.Linear(2 * h_emb, h_enc)
         self.tanh = nn.Tanh()
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:

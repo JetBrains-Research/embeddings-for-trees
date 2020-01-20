@@ -94,10 +94,12 @@ class ModelFactory:
     }
 
     def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict,
-                 token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
+                 hidden_states: Dict, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
         self.embedding_info = embedding_info
         self.encoder_info = encoder_info
         self.decoder_info = decoder_info
+
+        self.hidden_states = hidden_states
 
         self.token_to_id = token_to_id
         self.type_to_id = type_to_id
@@ -120,15 +122,28 @@ class ModelFactory:
 
     def construct_model(self, device: torch.device) -> Tree2Seq:
         if self.using_attention:
-            attention_part = self.attention(**self.attention_info['params'])
-            decoder_part = self.decoder(**self.decoder_info['params'], attention=attention_part)
+            attention_part = self.attention(
+                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
+                **self.attention_info['params']
+            )
+            decoder_part = self.decoder(
+                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
+                **self.decoder_info['params'], attention=attention_part
+            )
         else:
-            decoder_part = self.decoder(**self.decoder_info['params'])
+            decoder_part = self.decoder(
+                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
+                **self.decoder_info['params']
+            )
         return Tree2Seq(
             self.embedding(
-                **self.embedding_info['params'], token_to_id=self.token_to_id, type_to_id=self.type_to_id, device=device
+                h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
+                type_to_id=self.type_to_id, device=device, **self.embedding_info['params']
             ),
-            self.encoder(**self.encoder_info['params']),
+            self.encoder(
+                h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
+                **self.encoder_info['params']
+            ),
             decoder_part,
             self.using_attention
         ).to(device)
