@@ -9,8 +9,7 @@ import torch.nn as nn
 
 from data_workers.convert import convert_dot_to_dgl, prepare_batch, transform_keys
 from model.tree2seq import load_model
-from utils.common import fix_seed, get_device, EOS, split_tokens_to_subtokens, PAD, create_folder, \
-    convert_tokens_to_subtokens
+from utils.common import fix_seed, get_device, EOS, PAD, create_folder
 from utils.learning_info import LearningInfo
 from utils.training import eval_on_batch
 
@@ -40,6 +39,7 @@ def interactive(path_to_function: str, path_to_model: str):
     device = get_device()
     print(f"using {device} device")
 
+    # convert function to dot format
     print(f"prepare ast...")
     create_folder(TMP_FOLDER)
     if not build_ast(path_to_function):
@@ -63,30 +63,26 @@ def interactive(path_to_function: str, path_to_model: str):
     batched_graph = dgl.batch(
         list(map(lambda g: dgl.reverse(g, share_ndata=True), dgl.unbatch(batched_graph)))
     )
+
+    # load model
+    print("loading models..")
     model = load_model(path_to_model, device)
-
-    with open(labels_path, 'rb') as pkl_file:
-        label_to_id = pkl_load(pkl_file)
-    sublabel_to_id, label_to_sublabel = split_tokens_to_subtokens(label_to_id, device=device)
-    id_to_sublabel = {v: k for k, v in sublabel_to_id.items()}
-    eval_label_to_sublabel = convert_tokens_to_subtokens(labels, sublabel_to_id, device)
-
-    criterion = nn.CrossEntropyLoss(ignore_index=sublabel_to_id[PAD]).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
     info = LearningInfo()
 
     print("forward pass...")
-    batch_info, prediction = eval_on_batch(model, criterion, batched_graph, labels,
-                                           eval_label_to_sublabel, sublabel_to_id, device)
+    batch_info, prediction = eval_on_batch(model, criterion, batched_graph, labels, device)
 
     info.accumulate_info(batch_info)
+    id_to_sublabel = {v: k for k, v in model.decoder.label_to_id.items()}
     label = ''
     for cur_sublabel in prediction:
-        if cur_sublabel.item() == sublabel_to_id[EOS]:
+        if cur_sublabel.item() == model.decoder.label_to_id[EOS]:
             break
         label += '|' + id_to_sublabel[cur_sublabel.item()]
     label = label[1:]
-    print(label)
-    print(info.get_state_dict())
+    print(f"Predicted function name is\n{label}")
+    print(f"Calculated metrics with respect to '{labels[0]}' name\n{info.get_state_dict()}")
 
 
 if __name__ == '__main__':

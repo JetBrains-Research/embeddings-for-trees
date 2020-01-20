@@ -164,7 +164,6 @@ class ModelFactory:
 
 
 def load_model(path_to_model: str, device: torch.device) -> Tree2Seq:
-    print("loading model...")
     checkpoint = torch.load(path_to_model, map_location=device)
     configuration = checkpoint['configuration']
     model_factory = ModelFactory(**configuration)
