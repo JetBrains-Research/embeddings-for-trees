@@ -9,7 +9,6 @@ import torch
 from model.tree2seq import Tree2Seq
 from utils.common import create_folder
 
-
 FULL_DATASET = 'full_dataset'
 
 
@@ -22,7 +21,6 @@ def get_possible_loggers():
 
 
 class _ILogger:
-
     name = '_ILogger'
 
     def __init__(self, checkpoints_folder: str):
@@ -43,13 +41,16 @@ class _ILogger:
 
 
 class WandBLogger(_ILogger):
-
     name = 'wandb'
     step = 0
 
     def __init__(self, project_name: str, config: Dict, model: Tree2Seq, checkpoints_folder: str):
         super().__init__(checkpoints_folder)
         wandb.init(project=project_name, config=config)
+        try:
+            display(wandb.jupyter.Run())
+        except NameError:
+            pass
         # wandb can't work with graphs?
         # wandb.watch(model, log='all')
 
@@ -70,7 +71,6 @@ class WandBLogger(_ILogger):
 
 
 class TerminalLogger(_ILogger):
-
     name = 'terminal'
     _dividing_line = '=' * 100 + '\n'
 
@@ -93,7 +93,6 @@ class TerminalLogger(_ILogger):
 
 
 class FileLogger(TerminalLogger):
-
     name = 'file'
 
     def __init__(self, config: Dict, logging_folder: str, checkpoints_folder: str):
