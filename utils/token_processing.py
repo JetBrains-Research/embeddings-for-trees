@@ -81,7 +81,7 @@ def convert_label_to_sublabels(
     torch_labels[sublabels_length + 1, torch.arange(0, len(labels))] = sublabel_to_id[EOS]
     for sample, label in enumerate(labels):
         torch_labels[1:sublabels_length[sample] + 1, sample] = label_to_sublabel[label]
-    return torch_labels
+    return torch_labels.to(device)
 
 
 def get_token_id_to_subtoken_dict(
