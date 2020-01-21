@@ -5,8 +5,7 @@ from typing import Dict, List, Tuple, Callable
 
 import numpy as np
 import pandas as pd
-from dgl import DGLGraph, BatchedDGLGraph
-from dgl import batch as dgl_batch
+from dgl import DGLGraph, BatchedDGLGraph, unbatch, batch
 from networkx.drawing.nx_pydot import read_dot
 from tqdm.auto import tqdm
 
@@ -37,21 +36,35 @@ def _collect_ast_description(projects_paths: List[str], asts_batch: List[str]) -
     return asts_description
 
 
-def _convert_full_project(project_path: str) -> Tuple[List[DGLGraph], List[str]]:
+def _convert_full_project(project_path: str, n_jobs: int = -1) -> Tuple[List[DGLGraph], List[str]]:
     asts_folder = os.path.join(project_path, 'asts')
-    asts = [os.path.join(asts_folder, ast) for ast in os.listdir(asts_folder)][:200]
-    graphs = [convert_dot_to_dgl(ast) for ast in asts]
+    ast_files = sorted(
+        os.listdir(asts_folder),
+        key=lambda name: int(name[4:-4])
+    )
+    asts = [os.path.join(asts_folder, ast) for ast in ast_files]
+
+    n_jobs = cpu_count() if n_jobs == -1 else n_jobs
+    with Pool(n_jobs) as pool:
+        results = pool.imap(convert_dot_to_dgl, asts)
+        graphs = [graph for graph in tqdm(results, total=len(asts))]
+
     return graphs, asts
 
 
+def _get_project_description(project_path: str) -> pd.DataFrame:
+    project_description = pd.read_csv(os.path.join(project_path, 'description.csv'))
+    project_description['dot_file'] = project_description['dot_file'].apply(
+        lambda dot_file: os.path.join(project_path, 'asts', dot_file)
+    )
+    return project_description
+
+
 def _collect_all_descriptions(project_paths: List[str]) -> pd.DataFrame:
-    asts_description = pd.DataFrame()
-    for project_path in project_paths:
-        project_description = pd.read_csv(os.path.join(project_path, 'description.csv'))
-        project_description['dot_file'] = project_description['dot_file'].apply(
-            lambda dot_file: os.path.join(project_path, 'asts', dot_file)
-        )
-        asts_description = pd.concat([asts_description, project_description], ignore_index=True)
+    asts_description = pd.concat(
+        [_get_project_description(pr_path) for pr_path in tqdm(project_paths)],
+        ignore_index=True
+    )
     return asts_description
 
 
@@ -77,7 +90,7 @@ def prepare_batch(current_description: pd.DataFrame, current_names: List[str],
 
     labels = description_groups.first().loc[current_names]['label'].to_list()
     paths = description_groups.first().loc[current_names]['source_file'].to_list()
-    batched_graph = dgl_batch(batched_graph_callback())
+    batched_graph = batch(batched_graph_callback())
     batched_graph.ndata['token_id'] = current_description['token_id'].to_numpy()
     batched_graph.ndata['type_id'] = current_description['type_id'].to_numpy()
     return batched_graph, labels, paths
@@ -87,6 +100,37 @@ def save_batch(batched_graph: BatchedDGLGraph, labels: List[str], paths: List[st
                output_path: str, batch_num: int) -> None:
     with open(os.path.join(output_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
         pkl_dump({'batched_graph': batched_graph, 'labels': labels, 'paths': paths}, pkl_file)
+
+
+def _convert_per_project(project_paths: List[str], asts: List[str], ast_order: np.array, output_path: str,
+                         token_to_id: Dict, type_to_id: Dict, n_jobs: int, batch_size: int) -> None:
+    converted_asts = {}
+    for project_path in tqdm(project_paths):
+        print(f"converting {project_path} asts into dgl format")
+        project_graphs, project_asts = _convert_full_project(project_path, n_jobs)
+        print(f"prepare description for {project_path} project")
+        project_description = _get_project_description(project_path)
+        project_description['token'].fillna(value='NAN', inplace=True)
+        project_description = transform_keys(project_description, token_to_id, type_to_id)
+
+        print(f"add features to graphs in {project_path} project")
+        batched_graph, labels, paths = prepare_batch(project_description, project_asts, lambda: project_graphs)
+        project_graphs = unbatch(batched_graph)
+
+        for pos, ast_name in enumerate(project_asts):
+            converted_asts[ast_name] = (project_graphs[pos], labels[pos], paths[pos])
+
+    print(f"save batches")
+    asts = np.array(asts)[ast_order]
+    n_batches = len(asts) // batch_size + (1 if len(asts) % batch_size > 0 else 0)
+    for batch_num in tqdm(range(n_batches)):
+        current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(asts)))
+        current_names = asts[current_slice]
+
+        current_graphs, current_labels, current_paths = zip(
+            *[converted_asts[ast] for ast in current_names]
+        )
+        save_batch(batch(current_graphs), current_labels, current_paths, output_path, batch_num)
 
 
 def _convert_high_memory(project_paths: List[str], asts: List[str], asts_order: np.array, output_path: str,
@@ -158,9 +202,10 @@ def convert_holdout(data_path: str, holdout_name: str, token_to_id: Dict,
             ]
     random_index_permutation = np.random.permutation(len(asts))
 
-    _convert_func = _convert_small_memory
-    if is_high_memory:
-        _convert_func = _convert_high_memory
+    # _convert_func = _convert_small_memory
+    # if is_high_memory:
+    #     _convert_func = _convert_high_memory
+    _convert_func = _convert_per_project if is_high_memory else _convert_small_memory
     _convert_func(projects_paths, asts, random_index_permutation, output_holdout_path,
                   token_to_id, type_to_id, n_jobs, batch_size)
 
