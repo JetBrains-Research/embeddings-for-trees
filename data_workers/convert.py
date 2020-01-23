@@ -122,7 +122,11 @@ def _convert_per_project(project_paths: List[str], asts: List[str], ast_order: n
     for project_path in tqdm(project_paths):
         converted_func += len(os.listdir(os.path.join(project_path, 'asts')))
         if not os.path.exists(os.path.join(project_path, 'batch_0.pkl')):
-            _prepare_project(project_path, token_to_id, type_to_id, n_jobs)
+            try:
+                _prepare_project(project_path, token_to_id, type_to_id, n_jobs)
+            except:
+                with open(os.path.join(os.getcwd(), 'convert.txt'), 'a') as log_file:
+                    log_file.write(f"can't convert {project_path} project\n")
         print(f"converted {converted_func} functions")
 
     print("load all graphs to memory")
