@@ -5,51 +5,77 @@ import torch
 import torch.nn as nn
 
 
-class ChildSumTreeLSTMCell(nn.Module):
-    def __init__(self, x_size, h_size):
+class _ITreeLSTMCell(nn.Module):
+    def __init__(self, x_size: int, h_size: int):
         super().__init__()
         self.x_size = x_size
         self.h_size = h_size
-        self.W_iou = nn.Linear(x_size, 3 * h_size, bias=False)
-        self.U_iou = nn.Linear(h_size, 3 * h_size, bias=False)
-        self.b_iou = nn.Parameter(torch.zeros(1, 3 * h_size), requires_grad=True)
-        self.U_f = nn.Linear(h_size, h_size)
-        self.W_f = nn.Linear(x_size, h_size, bias=False)
-        self.b_f = nn.Parameter(torch.zeros((1, h_size)), requires_grad=True)
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
-        return {'h': edges.src['h'], 'c': edges.src['c']}
+        raise NotImplementedError
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        h_tilda = torch.sum(nodes.mailbox['h'], 1)
-        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['node_f'].unsqueeze(1))
-        c = torch.sum(f * nodes.mailbox['c'], 1)
-        return {'Uh_tilda': self.U_iou(h_tilda), 'c': c}
+        raise NotImplementedError
 
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
-        iou = nodes.data['node_iou'] + nodes.data['Uh_tilda']
+        raise NotImplementedError
+
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Propagate nodes by defined order,
+        assuming graph.ndata['x'] contain features
+        """
+        raise NotImplementedError
+
+
+class ChildSumTreeLSTMCell(_ITreeLSTMCell):
+    def __init__(self, x_size, h_size):
+        super().__init__(x_size, h_size)
+        self.W_iou = nn.Linear(self.x_size, 3 * self.h_size, bias=False)
+        self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
+        self.b_iou = nn.Parameter(torch.zeros(1, 3 * self.h_size), requires_grad=True)
+        self.U_f = nn.Linear(self.h_size, self.h_size)
+        self.W_f = nn.Linear(self.x_size, self.h_size, bias=False)
+        self.b_f = nn.Parameter(torch.zeros((1, self.h_size)), requires_grad=True)
+
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        return {
+            'h': edges.src['h'],
+            'f_dot_c': edges.src['f_dot_c'],
+        }
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        h_sum = torch.sum(nodes.mailbox['h'], 1)
+        fc_sum = torch.sum(nodes.mailbox['f_dot_c'], 1)
+        return {'Uh_sum': self.U_iou(h_sum), 'fc_sum': fc_sum}
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        iou = nodes.data['x_iou'] + nodes.data['Uh_sum']
         i, o, u = torch.chunk(iou, 3, 1)
         i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
-        c = i * u + nodes.data['c']
+
+        c = i * u + nodes.data['fc_sum']
         h = o * torch.tanh(c)
-        return {'h': h, 'c': c}
 
-    def process_batch(self, batch: dgl.BatchedDGLGraph, features: torch.Tensor, device: torch.device) \
-            -> Tuple[torch.Tensor, torch.Tensor]:
-        # register function for message passing
-        batch.register_message_func(self.message_func)
-        batch.register_reduce_func(self.reduce_func)
-        batch.register_apply_node_func(self.apply_node_func)
+        f = torch.sigmoid(nodes.data['x_f'] + self.U_f(h))
+        f_dot_c = f * c
+        return {'h': h, 'f_dot_c': f_dot_c}
 
-        nodes_in_batch = batch.number_of_nodes()
-        batch.ndata['node_iou'] = self.W_iou(features) + self.b_iou
-        batch.ndata['node_f'] = self.W_f(features) + self.b_f
-        batch.ndata['h'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['c'] = torch.zeros(nodes_in_batch, self.h_size).to(device)
-        batch.ndata['Uh_tilda'] = torch.zeros(nodes_in_batch, 3 * self.h_size).to(device)
-        # propagate
-        dgl.prop_nodes_topo(batch)
-        # get encoded output
-        h = batch.ndata.pop('h')
-        c = batch.ndata.pop('c')
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        number_of_nodes = graph.number_of_nodes()
+        graph.ndata['x_iou'] = self.W_iou(graph.ndata['x']) + self.b_iou
+        graph.ndata['x_f'] = self.W_f(graph.ndata['x']) + self.b_f
+        graph.ndata['h'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['c'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+
+        graph.register_message_func(self.message_func)
+        graph.register_reduce_func(self.reduce_func)
+        graph.register_apply_node_func(self.apply_node_func)
+
+        dgl.prop_nodes_topo(graph)
+
+        h = graph.ndata.pop('h')
+        c = graph.ndata.pop('c')
         return h, c
+

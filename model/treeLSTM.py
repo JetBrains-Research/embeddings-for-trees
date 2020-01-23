@@ -17,7 +17,8 @@ class TokenTreeLSTM(_IEncoder):
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         dropout_tokens = self.dropout(batch.ndata['token_embeds'])
-        return self.cell.process_batch(batch, dropout_tokens, device)
+        batch.ndata['x'] = dropout_tokens
+        return self.cell(batch, device)
 
 
 class TokenTypeTreeLSTM(_IEncoder):
@@ -35,5 +36,5 @@ class TokenTypeTreeLSTM(_IEncoder):
                 torch.cat([batch.ndata['token_embeds'], batch.ndata['type_embeds']], 1)
             )
         )
-        dropout_tokens = self.dropout(features)
-        return self.cell.process_batch(batch, dropout_tokens, device)
+        batch.ndata['x'] = self.dropout(features)
+        return self.cell(batch, device)
