@@ -66,7 +66,7 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         graph.ndata['x_f'] = self.W_f(graph.ndata['x']) + self.b_f
         graph.ndata['h'] = torch.zeros((number_of_nodes, self.h_size), device=device)
         graph.ndata['c'] = torch.zeros((number_of_nodes, self.h_size), device=device)
-        graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, 3 * self.h_size), device=device)
         graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
 
         graph.register_message_func(self.message_func)
