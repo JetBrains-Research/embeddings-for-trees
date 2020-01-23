@@ -9,7 +9,7 @@ from model.attention_decoder import LSTMAttentionDecoder, _IAttentionDecoder
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding
 from model.encoder import _IEncoder
-from model.treelstm import TokenTreeLSTM, TokenTypeTreeLSTM
+from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM
 from utils.common import PAD, EOS, SOS
 
 
