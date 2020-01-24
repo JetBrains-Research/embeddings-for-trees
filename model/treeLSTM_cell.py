@@ -45,8 +45,9 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         }
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        x_f = nodes.data['x_f'].unsqueeze(1).expand(nodes.mailbox['h_f'].shape)
         f = torch.sigmoid(
-            nodes.data['x_f'] + nodes.mailbox['h_f']
+            x_f + nodes.mailbox['h_f']
         )
         fc_sum = torch.sum(nodes.mailbox['c'] * f, 1)
         return {
