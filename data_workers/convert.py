@@ -45,8 +45,8 @@ def _convert_full_project(project_path: str, n_jobs: int = -1) -> Tuple[List[DGL
     )
     asts = [os.path.join(ast_folder, ast) for ast in ast_files]
 
-    n_jobs = os.cpu_count() if n_jobs == -1 else n_jobs
-    with Pool(n_jobs, maxtasksperchild=1000) as pool:
+    n_jobs = cpu_count() if n_jobs == -1 else n_jobs
+    with Pool(n_jobs) as pool:
         results = pool.imap(convert_dot_to_dgl, asts)
         graphs = [graph for graph in tqdm(results, total=len(asts))]
     return graphs, asts
