@@ -39,14 +39,20 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
         return {
-            'h': edges.src['h'],
-            'f_dot_c': edges.src['f_dot_c'],
+            'h_iou': self.U_iou(edges.src['h']),
+            'h_f': self.U_f(edges.src['h']),
+            'c': edges.src['c']
         }
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        h_sum = torch.sum(nodes.mailbox['h'], 1)
-        fc_sum = torch.sum(nodes.mailbox['f_dot_c'], 1)
-        return {'Uh_sum': self.U_iou(h_sum), 'fc_sum': fc_sum}
+        f = torch.sigmoid(
+            nodes.data['x_f'] + nodes.mailbox['h_f']
+        )
+        fc_sum = torch.sum(nodes.mailbox['c'] * f, 1)
+        return {
+            'Uh_sum': torch.sum(nodes.mailbox['h_iou'], 1),
+            'fc_sum': fc_sum
+        }
 
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         iou = nodes.data['x_iou'] + nodes.data['Uh_sum']
@@ -56,9 +62,7 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         c = i * u + nodes.data['fc_sum']
         h = o * torch.tanh(c)
 
-        f = torch.sigmoid(nodes.data['x_f'] + self.U_f(h))
-        f_dot_c = f * c
-        return {'h': h, 'f_dot_c': f_dot_c}
+        return {'h': h, 'c': c, 'i': i}
 
     def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         number_of_nodes = graph.number_of_nodes()
