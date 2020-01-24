@@ -134,6 +134,10 @@ def _convert_per_project(project_paths: List[str], asts: List[str], ast_order: n
     labels = []
     paths = []
     for project_path in tqdm(project_paths):
+        if not os.path.exists(os.path.join(project_path, 'batch_0.pkl')):
+            with open(os.path.join(os.getcwd(), 'convert.txt'), 'a') as log_file:
+                log_file.write(f"can't load graphs for {project_path} project\n")
+            continue
         with open(os.path.join(project_path, 'batch_0.pkl'), 'rb') as pkl_file:
             project_data = pkl_load(pkl_file)
             graphs += unbatch(project_data['batched_graph'])
