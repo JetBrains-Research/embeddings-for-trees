@@ -3,8 +3,6 @@ from typing import Tuple, Union
 
 import dgl
 import torch
-import torch.nn as nn
-from tqdm.auto import tqdm
 
 from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell
 from utils.common import get_device, fix_seed
@@ -81,7 +79,7 @@ class TreeLSTMCellTest(unittest.TestCase):
     h_sizes = [5, 7, 15, 128, 128]
     numbers_of_children = [4, 7, 13, 10, 20]
 
-    def _test_childsum_tree_lstm_cell(self, tree_lstm_type): 
+    def _test_childsum_tree_lstm_cell(self, tree_lstm_type):
         device = get_device()
         fix_seed()
         for i in range(len(self.x_sizes)):

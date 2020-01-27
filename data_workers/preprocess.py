@@ -4,7 +4,6 @@ from collections import Counter
 from pickle import dump as pkl_dump
 from pickle import load as pkl_load
 from subprocess import run as subprocess_run
-from tarfile import open as tar_open
 from typing import Tuple, Dict
 
 import numpy as np
