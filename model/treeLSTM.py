@@ -5,14 +5,14 @@ import torch
 import torch.nn as nn
 
 from model.encoder import _IEncoder
-from model.treeLSTM_cell import ChildSumTreeLSTMCell
+from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell
 
 
 class TokenTreeLSTM(_IEncoder):
 
     def __init__(self, h_emb: int, h_enc: int, dropout_prob: float = 0.) -> None:
         super().__init__(h_emb, h_enc)
-        self.cell = ChildSumTreeLSTMCell(self.h_emb, self.h_enc)
+        self.cell = EdgeChildSumTreeLSTMCell(self.h_emb, self.h_enc)
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -25,7 +25,7 @@ class TokenTypeTreeLSTM(_IEncoder):
 
     def __init__(self, h_emb: int, h_enc: int, dropout_prob: float = 0.) -> None:
         super().__init__(h_emb, h_enc)
-        self.cell = ChildSumTreeLSTMCell(self.h_enc, self.h_enc)
+        self.cell = EdgeChildSumTreeLSTMCell(self.h_enc, self.h_enc)
         self.dropout = nn.Dropout(dropout_prob)
         self.linear = nn.Linear(2 * self.h_emb, self.h_enc)
         self.tanh = nn.Tanh()
