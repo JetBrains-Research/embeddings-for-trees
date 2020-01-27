@@ -2,6 +2,7 @@ import math
 from typing import Dict, Tuple
 
 import dgl
+import dgl.function as fn
 import torch
 import torch.nn as nn
 
@@ -46,21 +47,24 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
         h = edges.src['h'].unsqueeze(1)
+        h_f = torch.bmm(h, edges.data['U_f']).squeeze(1)
+        x_f = edges.dst['x_f']
+        f = torch.sigmoid(x_f + h_f)
         return {
             'h_iou': torch.bmm(h, edges.data['U_iou']).squeeze(1),
-            'h_f': torch.bmm(h, edges.data['U_f']).squeeze(1),
-            'c': edges.src['c']
+            'fc': edges.src['c'] * f
         }
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        x_f = nodes.data['x_f'].unsqueeze(1).expand(nodes.mailbox['h_f'].shape)
-        f = torch.sigmoid(
-            x_f + nodes.mailbox['h_f']
-        )
-        fc_sum = torch.sum(nodes.mailbox['c'] * f, 1)
+        # x_f = nodes.data['x_f'].unsqueeze(1).expand(nodes.mailbox['h_f'].shape)
+        # f = torch.sigmoid(
+        #     x_f + nodes.mailbox['h_f']
+        # )
+        # fc_sum = torch.sum(nodes.mailbox['c'] * f, 1)
         return {
             'Uh_sum': torch.sum(nodes.mailbox['h_iou'], 1),
-            'fc_sum': fc_sum
+            # 'fc_sum': fc_sum,
+            'fc_sum': torch.sum(nodes.mailbox['fc'], 1)
         }
 
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
@@ -86,10 +90,10 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         graph.edata['U_f'] = self.U_f.unsqueeze(0).expand(graph.number_of_edges(), -1, -1)
 
         graph.register_message_func(self.message_func)
-        graph.register_reduce_func(self.reduce_func)
+        # graph.register_reduce_func(self.reduce_func)
         graph.register_apply_node_func(self.apply_node_func)
 
-        dgl.prop_nodes_topo(graph)
+        dgl.prop_nodes_topo(graph, reduce_func=[fn.sum('h_iou', 'Uh_sum'), fn.sum('fc', 'fc_sum')])
 
         h = graph.ndata.pop('h')
         c = graph.ndata.pop('c')
