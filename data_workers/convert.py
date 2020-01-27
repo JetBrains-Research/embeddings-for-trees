@@ -124,9 +124,9 @@ def _convert_per_project(project_paths: List[str], asts: List[str], ast_order: n
         if not os.path.exists(os.path.join(project_path, 'batch_0.pkl')):
             try:
                 _prepare_project(project_path, token_to_id, type_to_id, n_jobs)
-            except:
+            except Exception as err:
                 with open(os.path.join(os.getcwd(), 'convert.txt'), 'a') as log_file:
-                    log_file.write(f"can't convert {project_path} project\n")
+                    log_file.write(f"can't convert {project_path} project, failed with\n{err}")
         print(f"converted {converted_func} functions")
 
     print("load all graphs to memory")
@@ -144,7 +144,7 @@ def _convert_per_project(project_paths: List[str], asts: List[str], ast_order: n
             labels += project_data['labels']
             paths += project_data['paths']
 
-    assert len(graphs) == len(ast_order)
+    assert len(graphs) == len(ast_order), f"expect {len(ast_order)} graphs, but found {len(graphs)}"
     graphs = np.array(graphs)[ast_order]
     labels = np.array(labels)[ast_order]
     paths = np.array(paths)[ast_order]
