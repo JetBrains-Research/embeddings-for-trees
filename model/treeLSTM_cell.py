@@ -1,3 +1,4 @@
+import math
 from typing import Dict, Tuple
 
 import dgl
@@ -31,16 +32,23 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
     def __init__(self, x_size, h_size):
         super().__init__(x_size, h_size)
         self.W_iou = nn.Linear(self.x_size, 3 * self.h_size, bias=False)
-        self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
+        self.U_iou = nn.Parameter(torch.zeros(self.h_size, 3 * self.h_size), requires_grad=True)
         self.b_iou = nn.Parameter(torch.zeros(1, 3 * self.h_size), requires_grad=True)
-        self.U_f = nn.Linear(self.h_size, self.h_size)
+
         self.W_f = nn.Linear(self.x_size, self.h_size, bias=False)
+        self.U_f = nn.Parameter(torch.zeros(self.h_size, self.h_size), requires_grad=True)
         self.b_f = nn.Parameter(torch.zeros((1, self.h_size)), requires_grad=True)
 
+        nn.init.kaiming_uniform_(self.U_iou, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.U_f, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.b_iou, a=math.sqrt(5))
+        nn.init.kaiming_uniform_(self.b_f, a=math.sqrt(5))
+
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        h = edges.src['h'].unsqueeze(1)
         return {
-            'h_iou': self.U_iou(edges.src['h']),
-            'h_f': self.U_f(edges.src['h']),
+            'h_iou': torch.bmm(h, edges.data['U_iou']).squeeze(1),
+            'h_f': torch.bmm(h, edges.data['U_f']).squeeze(1),
             'c': edges.src['c']
         }
 
@@ -74,6 +82,9 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, 3 * self.h_size), device=device)
         graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
 
+        graph.edata['U_iou'] = self.U_iou.unsqueeze(0).expand(graph.number_of_edges(), -1, -1)
+        graph.edata['U_f'] = self.U_f.unsqueeze(0).expand(graph.number_of_edges(), -1, -1)
+
         graph.register_message_func(self.message_func)
         graph.register_reduce_func(self.reduce_func)
         graph.register_apply_node_func(self.apply_node_func)
@@ -84,3 +95,8 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
         c = graph.ndata.pop('c')
         return h, c
 
+    def get_params(self):
+        return {
+            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.data, 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'u_f': self.U_f.data, 'b_f': self.b_f.data
+        }
