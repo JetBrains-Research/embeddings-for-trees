@@ -40,25 +40,19 @@ class EdgeChildSumTreeLSTMCell(_ITreeLSTMCell):
     def __init__(self, x_size, h_size):
         super().__init__(x_size, h_size)
         self.W_iou = nn.Linear(self.x_size, 3 * self.h_size, bias=False)
-        self.U_iou = nn.Parameter(torch.zeros(self.h_size, 3 * self.h_size), requires_grad=True)
+        self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
         self.b_iou = nn.Parameter(torch.zeros(1, 3 * self.h_size), requires_grad=True)
 
         self.W_f = nn.Linear(self.x_size, self.h_size, bias=False)
-        self.U_f = nn.Parameter(torch.zeros(self.h_size, self.h_size), requires_grad=True)
-        self.b_f = nn.Parameter(torch.zeros((1, self.h_size)), requires_grad=True)
-
-        nn.init.kaiming_uniform_(self.U_iou, a=math.sqrt(5))
-        nn.init.kaiming_uniform_(self.U_f, a=math.sqrt(5))
-        nn.init.kaiming_uniform_(self.b_iou, a=math.sqrt(5))
-        nn.init.kaiming_uniform_(self.b_f, a=math.sqrt(5))
+        self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
+        self.b_f = nn.Parameter(torch.zeros((1, h_size)), requires_grad=True)
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
-        h = edges.src['h'].unsqueeze(1)
-        h_f = torch.bmm(h, edges.data['U_f']).squeeze(1)
+        h_f = self.U_f(edges.src['h'])
         x_f = edges.dst['x_f']
         f = torch.sigmoid(x_f + h_f)
         return {
-            'h_iou': torch.bmm(h, edges.data['U_iou']).squeeze(1),
+            'Uh': self.U_iou(edges.src['h']),
             'fc': edges.src['c'] * f
         }
 
@@ -85,13 +79,10 @@ class EdgeChildSumTreeLSTMCell(_ITreeLSTMCell):
         graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, 3 * self.h_size), device=device)
         graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
 
-        graph.edata['U_iou'] = self.U_iou.unsqueeze(0).expand(graph.number_of_edges(), -1, -1)
-        graph.edata['U_f'] = self.U_f.unsqueeze(0).expand(graph.number_of_edges(), -1, -1)
-
         graph.register_message_func(self.message_func)
         graph.register_apply_node_func(self.apply_node_func)
 
-        dgl.prop_nodes_topo(graph, reduce_func=[fn.sum('h_iou', 'Uh_sum'), fn.sum('fc', 'fc_sum')])
+        dgl.prop_nodes_topo(graph, reduce_func=[fn.sum('Uh', 'Uh_sum'), fn.sum('fc', 'fc_sum')])
 
         h = graph.ndata.pop('h')
         c = graph.ndata.pop('c')
@@ -99,8 +90,8 @@ class EdgeChildSumTreeLSTMCell(_ITreeLSTMCell):
 
     def get_params(self):
         return {
-            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.data, 'b_iou': self.b_iou.data,
-            'w_f': self.W_f.weight, 'u_f': self.U_f.data, 'b_f': self.b_f.data
+            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight.t(), 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'u_f': self.U_f.weight.t(), 'b_f': self.b_f.data
         }
 
 
@@ -114,8 +105,9 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
         self.W_iou = nn.Linear(self.x_size, 3 * self.h_size, bias=False)
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
         self.b_iou = nn.Parameter(torch.zeros(1, 3 * self.h_size), requires_grad=True)
-        self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
+
         self.W_f = nn.Linear(self.x_size, self.h_size, bias=False)
+        self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
         self.b_f = nn.Parameter(torch.zeros((1, h_size)), requires_grad=True)
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
