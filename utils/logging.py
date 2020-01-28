@@ -9,8 +9,6 @@ import torch
 from model.tree2seq import Tree2Seq
 from utils.common import create_folder
 
-FULL_DATASET = 'full_dataset'
-
 
 def get_possible_loggers():
     return [
@@ -28,7 +26,7 @@ class _ILogger:
         self.checkpoints_folder = join_path(checkpoints_folder, self.timestamp)
         create_folder(self.checkpoints_folder)
 
-    def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
+    def log(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool = True) -> None:
         raise NotImplementedError
 
     def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
@@ -42,7 +40,6 @@ class _ILogger:
 
 class WandBLogger(_ILogger):
     name = 'wandb'
-    step = 0
 
     def __init__(self, project_name: str, config: Dict, model: Tree2Seq, checkpoints_folder: str):
         super().__init__(checkpoints_folder)
@@ -54,15 +51,12 @@ class WandBLogger(_ILogger):
         # wandb can't work with graphs?
         # wandb.watch(model, log='all')
 
-    def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
+    def log(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool = True) -> None:
         group = 'train' if is_train else 'validation'
         state_dict = {f'{group}/{key}': value for key, value in state_dict.items()}
         state_dict['epoch'] = epoch_num
-        if not is_train:
-            # set step for validation the same as last for training or zero
-            self.step = max(0, self.step - 1)
-        wandb.log(state_dict, step=self.step)
-        self.step += 1
+        state_dict['batch_id'] = batch_id
+        wandb.log(state_dict)
 
     def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
         checkpoint_path = super().save_model(model, epoch_num, configuration)
@@ -77,14 +71,14 @@ class TerminalLogger(_ILogger):
     def __init__(self, checkpoints_folder: str):
         super().__init__(checkpoints_folder)
 
-    def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
-        print(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
+    def log(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool = True) -> None:
+        print(self._create_log_message(state_dict, epoch_num, batch_id, is_train))
 
-    def _create_log_message(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool) -> str:
-        log_info = f"{'train' if is_train else 'validation'} {epoch_num}.{batch_num}:\n" + \
+    def _create_log_message(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool) -> str:
+        log_info = f"{'train' if is_train else 'validation'} {epoch_num}.{batch_id}:\n" + \
                    ', '.join(f'{key}: {value}' for key, value in state_dict.items()) + \
                    '\n' + self._dividing_line
-        if batch_num == 0:
+        if batch_id == 0:
             log_info = self._dividing_line + log_info
         return log_info
 
@@ -102,9 +96,9 @@ class FileLogger(TerminalLogger):
             json_dump(config, logging_file)
             logging_file.write('\n' + self._dividing_line)
 
-    def log(self, state_dict: Dict, epoch_num: int, batch_num: int, is_train: bool = True) -> None:
+    def log(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool = True) -> None:
         with open(self.file_path, 'a') as logging_file:
-            logging_file.write(self._create_log_message(state_dict, epoch_num, batch_num, is_train))
+            logging_file.write(self._create_log_message(state_dict, epoch_num, batch_id, is_train))
 
     def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
         return super().save_model(model, epoch_num, configuration)

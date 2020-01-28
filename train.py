@@ -11,7 +11,7 @@ from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq
 from utils.common import fix_seed, get_device, is_current_step_match
 from utils.learning_info import LearningInfo
-from utils.logging import get_possible_loggers, FileLogger, WandBLogger, FULL_DATASET, TerminalLogger
+from utils.logging import get_possible_loggers, FileLogger, WandBLogger, TerminalLogger
 from utils.training import train_on_batch, evaluate_dataset
 
 
@@ -71,13 +71,14 @@ def train(params: Dict, logging: str) -> None:
             if is_current_step_match(batch_id, params['logging_step']):
                 logger.log(train_acc_info.get_state_dict(), epoch, batch_id)
                 train_acc_info = LearningInfo()
-            if is_current_step_match(batch_id, params['evaluation_step']):
+            if is_current_step_match(batch_id, params['evaluation_step']) and batch_id != 0:
                 eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-                logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
+                logger.log(eval_epoch_info.get_state_dict(), epoch, batch_id, False)
 
+        logger.log(train_acc_info.get_state_dict(), epoch, len(training_set))
         # iterate over validation set
         eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-        logger.log(eval_epoch_info.get_state_dict(), epoch, FULL_DATASET, False)
+        logger.log(eval_epoch_info.get_state_dict(), epoch, len(training_set), False)
 
         if is_current_step_match(epoch, params['checkpoint_step']):
             logger.save_model(model, epoch, model_factory.save_configuration())
