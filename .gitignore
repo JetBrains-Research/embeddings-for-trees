@@ -5,6 +5,11 @@ data/
 logs/
 wandb/
 checkpoints/
+.tmp/
+
+*.txt
+*.pt
+*.jar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
