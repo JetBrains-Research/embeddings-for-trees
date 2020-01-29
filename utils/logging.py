@@ -1,7 +1,7 @@
 from datetime import datetime
 from json import dump as json_dump
 from os.path import join as join_path
-from typing import Dict
+from typing import Dict, Union
 
 import wandb
 import torch
@@ -29,21 +29,26 @@ class _ILogger:
     def log(self, state_dict: Dict, epoch_num: int, batch_id: int, is_train: bool = True) -> None:
         raise NotImplementedError
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
-        saving_path = join_path(self.checkpoints_folder, f'epoch_{epoch_num}.pt')
-        torch.save({
+    def save_model(self, model: Tree2Seq, output_name: str, configuration: Dict, **kwargs: Dict) -> str:
+        saving_path = join_path(self.checkpoints_folder, output_name)
+        output = {
             'state_dict': model.state_dict(),
             'configuration': configuration
-        }, saving_path)
+        }
+        output.update(kwargs)
+        torch.save(output, saving_path)
         return saving_path
 
 
 class WandBLogger(_ILogger):
     name = 'wandb'
 
-    def __init__(self, project_name: str, config: Dict, model: Tree2Seq, checkpoints_folder: str):
+    def __init__(
+            self, project_name: str, config: Dict, model: Tree2Seq,
+            checkpoints_folder: str, resume: Union[bool, str] = False
+    ) -> None:
         super().__init__(checkpoints_folder)
-        wandb.init(project=project_name, config=config)
+        wandb.init(project=project_name, config=config, resume=resume)
         try:
             display(wandb.jupyter.Run())
         except NameError:
@@ -58,8 +63,8 @@ class WandBLogger(_ILogger):
         state_dict['batch_id'] = batch_id
         wandb.log(state_dict)
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
-        checkpoint_path = super().save_model(model, epoch_num, configuration)
+    def save_model(self, model: Tree2Seq, output_name: str, configuration: Dict, **kwargs: Dict) -> str:
+        checkpoint_path = super().save_model(model, output_name, configuration, **kwargs)
         wandb.save(checkpoint_path)
         return checkpoint_path
 
@@ -82,8 +87,8 @@ class TerminalLogger(_ILogger):
             log_info = self._dividing_line + log_info
         return log_info
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
-        return super().save_model(model, epoch_num, configuration)
+    def save_model(self, model: Tree2Seq, output_name: str, configuration: Dict, **kwargs: Dict) -> str:
+        return super().save_model(model, output_name, configuration, **kwargs)
 
 
 class FileLogger(TerminalLogger):
@@ -100,5 +105,5 @@ class FileLogger(TerminalLogger):
         with open(self.file_path, 'a') as logging_file:
             logging_file.write(self._create_log_message(state_dict, epoch_num, batch_id, is_train))
 
-    def save_model(self, model: Tree2Seq, epoch_num: int, configuration: Dict) -> str:
-        return super().save_model(model, epoch_num, configuration)
+    def save_model(self, model: Tree2Seq, output_name: str, configuration: Dict, **kwargs: Dict) -> str:
+        return super().save_model(model, output_name, configuration, **kwargs)

@@ -163,10 +163,10 @@ class ModelFactory:
         }
 
 
-def load_model(path_to_model: str, device: torch.device) -> Tree2Seq:
-    checkpoint = torch.load(path_to_model, map_location=device)
+def load_model(path_to_model: str, device: torch.device) -> Tuple[Tree2Seq, Dict]:
+    checkpoint: Dict = torch.load(path_to_model, map_location=device)
     configuration = checkpoint['configuration']
     model_factory = ModelFactory(**configuration)
     model: Tree2Seq = model_factory.construct_model(device)
     model.load_state_dict(checkpoint['state_dict'])
-    return model
+    return model, checkpoint
