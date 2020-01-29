@@ -21,7 +21,8 @@
   "encoder": {
     "name": "TokenTypeTreeLSTM",
     "params": {
-      "dropout_prob": 0.2
+      "dropout_prob": 0.2,
+      "cell_type": "NodeChildSumTreeLSTMCell"
     }
   },
 

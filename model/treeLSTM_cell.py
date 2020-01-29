@@ -152,3 +152,13 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
             'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight.t(), 'b_iou': self.b_iou.data,
             'w_f': self.W_f.weight, 'u_f': self.U_f.weight.t(), 'b_f': self.b_f.data
         }
+
+
+def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
+    tree_lstm_cells = {
+        EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
+        NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell
+    }
+    if tree_lstm_type not in tree_lstm_cells:
+        raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
+    return tree_lstm_cells[tree_lstm_type]
