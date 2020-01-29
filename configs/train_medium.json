@@ -1,16 +1,17 @@
 {
   "paths": {
-    "train": "./data/test_data/train",
-    "validate": "./data/test_data/val",
+    "train": "./data/java-med/training_preprocessed",
+    "validate": "./data/java-med/validation_preprocessed",
 
-    "vocabulary": "./data/java-small/vocabulary.pkl"
+    "vocabulary": "./data/java-med/vocabulary.pkl"
   },
 
   "hidden_states": {
-    "embedding": 64,
-    "encoder": 64,
-    "decoder": 64
+    "embedding": 128,
+    "encoder": 128,
+    "decoder": 128
   },
+
 
   "embedding": {
     "name": "SubTokenTypeEmbedding",
@@ -35,17 +36,17 @@
     }
   },
 
-  "batch_size": 8,
+  "batch_size": 250,
   "n_epochs": 1,
-  "lr": 0.01,
+  "lr": 0.001,
   "weight_decay": 1e-4,
   "clip_norm": 5,
   "teacher_force": 0.5,
 
-  "evaluation_step": -1,
+  "evaluation_step": 1000,
 
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": 50,
+  "checkpoint_step": 1000,
   "checkpoints_folder": "checkpoints"
 }
