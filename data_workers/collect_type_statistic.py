@@ -1,21 +1,22 @@
-import json
 import os
 import pickle
 from argparse import ArgumentParser
 from os.path import join
-from typing import Dict, List
 
 import dgl
 import numpy as np
+import pandas as pd
 from tqdm.auto import tqdm
 
 
-def collect_type_statistic(data_folder: str, vocabulary: str) -> List:
+def collect_type_statistic(data_folder: str, vocabulary: str) -> pd.DataFrame:
     with open(vocabulary, 'rb') as pkl_file:
         type_to_id = pickle.load(pkl_file)['type_to_id']
     id_to_type = {v: k for k, v in type_to_id.items()}
+    stats = pd.DataFrame(
+        columns=['count'], dtype=np.int
+    )
     batches = os.listdir(data_folder)
-    stats_per_type = {}
     for batch in tqdm(batches):
         with open(join(data_folder, batch), 'rb') as pkl_file:
             graphs = dgl.unbatch(
@@ -24,32 +25,24 @@ def collect_type_statistic(data_folder: str, vocabulary: str) -> List:
         for graph in tqdm(graphs):
             for n_i in range(graph.number_of_nodes()):
                 cur_type_id = graph.ndata['type_id'][n_i].item()
-                if cur_type_id not in stats_per_type:
-                    stats_per_type[cur_type_id] = []
-                children_types = graph.ndata['type_id'][graph.out_edges(n_i)[1]].tolist()
-                children_types.sort()
-                for prev_children, num in stats_per_type[cur_type_id]:
-                    if len(children_types) == len(prev_children) and np.allclose(children_types, prev_children):
-                        num += 1
-                        continue
-                stats_per_type[cur_type_id].append((tuple(children_types), 1))
-    stats = []
-    for type_id in stats_per_type:
-        stats += [
-            (count, id_to_type[type_id], [id_to_type[child_type] for child_type in children_types])
-            for (children_types, count) in stats_per_type[type_id]
-        ]
-    stats = list(sorted(stats, key=lambda t: t[0], reverse=True))
+                children_mask_int = [0 for _ in range(len(type_to_id))]
+                for child_type_id in graph.ndata['type_id'][graph.out_edges(n_i)[1]]:
+                    children_mask_int[child_type_id.item()] += 1
+                children_mask = ''.join(map(str, children_mask_int))
+                pandas_index = pd.MultiIndex.from_tuples([(cur_type_id, children_mask)])
+                if (cur_type_id, children_mask) not in stats.index:
+                    new_row = pd.DataFrame({'count': [0]}, index=pandas_index)
+                    stats = stats.append(new_row)
+                stats.loc[pandas_index, 'count'] += 1
+    stats = stats.reset_index()
+    stats['node_type_id'] = stats['index'].apply(lambda t: t[0])
+    stats['node_type'] = stats['node_type_id'].apply(lambda t: id_to_type[t])
+    for cur_type, cur_type_id in type_to_id.items():
+        stats[cur_type] = stats['index'].apply(
+            lambda t: int(t[1][cur_type_id])
+        )
+    stats.drop('index', inplace=True, axis=1)
     return stats
-
-
-def save_stats(stats: List, output_path: str) -> None:
-    with open(output_path, 'w') as output_file:
-        output_file.write(f"count,type,children_types\n")
-        for count, type_name, children_type_names in stats:
-            output_file.write(
-                f"{count},{type_name},{' '.join(children_type_names)}\n"
-            )
 
 
 if __name__ == '__main__':
@@ -59,4 +52,4 @@ if __name__ == '__main__':
     arg_parse.add_argument('output', type=str)
     args = arg_parse.parse_args()
 
-    save_stats(collect_type_statistic(args.data_folder, args.vocabulary), args.output)
+    collect_type_statistic(args.data_folder, args.vocabulary).to_csv(args.output, index=False)
