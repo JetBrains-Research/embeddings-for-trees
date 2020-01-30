@@ -17,7 +17,7 @@ def evaluate(params: Dict) -> None:
 
     evaluation_set = JavaDataset(params['paths']['evaluate'], params['batch_size'], True)
 
-    model = load_model(params['paths']['model'], device)
+    model, _, _ = load_model(params['paths']['model'], device)
 
     # define loss function
     criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
