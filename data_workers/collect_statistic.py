@@ -78,7 +78,7 @@ def _collect_tree_statistic_per_batch(batch_path: str) -> pd.DataFrame:
 
 def collect_tree_statistic(data_folder: str, holdout_name: str, n_jobs: int) -> pd.DataFrame:
     batch_folder = os.path.join(data_folder, f'{holdout_name}_preprocessed')
-    batches = os.listdir(batch_folder)[:5]
+    batches = os.listdir(batch_folder)
     if n_jobs == -1:
         n_jobs = cpu_count()
     with Pool(n_jobs) as pool:
