@@ -8,6 +8,7 @@ from typing import Tuple, Dict
 
 import numpy as np
 import pandas as pd
+import dgl
 from requests import get
 from tqdm.auto import tqdm
 
@@ -125,6 +126,26 @@ def collect_vocabulary(train_path: str) -> Tuple[Dict, Dict, Dict]:
     return token_to_id, type_to_id, label_to_id
 
 
+def remove_outliers(holdout_path: str, min_border: int, max_border: int) -> int:
+    batches = os.listdir(holdout_path)
+    removed = 0
+    for batch_path in tqdm(batches):
+        with open(os.path.join(holdout_path, batch_path), 'rb') as pkl_file:
+            batch = pkl_load(pkl_file)
+        graphs = dgl.unbatch(batch['batched_graph'])
+        labels = batch['labels']
+        paths = batch['paths']
+        orig_size = len(graphs)
+        graphs, labels, paths = zip(*filter(
+            lambda cur: min_border <= cur[0].number_of_nodes() <= max_border,
+            zip(graphs, labels, paths)
+        ))
+        with open(os.path.join(holdout_path, batch_path), 'wb') as pkl_file:
+            pkl_dump({'batched_graph': dgl.batch(graphs), 'labels': labels, 'paths': paths}, pkl_file)
+        removed += orig_size - len(graphs)
+    return removed
+
+
 def main(args: Namespace) -> None:
     dataset_name = dataset_mapping[args.dataset]
     data_path = os.path.join(data_folder, dataset_name)
@@ -180,9 +201,19 @@ def main(args: Namespace) -> None:
             holdout: os.path.join(data_path, f'{holdout}_preprocessed') for holdout in holdout_folders
         }
 
+    if args.remove_outliers:
+        if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
+            raise RuntimeError("convert ast before removing outliers via --convert arg")
+        if args.min_outlier == -1 or args.max_outlier == -1:
+            raise ValueError("specify a min and max border for removing outliers")
+        for holdout, holdout_preprocessed_path in tqdm(holdout_preprocessed_paths.items()):
+            print(f"remove outliers for {holdout} holdout...")
+            removed = remove_outliers(holdout_preprocessed_path, args.min_outlier, args.max_outlier)
+            print(f"remove {removed} functions for this holdout")
+
     if args.upload:
         if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
-            raise RuntimeError("convert ast before uploading or using it via --convert arg")
+            raise RuntimeError("convert ast before uploading using it via --convert arg")
         tar_file_name = f'{dataset_name}_{args.tar_suffix}.tar.gz'
         completed_process = subprocess_run(
             ['tar', '-czf', tar_file_name, vocabulary_name] +
@@ -217,11 +248,15 @@ if __name__ == '__main__':
     arg_parser.add_argument('--build_ast', action='store_true')
     arg_parser.add_argument('--collect_vocabulary', action='store_true')
     arg_parser.add_argument('--convert', action='store_true')
+    arg_parser.add_argument('--remove_outliers', action='store_true')
     arg_parser.add_argument('--upload', action='store_true')
     arg_parser.add_argument('--download_preprocessed', action='store_true')
+
     arg_parser.add_argument('--n_jobs', type=int, default=-1)
     arg_parser.add_argument('--batch_size', type=int, default=100)
     arg_parser.add_argument('--high_memory', action='store_true')
     arg_parser.add_argument('--tar_suffix', type=str, default='default')
+    arg_parser.add_argument('--min_outlier', type=int, default=-1)
+    arg_parser.add_argument('--max_outlier', type=int, default=-1)
 
     main(arg_parser.parse_args())
