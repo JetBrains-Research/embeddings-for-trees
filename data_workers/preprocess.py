@@ -206,10 +206,8 @@ def main(args: Namespace) -> None:
             raise RuntimeError("convert ast before removing outliers via --convert arg")
         if args.min_outlier == -1 or args.max_outlier == -1:
             raise ValueError("specify a min and max border for removing outliers")
-        for holdout, holdout_preprocessed_path in tqdm(holdout_preprocessed_paths.items()):
-            print(f"remove outliers for {holdout} holdout...")
-            removed = remove_outliers(holdout_preprocessed_path, args.min_outlier, args.max_outlier)
-            print(f"remove {removed} functions for this holdout")
+        removed = remove_outliers(holdout_preprocessed_paths[holdout_folders[0]], args.min_outlier, args.max_outlier)
+        print(f"remove {removed} functions for training holdout")
 
     if args.upload:
         if not all([os.path.exists(path[1]) for path in holdout_preprocessed_paths.items()]):
