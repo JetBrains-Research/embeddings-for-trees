@@ -100,6 +100,8 @@ def train(params: Dict, logging: str) -> None:
                 logger.save_model(
                     model, f'epoch_{epoch}_batch_{batch_id}.pt', configuration, batch_id=batch_id
                 )
+            if device == 'cuda:0':
+                torch.cuda.empty_cache()
 
         logger.log(train_acc_info.get_state_dict(), epoch, len(training_set))
         eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
