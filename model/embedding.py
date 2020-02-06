@@ -53,28 +53,26 @@ class SubTokenEmbedding(_IEmbedding):
         self.token_id_to_full_token = {v: k for k, v in token_to_id.items()}
 
     def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
-        number_of_nodes = graph.number_of_nodes()
 
         # since in __init__ token_to_id replaced by subtoken_to_id
         token_id_to_subtoken = get_token_id_to_subtoken_dict(
             graph.ndata['token_id'].tolist(), self.token_id_to_full_token, self.token_to_id, device
         )
+        start_index = 0
+        subtoken_ids = []
+        node_slices = []
+        for node in graph.ndata['token_id']:
+            subtoken_ids.append(token_id_to_subtoken[node.item()])
+            node_slices.append(slice(start_index, start_index + subtoken_ids[-1].shape[0]))
+            start_index += subtoken_ids[-1].shape[0]
 
-        subtoken_lengths = torch.tensor([
-            token_id_to_subtoken[token.item()].shape[0] for token in graph.ndata['token_id']
-        ])
-        max_subtoken_length = subtoken_lengths.max()
+        full_subtokens_embeds = self.subtoken_embedding(torch.cat(subtoken_ids))
 
-        subtokens = torch.full(
-            (number_of_nodes, max_subtoken_length.item()),
-            self.token_pad_index, dtype=torch.long, device=device
-        )
-        for node in range(number_of_nodes):
-            token_id = graph.nodes[node].data['token_id'].item()
-            subtokens[node, :subtoken_lengths[node]] = token_id_to_subtoken[token_id]
-        graph.ndata['token_embeds'] = torch.sum(
-            self.subtoken_embedding(subtokens), dim=1
-        )
+        token_embeds = torch.zeros((graph.number_of_nodes(), self.h_emb), device=device)
+        for node in range(graph.number_of_nodes()):
+            token_embeds[node] = full_subtokens_embeds[node_slices[node]].sum(0)
+
+        graph.ndata['token_embeds'] = token_embeds
         return graph
 
 
