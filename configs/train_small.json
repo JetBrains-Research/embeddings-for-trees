@@ -22,7 +22,10 @@
     "name": "TokenTypeTreeLSTM",
     "params": {
       "dropout_prob": 0.2,
-      "cell_type": "NodeChildSumTreeLSTMCell"
+      "cell_type": "TypeSpecificTreeLSTMCell",
+      "cell_args": {
+        "type_relationship": "data/type_relationship_ids.pkl"
+      }
     }
   },
 
@@ -37,14 +40,14 @@
     }
   },
 
-  "batch_size": 250,
+  "batch_size": 400,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
   "teacher_force": 0.5,
 
-  "evaluation_step": 1000,
+  "evaluation_step": 100,
 
   "logging_step": 10,
   "logging_folder": "logs",
