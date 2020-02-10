@@ -27,7 +27,7 @@ def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
 
 
 def train_on_batch(
-        model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim,
+        model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
         graph: dgl.BatchedDGLGraph, labels: List[str],
         params: Dict, device: torch.device
 ) -> Dict:
@@ -44,6 +44,7 @@ def train_on_batch(
     loss.backward()
     nn.utils.clip_grad_norm_(model.parameters(), params['clip_norm'])
     optimizer.step()
+    scheduler.step()
 
     # Calculate metrics
     prediction = model.predict(root_logits)

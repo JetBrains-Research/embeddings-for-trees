@@ -51,6 +51,10 @@ def train(params: Dict, logging: str) -> None:
     optimizer = torch.optim.Adam(
         model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
     )
+    # create scheduler
+    scheduler = torch.optim.lr_scheduler.StepLR(
+        optimizer, step_size=params['scheduler_step_size'], gamma=params['scheduler_gamma']
+    )
 
     # define loss function
     criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
@@ -85,7 +89,7 @@ def train(params: Dict, logging: str) -> None:
             graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
             graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
             batch_info = train_on_batch(
-                model, criterion, optimizer, graph, labels, params, device
+                model, criterion, optimizer, scheduler, graph, labels, params, device
             )
             train_acc_info.accumulate_info(batch_info)
             # log current train process
