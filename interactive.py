@@ -65,8 +65,8 @@ def interactive(path_to_function: str, path_to_model: str):
     )
 
     # load model
-    print("loading models..")
-    model = load_model(path_to_model, device)
+    print("loading model..")
+    model, _ = load_model(path_to_model, device)
     criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
     info = LearningInfo()
 
