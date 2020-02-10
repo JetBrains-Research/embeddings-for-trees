@@ -1,4 +1,5 @@
-from typing import Dict, Tuple
+from pickle import load as pkl_load
+from typing import Dict, Tuple, Union
 
 import dgl
 import dgl.function as fn
@@ -155,20 +156,32 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
 
 class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
 
-    def __init__(self, x_size, h_size, type_relationship: Dict):
+    def __init__(self, x_size, h_size, type_relationship: Union[str, Dict]):
         """type relationship is a dict with information about children
+        key: tuple with ids for src group, e.g. If and Switch statements
+        value: list of lists, where each list corresponding to type ids of some group
         { ...
-            type_id: [type_id_1, ..., type_id_k]
+            (src_type_id_1, ..., src_type_id_n): [
+                [dst_group_type_id_1, ..., dst_group_type_id_k],
+                ...,
+                [dst_group_type_id_1, ..., dst_group_type_id_m]
+            ]
         ... }
         """
         super().__init__(x_size, h_size)
+        if isinstance(type_relationship, str):
+            with open(type_relationship, 'rb') as pkl_file:
+                self.type_relationship = pkl_load(pkl_file)
+        else:
+            self.type_relationship = type_relationship
         count_diff_matrix = 1
-        self.type_relationship = type_relationship
         # dict of matrices ids, key: (src_type_id, dst_type_id), value: matrix_id
         self.edge_matrix_id = {}
-        for type_id, children in self.type_relationship.items():
-            for child_id in children:
-                self.edge_matrix_id[(type_id, child_id)] = count_diff_matrix
+        for type_ids, groups in self.type_relationship.items():
+            for dst_group in groups:
+                for child_id in dst_group:
+                    for src_id in type_ids:
+                        self.edge_matrix_id[(src_id, child_id)] = count_diff_matrix
                 count_diff_matrix += 1
 
         self.U_f = nn.Parameter(torch.rand(count_diff_matrix, self.h_size, self.h_size), requires_grad=True)
@@ -210,7 +223,8 @@ class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
 def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
     tree_lstm_cells = {
         EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
-        NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell
+        NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
+        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell
     }
     if tree_lstm_type not in tree_lstm_cells:
         raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")

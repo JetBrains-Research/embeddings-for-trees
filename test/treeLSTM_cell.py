@@ -191,7 +191,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
                 g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
                 type_relationship = {
-                    0: list(range(1, number_of_children // 2))
+                    (0,): [list(range(1, number_of_children // 2))]
                 }
 
                 tree_lstm_cell = TypeSpecificTreeLSTMCell(x_size, h_size, type_relationship)
