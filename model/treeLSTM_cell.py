@@ -1,4 +1,3 @@
-import math
 from typing import Dict, Tuple
 
 import dgl
@@ -151,6 +150,60 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
         return {
             'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight.t(), 'b_iou': self.b_iou.data,
             'w_f': self.W_f.weight, 'u_f': self.U_f.weight.t(), 'b_f': self.b_f.data
+        }
+
+
+class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
+
+    def __init__(self, x_size, h_size, type_relationship: Dict):
+        """type relationship is a dict with information about children
+        { ...
+            type_id: [type_id_1, ..., type_id_k]
+        ... }
+        """
+        super().__init__(x_size, h_size)
+        count_diff_matrix = 1
+        self.type_relationship = type_relationship
+        # dict of matrices ids, key: (src_type_id, dst_type_id), value: matrix_id
+        self.edge_matrix_id = {}
+        for type_id, children in self.type_relationship.items():
+            for child_id in children:
+                self.edge_matrix_id[(type_id, child_id)] = count_diff_matrix
+                count_diff_matrix += 1
+
+        self.U_f = nn.Parameter(torch.rand(count_diff_matrix, self.h_size, self.h_size), requires_grad=True)
+
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        _W = self.U_f[edges.data['matrix_id']]
+        _x = edges.src['h'].unsqueeze(1)
+        h_f = torch.bmm(_x, _W).squeeze(1)
+        x_f = edges.dst['x_f']
+        f = torch.sigmoid(x_f + h_f)
+        return {
+            'Uh': self.U_iou(edges.src['h']),
+            'fc': edges.src['c'] * f
+        }
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        return super().reduce_func(nodes)
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        return super().apply_node_func(nodes)
+
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        matrix_id = torch.zeros(graph.number_of_edges(), dtype=torch.long)
+        # because all edges in graph reversed (from child to parent)
+        for edge_dst, edge_src, edge_id in zip(*graph.all_edges('all')):
+            src_type = graph.ndata['type_id'][edge_src].item()
+            dst_type = graph.ndata['type_id'][edge_dst].item()
+            matrix_id[edge_id.item()] = self.edge_matrix_id.get((src_type, dst_type), 0)
+        graph.edata['matrix_id'] = matrix_id.to(device)
+        return super().forward(graph, device)
+
+    def get_params(self) -> Dict:
+        return {
+            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight.t(), 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'u_f': self.U_f.data, 'b_f': self.b_f.data
         }
 
 
