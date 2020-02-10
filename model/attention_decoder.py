@@ -87,4 +87,4 @@ class LSTMAttentionDecoder(_IAttentionDecoder):
         return logits, new_hidden_states, new_memory_cells
 
     def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
-        return convert_label_to_sublabels(labels, self.sublabel_to_id, device)
+        return convert_label_to_sublabels(labels, self.sublabel_to_id).to(device)

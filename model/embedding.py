@@ -56,7 +56,7 @@ class SubTokenEmbedding(_IEmbedding):
 
         # since in __init__ token_to_id replaced by subtoken_to_id
         token_id_to_subtoken = get_token_id_to_subtoken_dict(
-            graph.ndata['token_id'].tolist(), self.token_id_to_full_token, self.token_to_id, device
+            graph.ndata['token_id'].tolist(), self.token_id_to_full_token, self.token_to_id
         )
         start_index = 0
         subtoken_ids = []
@@ -66,7 +66,7 @@ class SubTokenEmbedding(_IEmbedding):
             node_slices.append(slice(start_index, start_index + subtoken_ids[-1].shape[0]))
             start_index += subtoken_ids[-1].shape[0]
 
-        full_subtokens_embeds = self.subtoken_embedding(torch.cat(subtoken_ids))
+        full_subtokens_embeds = self.subtoken_embedding(torch.cat(subtoken_ids).to(device))
 
         token_embeds = torch.zeros((graph.number_of_nodes(), self.h_emb), device=device)
         for node in range(graph.number_of_nodes()):

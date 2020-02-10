@@ -94,4 +94,4 @@ class LSTMDecoder(_IDecoder):
         return logits, root_hidden_states, root_memory_cells
 
     def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
-        return convert_label_to_sublabels(labels, self.sublabel_to_id, device)
+        return convert_label_to_sublabels(labels, self.sublabel_to_id).to(device)

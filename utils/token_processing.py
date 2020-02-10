@@ -40,26 +40,25 @@ def get_dict_of_subtokens(
 
 
 def get_token_to_subtoken_dict(
-        tokens: List[str], subtoken_to_id: Dict, device: torch.device, delimiter: str = '|'
+        tokens: List[str], subtoken_to_id: Dict, delimiter: str = '|'
 ) -> Dict:
     """Create a dict for converting token to corresponding tensor with subtoken's ids
 
     :param tokens: list of tokens
     :param subtoken_to_id: dict for converting subtoken to its id
-    :param device: torch device, where allocate the tensor
     :param delimiter: used in tokens to divide into subtokens
     :return: new dict
     """
     token_to_subtoken = {}
     unk_index = subtoken_to_id[UNK]
     for token in tokens:
-        cur_split = torch.tensor([subtoken_to_id.get(tok, unk_index) for tok in token.split(delimiter)]).to(device)
+        cur_split = torch.tensor([subtoken_to_id.get(tok, unk_index) for tok in token.split(delimiter)])
         token_to_subtoken[token] = cur_split
     return token_to_subtoken
 
 
 def convert_label_to_sublabels(
-        labels: List[str], sublabel_to_id: Dict, device: torch.device, delimiter: str = '|'
+        labels: List[str], sublabel_to_id: Dict, delimiter: str = '|'
 ) -> torch.Tensor:
     """Convert batch of labels to torch tensor with ids of corresponding sublabels
     SOS token is added at the beginning and EOS token is added at the ending for each label
@@ -67,11 +66,10 @@ def convert_label_to_sublabels(
 
     :param labels: list of labels (shape: [batch_size])
     :param sublabel_to_id: dict for converting sublabels to ids
-    :param device: torch device
     :param delimiter: used in tokens to divide into subtokens
     :return: tensor with information about sublabels (shape: [max_length_of_sublabels + 2, batch_size])
     """
-    label_to_sublabel = get_token_to_subtoken_dict(labels, sublabel_to_id, device, delimiter)
+    label_to_sublabel = get_token_to_subtoken_dict(labels, sublabel_to_id, delimiter)
 
     sublabels_length = torch.tensor([label_to_sublabel[label].shape[0] for label in labels])
     max_sublabel_length = sublabels_length.max()
@@ -81,23 +79,22 @@ def convert_label_to_sublabels(
     torch_labels[sublabels_length + 1, torch.arange(0, len(labels))] = sublabel_to_id[EOS]
     for sample, label in enumerate(labels):
         torch_labels[1:sublabels_length[sample] + 1, sample] = label_to_sublabel[label]
-    return torch_labels.to(device)
+    return torch_labels
 
 
 def get_token_id_to_subtoken_dict(
-    token_ids: List[int], id_to_token: Dict, subtoken_to_id: Dict, device: torch.device, delimiter: str = '|'
+    token_ids: List[int], id_to_token: Dict, subtoken_to_id: Dict, delimiter: str = '|'
 ) -> Dict:
     """Create a dict for converting token's id to tensor of corresponding subtoken's ids
 
     :param token_ids: list of token's ids
     :param id_to_token: dict for converting token's id to token
     :param subtoken_to_id: dict for converting subtoken to id
-    :param device: torch device
     :param delimiter: used in tokens to divide into subtokens
     :return: new dict
     """
     tokens = [id_to_token[token_id] for token_id in token_ids]
-    token_to_subtoken = get_token_to_subtoken_dict(tokens, subtoken_to_id, device, delimiter)
+    token_to_subtoken = get_token_to_subtoken_dict(tokens, subtoken_to_id, delimiter)
     token_id_to_subtoken = {
         token_id: token_to_subtoken[id_to_token[token_id]] for token_id in token_ids
     }
