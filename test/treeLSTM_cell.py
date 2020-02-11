@@ -1,10 +1,11 @@
 import unittest
-from typing import Tuple, Union
+from typing import Tuple, Union, Dict
 
 import dgl
 import torch
 
-from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell
+from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell, \
+    TypeSpecificTreeLSTMCell
 from utils.common import get_device, fix_seed
 
 ATOL = 1e-6
@@ -104,26 +105,30 @@ def _calculate_nary_tree_lstm_states(
     return h_calculated, c_calculated
 
 
-def _test_childsum(tree_lstm_type: Union[NodeChildSumTreeLSTMCell, EdgeChildSumTreeLSTMCell], x_size: int,
-                   h_size: int, number_of_children: int, device: torch.device
-                   ) -> Tuple[bool, bool]:
-    tree_lstm_cell = tree_lstm_type(x_size, h_size)
-
-    g = _gen_node_with_children(number_of_children)
-    g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
-
-    h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
-    h_calculated, c_calculated = _calculate_childsum_tree_lstm_states(
-        g.ndata['x'], **tree_lstm_cell.get_params()
-    )
-
-    return torch.allclose(h_tree_lstm, h_calculated, atol=ATOL), torch.allclose(c_tree_lstm, c_calculated, atol=ATOL)
-
-
 class TreeLSTMCellTest(unittest.TestCase):
     x_sizes = [5, 7, 10, 128, 256]
     h_sizes = [5, 7, 15, 128, 128]
     numbers_of_children = [4, 7, 13, 10, 20]
+
+    def _state_assert(self, h_tree_lstm: torch.Tensor, c_tree_lstm: torch.tensor,
+                      h_calculated: torch.Tensor, c_calculated: torch.Tensor, atol: float = ATOL):
+        self.assertTrue(torch.allclose(h_tree_lstm, h_calculated, atol=atol), msg=f"Unequal hidden state tensors")
+        self.assertTrue(torch.allclose(c_tree_lstm, c_calculated, atol=atol), msg=f"Unequal memory state tensors")
+
+    def _test_childsum(self, tree_lstm_type: Union[NodeChildSumTreeLSTMCell, EdgeChildSumTreeLSTMCell], x_size: int,
+                       h_size: int, number_of_children: int, device: torch.device
+                       ) -> None:
+        tree_lstm_cell = tree_lstm_type(x_size, h_size)
+
+        g = _gen_node_with_children(number_of_children)
+        g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
+
+        h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
+        h_calculated, c_calculated = _calculate_childsum_tree_lstm_states(
+            g.ndata['x'], **tree_lstm_cell.get_params()
+        )
+
+        self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
     def _test_childsum_tree_lstm_cell(self, tree_lstm_type):
         device = get_device()
@@ -131,14 +136,8 @@ class TreeLSTMCellTest(unittest.TestCase):
         for i in range(len(self.x_sizes)):
             x_size, h_size, number_of_children = self.x_sizes[i], self.h_sizes[i], self.numbers_of_children[i]
             with self.subTest(i=i):
-                h_equal, c_equal = _test_childsum(
+                self._test_childsum(
                     tree_lstm_type, x_size, h_size, number_of_children, device
-                )
-                self.assertTrue(
-                    h_equal, msg=f"Unequal hidden state tensors for ({x_size}, {h_size}, {number_of_children}) params"
-                )
-                self.assertTrue(
-                    c_equal, msg=f"Unequal memory state tensors for ({x_size}, {h_size}, {number_of_children}) params"
                 )
 
     def test_node_childsum_tree_lstm_cell(self):
@@ -177,8 +176,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 h_calculated = torch.cat([h1_calculated, h2_calculated], 0)
                 c_calculated = torch.cat([c1_calculated, c2_calculated], 0)
 
-                self.assertTrue(torch.allclose(h_tree_lstm, h_calculated, atol=ATOL), msg=f"Unequal hidden state tensors")
-                self.assertTrue(torch.allclose(c_tree_lstm, c_calculated, atol=ATOL), msg=f"Unequal memory state tensors")
+                self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
     def test_edge_specific_tree_lstm_cell(self):
         device = get_device()
@@ -204,13 +202,53 @@ class TreeLSTMCellTest(unittest.TestCase):
                 ]
                 tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
                 h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
+                self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
-                self.assertTrue(
-                    torch.allclose(h_tree_lstm, h_calculated, atol=ATOL), msg=f"Unequal hidden state tensors"
-                )
-                self.assertTrue(
-                    torch.allclose(c_tree_lstm, c_calculated, atol=ATOL), msg=f"Unequal memory state tensors"
-                )
+    def _test_type_specific_tree_lstm_cell(self,
+                                           x_size: int, h_size: int, number_of_children: int,
+                                           g: dgl.DGLGraph, nary_types: Dict, device: torch.device):
+        tree_lstm_cell = TypeSpecificTreeLSTMCell(x_size, h_size, nary_types)
+
+        h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
+
+        tree_lstm_cell_params = tree_lstm_cell.get_params()
+        children = list(range(1, number_of_children + 1))
+        u_f_indices = [
+            tree_lstm_cell.edge_matrix_id.get(0, {}).get(tuple(children), [0 for _ in children])
+        ]
+        tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
+        h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
+        self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
+
+    def test_type_specific_tree_lstm_cell_with_types(self):
+        device = get_device()
+        fix_seed()
+
+        for i, (x_size, h_size, number_of_children) in enumerate(
+                zip(self.x_sizes, self.h_sizes, self.numbers_of_children)):
+            with self.subTest(i=i):
+                g = _gen_node_with_children(number_of_children)
+                g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
+                g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
+                nary_types = {
+                    0: [list(range(1, number_of_children)), [1, 2], [10, 11, 12]]
+                }
+                self._test_type_specific_tree_lstm_cell(x_size, h_size, number_of_children, g, nary_types, device)
+
+    def test_type_specific_tree_lstm_cell_without_types(self):
+        device = get_device()
+        fix_seed()
+
+        for i, (x_size, h_size, number_of_children) in enumerate(
+                zip(self.x_sizes, self.h_sizes, self.numbers_of_children)):
+            with self.subTest(i=i):
+                g = _gen_node_with_children(number_of_children)
+                g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
+                g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
+                nary_types = {
+                    1: [[2, 3, 4], [5, 6, 7]]
+                }
+                self._test_type_specific_tree_lstm_cell(x_size, h_size, number_of_children, g, nary_types, device)
 
 
 if __name__ == '__main__':
