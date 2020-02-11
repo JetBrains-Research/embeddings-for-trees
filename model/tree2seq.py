@@ -9,7 +9,7 @@ from model.attention_decoder import LSTMAttentionDecoder, _IAttentionDecoder
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding
 from model.encoder import _IEncoder
-from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM
+from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM
 
 
 class Tree2Seq(nn.Module):
@@ -84,7 +84,8 @@ class ModelFactory:
     }
     _encoders = {
         'TokenTreeLSTM': TokenTreeLSTM,
-        'TokenTypeTreeLSTM': TokenTypeTreeLSTM
+        'TokenTypeTreeLSTM': TokenTypeTreeLSTM,
+        'LinearTreeLSTM': LinearTreeLSTM
     }
     _decoders = {
         'LinearDecoder': LinearDecoder,
