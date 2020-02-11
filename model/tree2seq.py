@@ -10,7 +10,6 @@ from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding
 from model.encoder import _IEncoder
 from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM
-from utils.common import PAD, EOS, SOS
 
 
 class Tree2Seq(nn.Module):
