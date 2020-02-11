@@ -31,7 +31,7 @@ class TokenTypeTreeLSTM(_IEncoder):
         super().__init__(h_emb, h_enc)
         if cell_args is None:
             cell_args = {}
-        self.cell = get_tree_lstm_cell(cell_type)(self.h_emb, self.h_enc, **cell_args)
+        self.cell = get_tree_lstm_cell(cell_type)(2 * self.h_emb, self.h_enc, **cell_args)
         self.dropout = nn.Dropout(dropout_prob)
 
     def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
