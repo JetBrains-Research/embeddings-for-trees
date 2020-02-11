@@ -4,7 +4,7 @@ from typing import Tuple, Union
 import dgl
 import torch
 
-from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, TypeSpecificTreeLSTMCell
+from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell
 from utils.common import get_device, fix_seed
 
 ATOL = 1e-6
@@ -180,7 +180,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 self.assertTrue(torch.allclose(h_tree_lstm, h_calculated, atol=ATOL), msg=f"Unequal hidden state tensors")
                 self.assertTrue(torch.allclose(c_tree_lstm, c_calculated, atol=ATOL), msg=f"Unequal memory state tensors")
 
-    def test_type_specific_tree_lstm_cell(self):
+    def test_edge_specific_tree_lstm_cell(self):
         device = get_device()
         fix_seed()
 
@@ -194,7 +194,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                     (0,): [list(range(1, number_of_children // 2))]
                 }
 
-                tree_lstm_cell = TypeSpecificTreeLSTMCell(x_size, h_size, type_relationship)
+                tree_lstm_cell = EdgeSpecificTreeLSTMCell(x_size, h_size, type_relationship)
 
                 h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
 

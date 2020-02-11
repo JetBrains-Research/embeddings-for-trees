@@ -154,7 +154,7 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
         }
 
 
-class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
+class EdgeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
 
     def __init__(self, x_size, h_size, type_relationship: Union[str, Dict]):
         """type relationship is a dict with information about children
@@ -224,7 +224,7 @@ def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
     tree_lstm_cells = {
         EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
         NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
-        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell
+        EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell
     }
     if tree_lstm_type not in tree_lstm_cells:
         raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
