@@ -250,6 +250,58 @@ class TreeLSTMCellTest(unittest.TestCase):
                 }
                 self._test_type_specific_tree_lstm_cell(x_size, h_size, number_of_children, g, nary_types, device)
 
+    def test_type_specific_tree_lstm_cell_complex(self):
+        device = get_device()
+        fix_seed()
+
+        x_size = 5
+        h_size = 5
+        number_of_children = [3, 5]
+
+        g1 = _gen_node_with_children(number_of_children[0])
+        g1.ndata['x'] = torch.rand(number_of_children[0] + 1, x_size)
+        g1.ndata['type_id'] = torch.tensor(range(0, number_of_children[0] + 1))
+        g2 = _gen_node_with_children(number_of_children[1])
+        g2.ndata['x'] = torch.rand(number_of_children[1] + 1, x_size)
+        g2.ndata['type_id'] = torch.tensor(
+            range(number_of_children[0] + 1, number_of_children[0] + number_of_children[1] + 2)
+        )
+
+        # only g1 root node match this type
+        nary_types = {
+            0: [
+                [1, 2, 3], [4, 5, 6]
+            ],
+            1: [
+                [1, 2, 3], [4, 5, 6]
+            ]
+        }
+
+        g_full = dgl.batch([g1, g2])
+
+        tree_lstm_cell = TypeSpecificTreeLSTMCell(x_size, h_size, nary_types)
+
+        h_tree_lstm, c_tree_lstm = tree_lstm_cell(g_full, device)
+
+        h_calculated_list = []
+        c_calculated_list = []
+        for g, i in zip([g1, g2], number_of_children):
+            tree_lstm_cell_params = tree_lstm_cell.get_params()
+            children = tuple(g.ndata['type_id'][1:].tolist())
+            root_id = g.ndata['type_id'][0].item()
+            u_f_indices = [
+                tree_lstm_cell.edge_matrix_id.get(root_id, {}).get(tuple(children), [0 for _ in children])
+            ]
+            tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
+            h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
+            h_calculated_list.append(h_calculated)
+            c_calculated_list.append(c_calculated)
+
+        h_calculated = torch.cat(h_calculated_list, 0)
+        c_calculated = torch.cat(c_calculated_list, 0)
+
+        self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
+
 
 if __name__ == '__main__':
     unittest.main()

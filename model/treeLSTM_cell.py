@@ -248,7 +248,7 @@ class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
         for src_type_id, dst_type_ids in self.nary_types.items():
             if src_type_id not in self.edge_matrix_id:
                 self.edge_matrix_id[src_type_id] = {}
-            cur_indexes = list(range(count_diff_matrix, count_diff_matrix + len(dst_type_ids[0])))
+            cur_indexes = torch.tensor(range(count_diff_matrix, count_diff_matrix + len(dst_type_ids[0])))
             for dst_type_id in dst_type_ids:
                 self.edge_matrix_id[src_type_id][tuple(sorted(dst_type_id))] = cur_indexes
             count_diff_matrix += len(dst_type_ids[0])
