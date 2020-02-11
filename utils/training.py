@@ -52,7 +52,7 @@ def train_on_batch(
         'loss': loss.item(),
         'statistics':
             calculate_batch_statistics(
-                ground_truth, prediction, [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
+                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
             )
     }
     return batch_train_info
@@ -78,7 +78,7 @@ def eval_on_batch(
             'loss': loss.item(),
             'statistics':
                 calculate_batch_statistics(
-                    ground_truth, prediction, [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
+                    ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
                 )
         }
         return batch_eval_info, prediction
