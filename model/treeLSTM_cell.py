@@ -157,7 +157,8 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
 class EdgeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
 
     def __init__(self, x_size, h_size, type_relationship: Union[str, Dict]):
-        """type relationship is a dict with information about children
+        """Set matrix for each edge base on types of vertices
+        :param type_relationship: if str, then path to pickle with Dict
         key: tuple with ids for src group, e.g. If and Switch statements
         value: list of lists, where each list corresponding to type ids of some group
         { ...
@@ -183,6 +184,7 @@ class EdgeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
                     for src_id in type_ids:
                         self.edge_matrix_id[(src_id, child_id)] = count_diff_matrix
                 count_diff_matrix += 1
+        print(count_diff_matrix)
 
         self.U_f = nn.Parameter(torch.rand(count_diff_matrix, self.h_size, self.h_size), requires_grad=True)
 
@@ -220,11 +222,82 @@ class EdgeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
         }
 
 
+class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
+
+    def __init__(self, x_size: int, h_size: int, nary_types: Union[str, Dict]):
+        """Use NAry cell type for given types
+        :param nary_types: if str, then path to pickle with Dict
+        contains information about types for NAry equations:
+        { ...
+            src_type_id: [
+                ...
+                [dst_type_id_1, ..., dst_type_id_k],
+                ...
+            ]
+        ... }
+        """
+        super().__init__(x_size, h_size)
+        if isinstance(nary_types, str):
+            with open(nary_types, 'rb') as pkl_file:
+                self.nary_types = pkl_load(pkl_file)
+        else:
+            self.nary_types = nary_types
+        count_diff_matrix = 1
+        # dict of matrices ids, key: src_type_id, value: {(dst_type_id_1, ..., dst_type_id_k): (m_id_1, ..., m_id_k))}
+        self.edge_matrix_id = {}
+        for src_type_id, dst_type_ids in self.nary_types.items():
+            if src_type_id not in self.edge_matrix_id:
+                self.edge_matrix_id[src_type_id] = {}
+            cur_indexes = list(range(count_diff_matrix, count_diff_matrix + len(dst_type_ids[0])))
+            for dst_type_id in dst_type_ids:
+                self.edge_matrix_id[src_type_id][tuple(sorted(dst_type_id))] = cur_indexes
+            count_diff_matrix += len(dst_type_ids[0])
+
+        self.U_f = nn.Parameter(torch.rand(count_diff_matrix, self.h_size, self.h_size), requires_grad=True)
+
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        _W = self.U_f[edges.data['matrix_id']]
+        _x = edges.src['h'].unsqueeze(1)
+        h_f = torch.bmm(_x, _W).squeeze(1)
+        x_f = edges.dst['x_f']
+        f = torch.sigmoid(x_f + h_f)
+        return {
+            'Uh': self.U_iou(edges.src['h']),
+            'fc': edges.src['c'] * f
+        }
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        return super().reduce_func(nodes)
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        return super().apply_node_func(nodes)
+
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        matrix_id = torch.zeros(graph.number_of_edges(), dtype=torch.long)
+        # because all edges in graph reversed (from child to parent)
+        for node in range(graph.number_of_nodes()):
+            children, _, edge_ids = graph.in_edges(node, form='all')
+            children_ids = tuple(sorted(graph.ndata['type_id'][children].tolist()))
+            if node in self.edge_matrix_id:
+                if children_ids in self.edge_matrix_id[node]:
+                    matrix_id[edge_ids] = self.edge_matrix_id[node][children_ids]
+
+        graph.edata['matrix_id'] = matrix_id.to(device)
+        return super().forward(graph, device)
+
+    def get_params(self) -> Dict:
+        return {
+            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight.t(), 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'u_f': self.U_f.data, 'b_f': self.b_f.data
+        }
+
+
 def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
     tree_lstm_cells = {
         EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
         NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
-        EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell
+        EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
+        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell
     }
     if tree_lstm_type not in tree_lstm_cells:
         raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
