@@ -70,7 +70,7 @@ def _calculate_nary_tree_lstm_states(
 
     :param x: features, x[0] corresponds to parent, other for children [number_of_children + 1, x_size]
     :param w_iou: [3 * h_size, x_size]
-    :param u_iou: [h_size, 3 * h_size]
+    :param u_iou: [number_of_children, h_size, 3 * h_size]
     :param b_iou: [1, 3 * h_size]
     :param w_f: [3 * h_size, x_size]
     :param u_f: [number_of_children, h_size, h_size]
@@ -85,8 +85,11 @@ def _calculate_nary_tree_lstm_states(
     h_children = o * torch.tanh(c_children)
 
     x_root = x[0]
-    h_sum = torch.sum(h_children, 0)
-    iou_root = x_root.matmul(w_iou.t()) + h_sum.matmul(u_iou) + b_iou
+
+    h_sum = torch.sum(
+        torch.bmm(h_children.unsqueeze(1), u_iou).squeeze(1), 0
+    )
+    iou_root = x_root.matmul(w_iou.t()) + h_sum + b_iou
     i, o, u = torch.chunk(iou_root, 3, 1)
     i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
 
@@ -198,10 +201,11 @@ class TreeLSTMCellTest(unittest.TestCase):
                 h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
 
                 tree_lstm_cell_params = tree_lstm_cell.get_params()
-                u_f_indices = [
+                u_indices = [
                     tree_lstm_cell.edge_matrix_id.get((0, i), 0) for i in range(1, number_of_children + 1)
                 ]
-                tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
+                tree_lstm_cell_params['u_iou'] = tree_lstm_cell_params['u_iou'][u_indices]
+                tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_indices]
                 h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
                 self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
@@ -214,10 +218,11 @@ class TreeLSTMCellTest(unittest.TestCase):
 
         tree_lstm_cell_params = tree_lstm_cell.get_params()
         children = list(range(1, number_of_children + 1))
-        u_f_indices = [
+        u_indices = [
             tree_lstm_cell.edge_matrix_id.get(0, {}).get(tuple(children), [0 for _ in children])
         ]
-        tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
+        tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_indices]
+        tree_lstm_cell_params['u_iou'] = tree_lstm_cell_params['u_iou'][u_indices]
         h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
         self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
@@ -290,10 +295,11 @@ class TreeLSTMCellTest(unittest.TestCase):
             tree_lstm_cell_params = tree_lstm_cell.get_params()
             children = tuple(g.ndata['type_id'][1:].tolist())
             root_id = g.ndata['type_id'][0].item()
-            u_f_indices = [
+            u_indices = [
                 tree_lstm_cell.edge_matrix_id.get(root_id, {}).get(tuple(children), [0 for _ in children])
             ]
-            tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_f_indices]
+            tree_lstm_cell_params['u_f'] = tree_lstm_cell_params['u_f'][u_indices]
+            tree_lstm_cell_params['u_iou'] = tree_lstm_cell_params['u_iou'][u_indices]
             h_calculated, c_calculated = _calculate_nary_tree_lstm_states(g.ndata['x'], **tree_lstm_cell_params)
             h_calculated_list.append(h_calculated)
             c_calculated_list.append(c_calculated)
@@ -352,8 +358,6 @@ class TreeLSTMCellTest(unittest.TestCase):
                 h_calculated = torch.cat((h_root, h_children), 0)
                 c_calculated = torch.cat((c_root, c_children), 0)
 
-                print(h_tree_lstm)
-                print(h_calculated)
 
                 self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
