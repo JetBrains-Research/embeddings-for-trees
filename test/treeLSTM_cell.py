@@ -1,11 +1,12 @@
 import unittest
+from math import sqrt
 from typing import Tuple, Union, Dict
 
 import dgl
 import torch
 
 from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell, \
-    TypeSpecificTreeLSTMCell
+    TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell
 from utils.common import get_device, fix_seed
 
 ATOL = 1e-6
@@ -301,6 +302,60 @@ class TreeLSTMCellTest(unittest.TestCase):
         c_calculated = torch.cat(c_calculated_list, 0)
 
         self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
+
+    def test_type_attention_tree_lstm_cell(self):
+        device = get_device()
+        fix_seed()
+
+        a_sizes = [5, 8, 13, 128, 256]
+        for i, (x_size, h_size, number_of_children, a_size) in enumerate(
+                zip(self.x_sizes, self.h_sizes, self.numbers_of_children, a_sizes)
+        ):
+            with self.subTest(i=i):
+                g = _gen_node_with_children(number_of_children)
+                g.ndata['x'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
+                g.ndata['type_embeds'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
+
+                tree_lstm_cell = TypeAttentionTreeLSTMCell(x_size, h_size, a_size).to(device)
+                h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
+
+                params = tree_lstm_cell.get_params()
+
+                nodes_x = g.ndata['x'][1:]
+                iou_children = nodes_x.matmul(params['w_iou'].t()) + params['b_iou']
+                i, o, u = torch.chunk(iou_children, 3, 1)
+                i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
+                c_children = i * u
+                h_children = o * torch.tanh(c_children)
+
+                x_root = g.ndata['x'][0]
+                type_root = g.ndata['type_embeds'][0]
+                type_children = g.ndata['type_embeds'][1:]
+
+                _Q = type_root.matmul(params['w_query'].t())
+                _K = type_children.matmul(params['w_key'].t())
+                _V = h_children.matmul(params['w_value'].t())
+                align = _Q.matmul(_K.t()) / sqrt(a_size)
+                a = torch.softmax(align - torch.max(align), 0)
+                h_attn = a.matmul(_V)
+
+                iou_root = x_root.matmul(params['w_iou'].t()) + h_attn + params['b_iou']
+                i, o, u = torch.chunk(iou_root, 3, 1)
+                i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
+                f_root_child = torch.sigmoid(
+                    x_root.matmul(params['w_f'].t()) + h_children.matmul(params['u_f']) + params['b_f']
+                )
+                c_root_child = c_children * f_root_child
+                c_root = i * u + torch.sum(c_root_child, 0)
+                h_root = o * torch.tanh(c_root)
+
+                h_calculated = torch.cat((h_root, h_children), 0)
+                c_calculated = torch.cat((c_root, c_children), 0)
+
+                print(h_tree_lstm)
+                print(h_calculated)
+
+                self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
 
 
 if __name__ == '__main__':

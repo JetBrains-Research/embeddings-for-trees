@@ -1,3 +1,4 @@
+from math import sqrt
 from pickle import load as pkl_load
 from typing import Dict, Tuple, Union
 
@@ -184,7 +185,6 @@ class EdgeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
                     for src_id in type_ids:
                         self.edge_matrix_id[(src_id, child_id)] = count_diff_matrix
                 count_diff_matrix += 1
-        print(count_diff_matrix)
 
         self.U_f = nn.Parameter(torch.rand(count_diff_matrix, self.h_size, self.h_size), requires_grad=True)
 
@@ -292,12 +292,99 @@ class TypeSpecificTreeLSTMCell(EdgeChildSumTreeLSTMCell):
         }
 
 
+class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
+
+    def __init__(self, x_size, h_size, a_size):
+        super().__init__(x_size, h_size)
+        self.W_iou = nn.Linear(self.x_size, 3 * self.h_size, bias=False)
+        self.b_iou = nn.Parameter(torch.zeros(1, 3 * self.h_size), requires_grad=True)
+
+        self.W_f = nn.Linear(self.x_size, self.h_size, bias=False)
+        self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
+        self.b_f = nn.Parameter(torch.zeros((1, h_size)), requires_grad=True)
+
+        self.a_size = a_size
+        self.W_query = nn.Linear(self.x_size, self.a_size, bias=False)
+        self.W_key = nn.Linear(self.x_size, self.a_size, bias=False)
+        self.W_value = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
+
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        h_f = self.U_f(edges.src['h'])
+        f = torch.sigmoid(edges.dst['x_f'] + h_f)
+        return {
+            'h': edges.src['h'],
+            'type_embeds': edges.src['type_embeds'],
+            'fc': edges.src['c'] * f
+        }
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        # [n; a]
+        _Q = self.W_query(nodes.data['type_embeds'])
+        # [n; k; a]
+        _K = self.W_key(nodes.mailbox['type_embeds'])
+        # [n; k; 3 * h]
+        _V = self.W_value(nodes.mailbox['h'])
+
+        # [n; 1; k]
+        align = torch.bmm(_Q.unsqueeze(1), _K.transpose(1, 2)) / sqrt(self.a_size)
+        align_max_per_axis = align.max(dim=2, keepdim=True)[0]
+        a = torch.softmax(
+            align - align_max_per_axis,
+            dim=2
+        )
+
+        # [n; 3 * h]
+        h = torch.bmm(a, _V).squeeze(1)
+
+        return {
+            'h_attn': h,
+            'fc_sum': torch.sum(nodes.mailbox['fc'], 1)
+        }
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        iou = nodes.data['x_iou'] + nodes.data['h_attn']
+        i, o, u = torch.chunk(iou, 3, 1)
+        i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
+
+        c = i * u + nodes.data['fc_sum']
+        h = o * torch.tanh(c)
+
+        return {'h': h, 'c': c}
+
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        number_of_nodes = graph.number_of_nodes()
+        graph.ndata['x_iou'] = self.W_iou(graph.ndata['x']) + self.b_iou
+        graph.ndata['x_f'] = self.W_f(graph.ndata['x']) + self.b_f
+        graph.ndata['h'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['c'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['h_attn'] = torch.zeros((number_of_nodes, 3 * self.h_size), device=device)
+
+        graph.register_message_func(self.message_func)
+        graph.register_reduce_func(self.reduce_func)
+        graph.register_apply_node_func(self.apply_node_func)
+
+        dgl.prop_nodes_topo(graph)
+
+        h = graph.ndata.pop('h')
+        c = graph.ndata.pop('c')
+        return h, c
+
+    def get_params(self):
+        return {
+            'w_iou': self.W_iou.weight, 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'u_f': self.U_f.weight.t(), 'b_f': self.b_f.data,
+            'w_query': self.W_query.weight, 'w_key': self.W_key.weight, 'w_value': self.W_value.weight
+        }
+
+
 def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
     tree_lstm_cells = {
         EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
         NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
         EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
-        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell
+        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell,
+        TypeAttentionTreeLSTMCell.__name__: TypeAttentionTreeLSTMCell
     }
     if tree_lstm_type not in tree_lstm_cells:
         raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
