@@ -345,7 +345,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 a = torch.softmax(align - torch.max(align), 0)
                 h_attn = a.matmul(_V)
 
-                iou_root = x_root.matmul(params['w_iou'].t()) + h_attn + params['b_iou']
+                iou_root = x_root.matmul(params['w_iou'].t()) + h_attn.matmul(params['u_iou'].t()) + params['b_iou']
                 i, o, u = torch.chunk(iou_root, 3, 1)
                 i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
                 f_root_child = torch.sigmoid(

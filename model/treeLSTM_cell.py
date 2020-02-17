@@ -307,6 +307,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
 
     def __init__(self, x_size, h_size, a_size):
         super().__init__(x_size, h_size)
+        self.U_iou = nn.Linear(3 * self.h_size, 3 * self.h_size, bias=False)
         self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
 
         self.a_size = a_size
@@ -343,7 +344,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
         h = torch.bmm(a, _V).squeeze(1)
 
         return {
-            'Uh_sum': h,  # for using with super functions
+            'Uh_sum': self.U_iou(h),  # name for using with super functions
             'fc_sum': torch.sum(nodes.mailbox['fc'], 1)
         }
 
@@ -365,7 +366,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
 
     def get_params(self):
         return {
-            'w_iou': self.W_iou.weight, 'b_iou': self.b_iou.data,
+            'w_iou': self.W_iou.weight, 'u_iou': self.U_iou.weight, 'b_iou': self.b_iou.data,
             'w_f': self.W_f.weight, 'u_f': self.U_f.weight.t(), 'b_f': self.b_f.data,
             'w_query': self.W_query.weight, 'w_key': self.W_key.weight, 'w_value': self.W_value.weight
         }
