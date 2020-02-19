@@ -53,7 +53,7 @@ def train(params: Dict, logging: str) -> None:
     )
     # create scheduler
     scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=params['scheduler_step_size'], gamma=params['scheduler_gamma']
+        optimizer, step_size=params['scheduler_step_size'], gamma=params['scheduler_gamma'], last_epoch=start_batch_id-1
     )
 
     # define loss function
