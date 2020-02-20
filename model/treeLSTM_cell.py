@@ -414,7 +414,7 @@ class FullMultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [n; h_size]
         h_f = self.U_f(h_attn)
 
-        f = torch.sigmoid(nodes.data['x_f'] + h_f)
+        f = torch.sigmoid(nodes.data['x_f'] + h_f).unsqueeze(1)
         fc = nodes.mailbox['c'] * f
         return {
             'Uh_sum': h_iou,  # name for using with super functions
