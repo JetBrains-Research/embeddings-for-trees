@@ -1,7 +1,9 @@
+from math import sqrt
 from typing import List
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as f
 
 from utils.common import segment_sizes_to_slices
 
@@ -55,3 +57,18 @@ class LuongConcatAttention(_IAttention):
         )
 
         return attentions
+
+
+def scaled_dot_product_attention(
+        query: torch.Tensor, key: torch.Tensor, value: torch.Tensor,
+        mask: torch.Tensor = None, dropout: nn.Dropout = None
+) -> torch.Tensor:
+    scores = query.matmul(key.transpose(-2, -1)) / sqrt(query.shape[-1])
+    if mask is not None:
+        scores = scores.masked_fill(mask == 0, -1e9)
+    scores = f.softmax(scores, dim=-1)
+    if dropout is not None:
+        scores = dropout(scores)
+    output = torch.matmul(scores, value)
+    return output
+

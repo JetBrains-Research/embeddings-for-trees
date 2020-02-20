@@ -7,6 +7,8 @@ import dgl.function as fn
 import torch
 import torch.nn as nn
 
+from model.attention import scaled_dot_product_attention
+
 
 class _ITreeLSTMCell(nn.Module):
     def __init__(self, x_size: int, h_size: int):
@@ -43,7 +45,10 @@ class _ITreeLSTMCell(nn.Module):
         raise NotImplementedError
 
     def get_params(self) -> Dict:
-        raise NotImplementedError
+        return {
+            'w_iou': self.W_iou.weight, 'b_iou': self.b_iou.data,
+            'w_f': self.W_f.weight, 'b_f': self.b_f.data
+        }
 
     def _init_matrices(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> dgl.BatchedDGLGraph:
         number_of_nodes = graph.number_of_nodes()
@@ -332,16 +337,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [n; k; 3 * h]
         _V = self.W_value(nodes.mailbox['h'])
 
-        # [n; 1; k]
-        align = torch.bmm(_Q.unsqueeze(1), _K.transpose(1, 2)) / sqrt(self.a_size)
-        align_max_per_axis = align.max(dim=2, keepdim=True)[0]
-        a = torch.softmax(
-            align - align_max_per_axis,
-            dim=2
-        )
-
-        # [n; 3 * h]
-        h = torch.bmm(a, _V).squeeze(1)
+        h = scaled_dot_product_attention(_Q, _K, _V, self.a_size).squeeze(1)
 
         return {
             'Uh_sum': self.U_iou(h),  # name for using with super functions
@@ -372,13 +368,95 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
         }
 
 
+class FullMultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
+
+    def __init__(self, x_size, h_size, a_size, n_heads):
+        super().__init__(x_size, h_size)
+        assert a_size % n_heads == 0
+        self.a_size = a_size
+        self.n_heads = n_heads
+        self.a_k = self.a_size // self.n_heads
+
+        self.W_query = nn.Linear(self.x_size, self.a_size)
+        self.W_key = nn.Linear(self.h_size, self.a_size)
+        self.W_value = nn.Linear(self.h_size, self.a_size)
+        self.attn_linear = nn.Linear(self.a_size, self.a_size)
+
+        self.U_iou = nn.Linear(self.a_size, 3 * self.h_size)
+        self.U_f = nn.Linear(self.a_size, self.h_size)
+
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        """use built-in functions"""
+        raise NotImplementedError
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        bs = nodes.batch_size()
+        # [n; 1; n_heads; a_k]
+        _Q = self.W_query(nodes.data['x']).view(bs, 1, self.n_heads, self.a_k)
+        # [n; k; n_heads; a_k]
+        _K = self.W_key(nodes.mailbox['h']).view(bs, -1, self.n_heads, self.a_k)
+        # [n; k; n_heads; a_k]
+        _V = self.W_value(nodes.mailbox['h']).view(bs, -1, self.n_heads, self.a_k)
+
+        # [n; n_heads; -1; a_k]
+        _Q = _Q.transpose(1, 2)
+        _K = _K.transpose(1, 2)
+        _V = _V.transpose(1, 2)
+
+        # [n; n_heads; 1; a_k]
+        scores = scaled_dot_product_attention(_Q, _K, _V)
+        # [n; a_size]
+        concat = scores.transpose(1, 2).contiguous().view(bs, self.a_size)
+        h_attn = self.attn_linear(concat)
+
+        # [n; 3 * h_size]
+        h_iou = self.U_iou(h_attn)
+        # [n; h_size]
+        h_f = self.U_f(h_attn)
+
+        f = torch.sigmoid(nodes.data['x_f'] + h_f)
+        fc = nodes.mailbox['c'] * f
+        return {
+            'Uh_sum': h_iou,  # name for using with super functions
+            'fc_sum': torch.sum(fc, 1)
+        }
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        return super().apply_node_func(nodes)
+
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        graph = self._init_matrices(graph, device)
+
+        dgl.prop_nodes_topo(
+            graph, reduce_func=self.reduce_func, apply_node_func=self.apply_node_func,
+            message_func=[fn.copy_u('h', 'h'), fn.copy_u('x', 'x'), fn.copy_u('c', 'c')]
+        )
+
+        h = graph.ndata.pop('h')
+        c = graph.ndata.pop('c')
+        return h, c
+
+    def get_params(self) -> Dict:
+        params = super().get_params()
+        params.update({
+            'w_query': self.W_query.weight, 'w_query_bias': self.W_query.bias,
+            'w_key': self.W_key.weight, 'w_key_bias': self.W_key.bias,
+            'w_value': self.W_value.weight, 'w_value_bias': self.W_value.bias,
+            'w_linear': self.attn_linear.weight, 'b_linear': self.attn_linear.bias,
+            'u_iou_w': self.U_iou.weight, 'u_f_w': self.U_f.weight,
+            'u_iou_b': self.U_iou.bias, 'u_f_b': self.U_f.bias
+        })
+        return params
+
+
 def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
     tree_lstm_cells = {
         EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
         NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
         EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
         TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell,
-        TypeAttentionTreeLSTMCell.__name__: TypeAttentionTreeLSTMCell
+        TypeAttentionTreeLSTMCell.__name__: TypeAttentionTreeLSTMCell,
+        FullMultiHeadAttentionTreeLSTMCell.__name__: FullMultiHeadAttentionTreeLSTMCell
     }
     if tree_lstm_type not in tree_lstm_cells:
         raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
