@@ -50,6 +50,7 @@ def train_on_batch(
     prediction = model.predict(root_logits)
     batch_train_info = {
         'loss': loss.item(),
+        'learning_rate': scheduler.get_lr()[0],
         'statistics':
             calculate_batch_statistics(
                 ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]

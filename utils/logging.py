@@ -49,10 +49,6 @@ class WandBLogger(_ILogger):
     ) -> None:
         super().__init__(checkpoints_folder)
         wandb.init(project=project_name, config=config, resume=resume)
-        try:
-            display(wandb.jupyter.Run())
-        except NameError:
-            pass
         # wandb can't work with graphs?
         # wandb.watch(model, log='all')
 
