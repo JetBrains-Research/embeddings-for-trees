@@ -3,7 +3,8 @@ import unittest
 import dgl
 import torch
 
-from model.embedding import SubTokenEmbedding
+from model.embedding import SubTokenEmbedding, PositionalEmbedding
+from test.test_utils import gen_tree
 from utils.common import fix_seed, get_device
 
 
@@ -38,7 +39,31 @@ class EmbeddingTest(unittest.TestCase):
             [1, 1, 0, 0, 1]
         ], device=device, dtype=torch.float)
 
-        self.assertEqual(torch.allclose(true_embeds, embed_g.ndata['token_embeds']), True)
+        self.assertTrue(torch.allclose(true_embeds, embed_g.ndata['token_embeds']))
+
+    def test_positional_embedding(self):
+        fix_seed()
+        device = get_device()
+
+        g = gen_tree(3, 3)
+        positional_embedding = PositionalEmbedding(3, 2)
+        g = positional_embedding(g, device)
+
+        correct_pos_embedding = torch.tensor([[0., 0., 0., 0., 0., 0.],
+                                              [1., 0., 0., 0., 0., 0.],
+                                              [0., 1., 0., 0., 0., 0.],
+                                              [0., 0., 1., 0., 0., 0.],
+                                              [1., 0., 0., 1., 0., 0.],
+                                              [0., 1., 0., 1., 0., 0.],
+                                              [0., 0., 1., 1., 0., 0.],
+                                              [1., 0., 0., 0., 1., 0.],
+                                              [0., 1., 0., 0., 1., 0.],
+                                              [0., 0., 1., 0., 1., 0.],
+                                              [1., 0., 0., 0., 0., 1.],
+                                              [0., 1., 0., 0., 0., 1.],
+                                              [0., 0., 1., 0., 0., 1.]])
+
+        self.assertTrue(torch.allclose(correct_pos_embedding, g.ndata['pos_embeds']))
 
 
 if __name__ == '__main__':
