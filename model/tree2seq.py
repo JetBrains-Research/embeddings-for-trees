@@ -10,6 +10,7 @@ from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding, \
     PositionalSubTokenTypeEmbedding
 from model.encoder import _IEncoder
+from model.transformer_encoder import Transformer
 from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM, SumEmbedsTreeLSTM
 
 
@@ -88,7 +89,9 @@ class ModelFactory:
         'TokenTreeLSTM': TokenTreeLSTM,
         'TokenTypeTreeLSTM': TokenTypeTreeLSTM,
         'LinearTreeLSTM': LinearTreeLSTM,
-        'SumEmbedsTreeLSTM': SumEmbedsTreeLSTM
+        'SumEmbedsTreeLSTM': SumEmbedsTreeLSTM,
+
+        'Transformer': Transformer
     }
     _decoders = {
         'LinearDecoder': LinearDecoder,
