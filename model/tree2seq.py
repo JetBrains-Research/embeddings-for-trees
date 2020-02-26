@@ -7,9 +7,10 @@ from dgl import BatchedDGLGraph
 from model.attention import LuongConcatAttention
 from model.attention_decoder import LSTMAttentionDecoder, _IAttentionDecoder
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
-from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding
+from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding, \
+    PositionalSubTokenTypeEmbedding
 from model.encoder import _IEncoder
-from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM
+from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM, SumEmbedsTreeLSTM
 
 
 class Tree2Seq(nn.Module):
@@ -80,12 +81,14 @@ class ModelFactory:
     _embeddings = {
         'FullTokenEmbedding': FullTokenEmbedding,
         'SubTokenEmbedding': SubTokenEmbedding,
-        'SubTokenTypeEmbedding': SubTokenTypeEmbedding
+        'SubTokenTypeEmbedding': SubTokenTypeEmbedding,
+        'PositionalSubTokenTypeEmbedding': PositionalSubTokenTypeEmbedding,
     }
     _encoders = {
         'TokenTreeLSTM': TokenTreeLSTM,
         'TokenTypeTreeLSTM': TokenTypeTreeLSTM,
-        'LinearTreeLSTM': LinearTreeLSTM
+        'LinearTreeLSTM': LinearTreeLSTM,
+        'SumEmbedsTreeLSTM': SumEmbedsTreeLSTM
     }
     _decoders = {
         'LinearDecoder': LinearDecoder,

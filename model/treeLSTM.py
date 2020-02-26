@@ -57,3 +57,20 @@ class LinearTreeLSTM(_IEncoder):
         features = self.activation(self.linear(features))
         batch.ndata['x'] = self.dropout(features)
         return self.cell(batch, device)
+
+
+class SumEmbedsTreeLSTM(_IEncoder):
+
+    def __init__(self, h_emb: int, h_enc: int, cell_type: str,
+                 cell_args: Dict = None, dropout_prob: float = 0.) -> None:
+        super().__init__(h_emb, h_enc)
+        if cell_args is None:
+            cell_args = {}
+        self.cell = get_tree_lstm_cell(cell_type)(self.h_emb, self.h_enc, **cell_args)
+        self.dropout = nn.Dropout(dropout_prob)
+
+    def forward(self, batch: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        embeds = [key for key in batch.ndata if 'embeds' in key]
+        features = sum([batch.ndata[e] for e in embeds])
+        batch.ndata['x'] = self.dropout(features)
+        return self.cell(batch, device)
