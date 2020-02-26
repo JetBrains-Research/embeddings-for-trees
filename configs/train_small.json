@@ -22,18 +22,19 @@
   },
 
   "encoder": {
-    "name": "SumEmbedsTreeLSTM",
+    "name": "Transformer",
     "params": {
-      "dropout_prob": 0.2,
-      "cell_type": "EdgeChildSumTreeLSTMCell",
-      "cell_args": {}
+      "n_head": 8,
+      "n_layers": 6,
+      "dropout": 0.1,
+      "h_ffd":2048
     }
   },
 
   "decoder": {
     "name": "LSTMAttentionDecoder",
     "params": {
-      "dropout_prob": 0.2
+      "dropout_prob": 0.1
     },
     "attention": {
       "name": "LuongConcatAttention",

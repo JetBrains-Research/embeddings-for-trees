@@ -21,10 +21,10 @@
   },
 
   "encoder": {
-    "name": "SumEmbedsTreeLSTM",
+    "name": "Transformer",
     "params": {
-      "dropout_prob": 0.2,
-      "cell_type": "EdgeChildSumTreeLSTMCell"
+      "n_head": 8,
+      "n_layers": 2
     }
   },
 
