@@ -5,5 +5,5 @@
     "model": "epoch_0.pt"
   },
 
-  "batch_size": 200
+  "batch_size": 500
 }

@@ -13,18 +13,18 @@
   },
 
   "embedding": {
-    "name": "SubTokenTypeEmbedding",
-    "params": {}
+    "name": "PositionalSubTokenTypeEmbedding",
+    "params": {
+      "n": 4,
+      "k": 16
+    }
   },
 
   "encoder": {
-    "name": "TokenTypeTreeLSTM",
+    "name": "SumEmbedsTreeLSTM",
     "params": {
       "dropout_prob": 0.2,
-      "cell_type": "TypeSpecificTreeLSTMCell",
-      "cell_args": {
-        "type_relationship": "data/type_relationship_ids.pkl"
-      }
+      "cell_type": "EdgeChildSumTreeLSTMCell"
     }
   },
 
@@ -45,7 +45,7 @@
   "weight_decay": 1e-4,
   "clip_norm": 5,
   "teacher_force": 0.5,
-  "scheduler_step_size": 10,
+  "scheduler_step_size": 25,
   "scheduler_gamma": 0.1,
 
   "evaluation_step": -1,
