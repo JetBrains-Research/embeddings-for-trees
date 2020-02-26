@@ -8,20 +8,10 @@ import torch
 from model.attention import scaled_dot_product_attention
 from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell, \
     TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell, FullMultiHeadAttentionTreeLSTMCell
+from test.test_utils import gen_node_with_children
 from utils.common import get_device, fix_seed
 
 ATOL = 1e-6
-
-
-def _gen_node_with_children(number_of_children: int, edges_to_root: bool = True) -> dgl.DGLGraph:
-    # create a graph with n+1 vertices and n edges (from 0 to 1, 2, ..., number_of_children)
-    g = dgl.DGLGraph()
-    g.add_nodes(number_of_children + 1)
-    g.add_edges(0, [i for i in range(1, number_of_children + 1)])
-    if edges_to_root:
-        g = g.reverse()
-    return g
-
 
 def _calculate_childsum_tree_lstm_states(
         x: torch.Tensor,
@@ -139,7 +129,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                        ) -> None:
         tree_lstm_cell = tree_lstm_type(x_size, h_size)
 
-        g = _gen_node_with_children(number_of_children)
+        g = gen_node_with_children(number_of_children)
         g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
 
         h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
@@ -178,8 +168,8 @@ class TreeLSTMCellTest(unittest.TestCase):
             with self.subTest(msg=f"test {tree_lstm_type.__name__} tree lstm cell"):
                 tree_lstm_cell = tree_lstm_type(x_size, h_size)
 
-                g1 = _gen_node_with_children(numbers_of_children[0])
-                g2 = _gen_node_with_children(numbers_of_children[1])
+                g1 = gen_node_with_children(numbers_of_children[0])
+                g2 = gen_node_with_children(numbers_of_children[1])
                 g1.ndata['x'] = torch.rand(numbers_of_children[0] + 1, x_size)
                 g2.ndata['x'] = torch.rand(numbers_of_children[1] + 1, x_size)
                 g = dgl.batch([g1, g2])
@@ -204,7 +194,7 @@ class TreeLSTMCellTest(unittest.TestCase):
         for i, (x_size, h_size, number_of_children) in enumerate(
                 zip(self.x_sizes, self.h_sizes, self.numbers_of_children)):
             with self.subTest(i=i):
-                g = _gen_node_with_children(number_of_children)
+                g = gen_node_with_children(number_of_children)
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
                 g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
                 type_relationship = {
@@ -248,7 +238,7 @@ class TreeLSTMCellTest(unittest.TestCase):
         for i, (x_size, h_size, number_of_children) in enumerate(
                 zip(self.x_sizes, self.h_sizes, self.numbers_of_children)):
             with self.subTest(i=i):
-                g = _gen_node_with_children(number_of_children)
+                g = gen_node_with_children(number_of_children)
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
                 g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
                 nary_types = {
@@ -263,7 +253,7 @@ class TreeLSTMCellTest(unittest.TestCase):
         for i, (x_size, h_size, number_of_children) in enumerate(
                 zip(self.x_sizes, self.h_sizes, self.numbers_of_children)):
             with self.subTest(i=i):
-                g = _gen_node_with_children(number_of_children)
+                g = gen_node_with_children(number_of_children)
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size)
                 g.ndata['type_id'] = torch.tensor(range(0, number_of_children + 1))
                 nary_types = {
@@ -279,10 +269,10 @@ class TreeLSTMCellTest(unittest.TestCase):
         h_size = 5
         number_of_children = [3, 5]
 
-        g1 = _gen_node_with_children(number_of_children[0])
+        g1 = gen_node_with_children(number_of_children[0])
         g1.ndata['x'] = torch.rand(number_of_children[0] + 1, x_size)
         g1.ndata['type_id'] = torch.tensor(range(0, number_of_children[0] + 1))
-        g2 = _gen_node_with_children(number_of_children[1])
+        g2 = gen_node_with_children(number_of_children[1])
         g2.ndata['x'] = torch.rand(number_of_children[1] + 1, x_size)
         g2.ndata['type_id'] = torch.tensor(
             range(number_of_children[0] + 1, number_of_children[0] + number_of_children[1] + 2)
@@ -333,7 +323,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 zip(self.x_sizes, self.h_sizes, self.numbers_of_children, a_sizes)
         ):
             with self.subTest(i=i):
-                g = _gen_node_with_children(number_of_children)
+                g = gen_node_with_children(number_of_children)
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
                 g.ndata['type_embeds'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
 
@@ -385,7 +375,7 @@ class TreeLSTMCellTest(unittest.TestCase):
                 zip(self.x_sizes, self.h_sizes, self.numbers_of_children, a_sizes, n_heads)
         ):
             with self.subTest(i=i):
-                g = _gen_node_with_children(number_of_children)
+                g = gen_node_with_children(number_of_children)
                 g.ndata['x'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
 
                 tree_lstm_cell = FullMultiHeadAttentionTreeLSTMCell(x_size, h_size, a_size, n_head).to(device)

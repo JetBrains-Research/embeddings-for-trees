@@ -337,7 +337,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [n; k; 3 * h]
         _V = self.W_value(nodes.mailbox['h'])
 
-        h = scaled_dot_product_attention(_Q, _K, _V, self.a_size).squeeze(1)
+        h = scaled_dot_product_attention(_Q, _K, _V).squeeze(1)
 
         return {
             'Uh_sum': self.U_iou(h),  # name for using with super functions

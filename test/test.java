@@ -1,8 +1,12 @@
 public class Main {
 
-    @Override
-    protected Result execute(CLICommand cmd) throws Exception {
-        return cmd.getExecutor(namenode).executeCommand(cmd.getCmd());
+    boolean f(Set<String> set, String value) {
+    for (String entry : set) {
+        if (entry.equalsIgnoreCase(value)) {
+            return true;
+        }
+    }
+    return false;
     }
 
 }
