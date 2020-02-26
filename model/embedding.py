@@ -43,6 +43,16 @@ class FullTokenEmbedding(_IEmbedding):
         return graph
 
 
+class FullTypeEmbedding(_IEmbedding):
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
+        super().__init__(token_to_id, type_to_id, h_emb)
+        self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
+
+    def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
+        graph.ndata['type_embeds'] = self.type_embedding(graph.ndata['type_id'])
+        return graph
+
+
 class SubTokenEmbedding(_IEmbedding):
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
         self.subtoken_to_id = get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN])
@@ -53,8 +63,6 @@ class SubTokenEmbedding(_IEmbedding):
         self.token_id_to_full_token = {v: k for k, v in token_to_id.items()}
 
     def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
-
-        # since in __init__ token_to_id replaced by subtoken_to_id
         token_id_to_subtoken = get_token_id_to_subtoken_dict(
             graph.ndata['token_id'].tolist(), self.token_id_to_full_token, self.token_to_id
         )
@@ -76,13 +84,15 @@ class SubTokenEmbedding(_IEmbedding):
         return graph
 
 
-class SubTokenTypeEmbedding(SubTokenEmbedding):
+class SubTokenTypeEmbedding(_IEmbedding):
 
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
-        self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
+        self.subtoken_embedding = SubTokenEmbedding(self.token_to_id, self.type_to_id, self.h_emb)
+        self.type_embedding = FullTypeEmbedding(self.token_to_id, self.type_to_id, self.h_emb)
 
     def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
-        graph = super().forward(graph, device)
-        graph.ndata['type_embeds'] = self.type_embedding(graph.ndata['type_id'])
+        graph = self.subtoken_embedding(graph, device)
+        graph = self.type_embedding(graph, device)
         return graph
+
