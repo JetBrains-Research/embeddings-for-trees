@@ -102,6 +102,7 @@ class PositionalEmbedding(nn.Module):
     """Implement positional embedding from
     https://papers.nips.cc/paper/9376-novel-positional-encodings-to-enable-tree-based-transformers.pdf
     """
+
     def __init__(self, n: int, k: int, p: float = 1.) -> None:
         super().__init__()
         self.n, self.k, self.p = n, k, p
@@ -122,4 +123,20 @@ class PositionalEmbedding(nn.Module):
                 graph.ndata['pos_embeds'][children, self.n:] = graph.ndata['pos_embeds'][node, :-self.n]
                 graph.ndata['pos_embeds'][children, :self.n] = torch.eye(children.shape[0], self.n, device=device)
         # TODO: implement parametrized positional embedding with using p
+        return graph
+
+
+class PositionalSubTokenTypeEmbedding(_IEmbedding):
+
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, n: int, k: int, p: float = 1.):
+        assert h_emb == n * k
+        super().__init__(token_to_id, type_to_id, h_emb)
+        self.subtoken_embedding = SubTokenEmbedding(self.token_to_id, self.type_to_id, self.h_emb)
+        self.type_embedding = FullTypeEmbedding(self.token_to_id, self.type_to_id, self.h_emb)
+        self.positional_embedding = PositionalEmbedding(n, k, p)
+
+    def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
+        graph = self.subtoken_embedding(graph, device)
+        graph = self.type_embedding(graph, device)
+        graph = self.positional_embedding(graph, device)
         return graph
