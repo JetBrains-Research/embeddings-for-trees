@@ -31,6 +31,7 @@ def train_on_batch(
         graph: dgl.BatchedDGLGraph, labels: List[str],
         params: Dict, device: torch.device
 ) -> Dict:
+    model.train()
     root_indexes = get_root_indexes(graph).to(device)
 
     # Model step
@@ -60,17 +61,19 @@ def train_on_batch(
 def eval_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph, labels: List[str], device: torch.device
 ) -> Tuple[Dict, torch.Tensor]:
+    model.eval()
 
     root_indexes = get_root_indexes(graph).to(device)
 
     # Model step
-    root_logits, ground_truth = model(graph, root_indexes, labels, 0.0, device)
-    root_logits = root_logits[1:]
-    ground_truth = ground_truth[1:]
-    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    with torch.no_grad():
+        root_logits, ground_truth = model(graph, root_indexes, labels, 0.0, device)
+        root_logits = root_logits[1:]
+        ground_truth = ground_truth[1:]
+        loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+        prediction = model.predict(root_logits)
 
     # Calculate metrics
-    prediction = model.predict(root_logits)
     batch_eval_info = {
         'loss': loss.item(),
         'statistics':
@@ -85,19 +88,15 @@ def eval_on_batch(
 def evaluate_dataset(
         dataset: Dataset, model: Tree2Seq, criterion: nn.modules.loss, device: torch.device
 ) -> LearningInfo:
-    model.eval()
     eval_epoch_info = LearningInfo()
 
-    with torch.no_grad():
-        for batch_id in tqdm(range(len(dataset))):
-            graph, labels = dataset[batch_id]
-            graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-            graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
-            batch_info, _ = eval_on_batch(
-                model, criterion, graph, labels, device
-            )
-            eval_epoch_info.accumulate_info(batch_info)
-            del graph, labels
+    for batch_id in tqdm(range(len(dataset))):
+        graph, labels = dataset[batch_id]
+        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+        graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
+        batch_info, _ = eval_on_batch(
+            model, criterion, graph, labels, device
+        )
+        eval_epoch_info.accumulate_info(batch_info)
 
-    model.train()
     return eval_epoch_info
