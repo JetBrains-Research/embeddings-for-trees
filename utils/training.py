@@ -31,8 +31,6 @@ def train_on_batch(
         graph: dgl.BatchedDGLGraph, labels: List[str],
         params: Dict, device: torch.device
 ) -> Dict:
-    model.train()
-
     root_indexes = get_root_indexes(graph).to(device)
 
     # Model step
@@ -62,39 +60,42 @@ def train_on_batch(
 def eval_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph, labels: List[str], device: torch.device
 ) -> Tuple[Dict, torch.Tensor]:
-    model.eval()
 
     root_indexes = get_root_indexes(graph).to(device)
 
     # Model step
-    with torch.no_grad():
-        root_logits, ground_truth = model(graph, root_indexes, labels, 0.0, device)
-        root_logits = root_logits[1:]
-        ground_truth = ground_truth[1:]
-        loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    root_logits, ground_truth = model(graph, root_indexes, labels, 0.0, device)
+    root_logits = root_logits[1:]
+    ground_truth = ground_truth[1:]
+    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
 
-        # Calculate metrics
-        prediction = model.predict(root_logits)
-        batch_eval_info = {
-            'loss': loss.item(),
-            'statistics':
-                calculate_batch_statistics(
-                    ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
-                )
-        }
-        return batch_eval_info, prediction
+    # Calculate metrics
+    prediction = model.predict(root_logits)
+    batch_eval_info = {
+        'loss': loss.item(),
+        'statistics':
+            calculate_batch_statistics(
+                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
+            )
+    }
+    return batch_eval_info, prediction
 
 
 def evaluate_dataset(
         dataset: Dataset, model: Tree2Seq, criterion: nn.modules.loss, device: torch.device
 ) -> LearningInfo:
+    model.eval()
     eval_epoch_info = LearningInfo()
-    for batch_id in tqdm(range(len(dataset))):
-        graph, labels = dataset[batch_id]
-        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-        graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
-        batch_info, _ = eval_on_batch(
-            model, criterion, graph, labels, device
-        )
-        eval_epoch_info.accumulate_info(batch_info)
+
+    with torch.no_grad():
+        for batch_id in tqdm(range(len(dataset))):
+            graph, labels = dataset[batch_id]
+            graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
+            graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
+            batch_info, _ = eval_on_batch(
+                model, criterion, graph, labels, device
+            )
+            eval_epoch_info.accumulate_info(batch_info)
+
+    model.train()
     return eval_epoch_info

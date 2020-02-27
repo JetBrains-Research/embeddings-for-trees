@@ -74,8 +74,8 @@ class Tree2Seq(nn.Module):
         :param logits: [max length, batch size, number of classes] logits for each position in sequence
         :return: [max length, batch size] token's ids for each position in sequence
         """
-        tokens_probas = nn.functional.softmax(logits, dim=-1)
-        return tokens_probas.argmax(dim=-1)
+        # tokens_probas = nn.functional.softmax(logits, dim=-1)
+        return logits.argmax(dim=-1)
 
 
 class ModelFactory:

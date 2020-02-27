@@ -49,6 +49,8 @@ class Transformer(_IEncoder):
 
         # [number of nodes, h_emb]
         embeds_sum = sum([graph.ndata[e] for e in embeds])
+        for e in embeds:
+            del graph.ndata[e]
         # [max_tree_size, batch_size, h_enc]
         features = torch.zeros(max_tree_size, len(graphs), self.h_enc, device=device)
 
