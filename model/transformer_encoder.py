@@ -48,20 +48,19 @@ class Transformer(_IEncoder):
         tree_slices = segment_sizes_to_slices(tree_sizes)
 
         # [number of nodes, h_emb]
-        embeds_sum = sum([graph.ndata[e] for e in embeds])
+        output = sum([graph.ndata[e] for e in embeds])
         for e in embeds:
             del graph.ndata[e]
         # [max_tree_size, batch_size, h_enc]
         features = torch.zeros(max_tree_size, len(graphs), self.h_enc, device=device)
 
         for i, tree_slice in enumerate(tree_slices):
-            features[:tree_sizes[i], i, :] = embeds_sum[tree_slice]
+            features[:tree_sizes[i], i, :] = output[tree_slice]
 
         # [max_tree_size, batch_size, h_enc]
-        encoded = self.transformer_encoder(features)
+        features = self.transformer_encoder(features)
 
-        # [number_of_nodes, h_enc]
-        output = torch.cat([
-            encoded[:tree_sizes[i], i, :] for i in range(len(tree_sizes))
-        ], dim=0)
+        for i, tree_slice in enumerate(tree_slices):
+            output[tree_slice] = features[:tree_sizes[i], i, :]
+
         return output, output
