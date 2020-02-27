@@ -25,7 +25,7 @@
     "name": "Transformer",
     "params": {
       "n_head": 8,
-      "n_layers": 6,
+      "n_layers": 3,
       "dropout": 0.1,
       "h_ffd": 1024
     }
