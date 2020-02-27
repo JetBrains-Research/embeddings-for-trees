@@ -78,6 +78,7 @@ def eval_on_batch(
                 ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
             )
     }
+    del root_logits, ground_truth, loss
     return batch_eval_info, prediction
 
 
@@ -96,6 +97,7 @@ def evaluate_dataset(
                 model, criterion, graph, labels, device
             )
             eval_epoch_info.accumulate_info(batch_info)
+            del graph, labels
 
     model.train()
     return eval_epoch_info
