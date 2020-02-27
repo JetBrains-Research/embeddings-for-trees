@@ -22,12 +22,9 @@
   },
 
   "encoder": {
-    "name": "Transformer",
+    "name": "SumEmbedsTreeLSTM",
     "params": {
-      "n_head": 8,
-      "n_layers": 3,
-      "dropout": 0.1,
-      "h_ffd": 1024
+      "cell_type": "EdgeChildSumTreeLSTM"
     }
   },
 
@@ -48,7 +45,12 @@
   "weight_decay": 1e-4,
   "clip_norm": 5,
   "teacher_force": 0.5,
-  "warm_start_percent": 5,
+
+  "scheduler": {
+    "name": "step",
+    "step_size": 500,
+    "step_gamma": 0.1
+  },
 
   "evaluation_step": 100,
 

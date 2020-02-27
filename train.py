@@ -52,10 +52,16 @@ def train(params: Dict, logging: str) -> None:
         model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
     )
     # create scheduler
-    warm_start = int(len(training_set) * params['n_epochs'] / 100 * params['warm_start_percent'])
-    scheduler = torch.optim.lr_scheduler.LambdaLR(
-        optimizer, lr_lambda=vaswani_lr_scheduler_lambda(warm_start, params['hidden_states']['encoder'])
-    )
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda _id: _id)
+    if params['scheduler']['name'] == 'vaswani':
+        warm_start = int(len(training_set) * params['n_epochs'] / 100 * params['scheduler']['warm_start_percent'])
+        scheduler = torch.optim.lr_scheduler.LambdaLR(
+            optimizer, lr_lambda=vaswani_lr_scheduler_lambda(warm_start, params['hidden_states']['encoder'])
+        )
+    elif params['scheduler']['name'] == 'step':
+        scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer, step_size=params['scheduler']['step_size'], gamma=params['scheduler']['step_gamma']
+        )
     # set current lr
     for i in range(start_batch_id):
         scheduler.step()

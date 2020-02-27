@@ -4,6 +4,7 @@ import dgl
 import torch
 import torch.nn as nn
 from dgl import BatchedDGLGraph
+from numpy import sqrt
 
 from utils.common import UNK, PAD, NAN, METHOD_NAME
 from utils.token_processing import get_dict_of_subtokens, get_token_id_to_subtoken_dict
@@ -139,4 +140,6 @@ class PositionalSubTokenTypeEmbedding(_IEmbedding):
         graph = self.subtoken_embedding(graph, device)
         graph = self.type_embedding(graph, device)
         graph = self.positional_embedding(graph, device)
+        graph.ndata['token_embeds'] *= sqrt(self.h_emb)
+        graph.ndata['type_embeds'] *= sqrt(self.h_emb)
         return graph
