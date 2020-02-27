@@ -2,7 +2,7 @@ from os import mkdir
 from os.path import exists
 from shutil import rmtree
 from tarfile import open as tar_open
-from typing import List
+from typing import List, Callable
 
 import numpy as np
 import torch
@@ -56,3 +56,9 @@ def segment_sizes_to_slices(sizes: List) -> List:
 
 def is_current_step_match(current_step: int, template: int) -> bool:
     return template != -1 and current_step % template == 0
+
+
+def vaswani_lr_scheduler_lambda(warm_start: int, d_model: int) -> Callable[[int], float]:
+    d_model_cf = np.power(d_model, -0.5)
+    warm_start_cf = np.power(warm_start, -1.5)
+    return lambda cur_step: d_model_cf * min(np.power(cur_step, -0.5), warm_start_cf * cur_step)

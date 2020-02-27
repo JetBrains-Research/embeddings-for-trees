@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq, load_model
-from utils.common import fix_seed, get_device, is_current_step_match
+from utils.common import fix_seed, get_device, is_current_step_match, vaswani_lr_scheduler_lambda
 from utils.learning_info import LearningInfo
 from utils.logging import get_possible_loggers, FileLogger, WandBLogger, TerminalLogger
 from utils.training import train_on_batch, evaluate_dataset
@@ -52,8 +52,9 @@ def train(params: Dict, logging: str) -> None:
         model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
     )
     # create scheduler
-    scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer, step_size=params['scheduler_step_size'], gamma=params['scheduler_gamma']
+    warm_start = int(len(training_set) * params['n_epochs'] / 100 * params['warm_start_percent'])
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, lr_lambda=vaswani_lr_scheduler_lambda(warm_start, params['hidden_states']['encoder'])
     )
     # set current lr
     for i in range(start_batch_id):
