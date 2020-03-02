@@ -1,5 +1,3 @@
-from typing import Tuple
-
 import dgl
 import torch
 import torch.nn as nn
@@ -34,12 +32,12 @@ class Transformer(_IEncoder):
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layers, self.n_layers)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
         """Apply transformer encoder
 
         :param graph: batched dgl graph
         :param device: torch device
-        :return: tensor of shape [max tree size, batch size, h_enc]
+        :return: encoded nodes [max tree size, batch size, hidden state]
         """
         embeds = [key for key in graph.ndata if 'embeds' in key]
         graphs = dgl.unbatch(graph)
@@ -47,20 +45,18 @@ class Transformer(_IEncoder):
         max_tree_size = max(tree_sizes)
         tree_slices = segment_sizes_to_slices(tree_sizes)
 
-        # [number of nodes, h_emb]
+        # [number of nodes, embedding hidden state]
         output = sum([graph.ndata[e] for e in embeds])
         for e in embeds:
             del graph.ndata[e]
-        # [max_tree_size, batch_size, h_enc]
+
+        # [max tree size, batch size, encoder hidden state]
         features = torch.zeros(max_tree_size, len(graphs), self.h_enc, device=device)
 
         for i, tree_slice in enumerate(tree_slices):
             features[:tree_sizes[i], i, :] = output[tree_slice]
 
-        # [max_tree_size, batch_size, h_enc]
-        features = self.transformer_encoder(features)
+        # [max tree size, batch size, h enc]
+        encoded_nodes = self.transformer_encoder(features)
 
-        for i, tree_slice in enumerate(tree_slices):
-            output[tree_slice] = features[:tree_sizes[i], i, :]
-
-        return output, output
+        return encoded_nodes

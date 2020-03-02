@@ -9,8 +9,7 @@ from utils.token_processing import convert_label_to_sublabels, get_dict_of_subto
 
 
 class _IDecoder(nn.Module):
-    """Interface for decoder block in Tree2Seq model
-    """
+    """Decode sequence given hidden states of nodes"""
 
     def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict) -> None:
         super().__init__()
@@ -25,7 +24,7 @@ class _IDecoder(nn.Module):
         self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: List[str],
             root_indexes: torch.LongTensor, device: torch.device
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Decode given encoded vectors of nodes
@@ -49,7 +48,7 @@ class LinearDecoder(_IDecoder):
         self.linear = nn.Linear(h_enc, h_dec)
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: List[str],
             root_indexes: torch.LongTensor, device: torch.device
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         # [number of nodes, hidden state]
@@ -103,7 +102,7 @@ class LSTMDecoder(_IDecoder):
         self.lstm_cell = nn.LSTMCell(input_size=lstm_input_size, hidden_size=self.h_enc)
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            self, encoded_data: Tuple[torch.Tensor, torch.Tensor], labels: List[str],
             root_indexes: torch.LongTensor, device: torch.device
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         assert len(encoded_data) == 2, f"For LSTM decoder, encoder should produce hidden and memory states"
