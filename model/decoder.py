@@ -1,9 +1,10 @@
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Union
 
 import torch
 import torch.nn as nn
 
-from utils.common import PAD, UNK
+from model.attention import get_attention
+from utils.common import PAD, UNK, segment_sizes_to_slices
 from utils.token_processing import convert_label_to_sublabels, get_dict_of_subtokens
 
 
@@ -23,26 +24,20 @@ class _IDecoder(nn.Module):
         self.out_size = len(self.label_to_id)
         self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
 
-    def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
-                root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Make decoder step for given token id and previous states
+    def forward(
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            root_indexes: torch.LongTensor, device: torch.device
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Decode given encoded vectors of nodes
 
-        :param input_token_id: [batch size]
-        :param root_hidden_states: [1, batch size, hidden state]
-        :param root_memory_cells: [1, batch size, hidden state]
+        :param encoded_data: tensor or tuple of tensors with encoded data
+        :param labels: list of string labels
+        :param root_indexes: indexes of roots in encoded data
+        :param device: torch device object
         :return: Tuple[
-            output: [batch size, number of classes]
-            new hidden state, new memory cell
+          logits [sequence len, batch size, labels vocab size],
+          ground truth [sequence len, batch size]
         ]
-        """
-        raise NotImplementedError
-
-    def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
-        """Convert labels with respect to decoder
-
-        :param device: torch device
-        :param labels: [batch_size] string names of each label
-        :return [batch_size, ...]
         """
         raise NotImplementedError
 
@@ -51,47 +46,127 @@ class LinearDecoder(_IDecoder):
 
     def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict) -> None:
         super().__init__(h_enc, h_dec, label_to_id)
-        self.h_dec = h_dec
-        self.linear = nn.Linear(h_enc, h_dec, bias=False)
-        self.bias = nn.Parameter(torch.zeros((1, h_dec)), requires_grad=True)
+        self.linear = nn.Linear(h_enc, h_dec)
 
-    def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
-                root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self.linear(root_hidden_states)
-        return logits, root_hidden_states, root_memory_cells
+    def forward(
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            root_indexes: torch.LongTensor, device: torch.device
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        # [number of nodes, hidden state]
+        if isinstance(encoded_data, tuple):
+            node_hidden_states = encoded_data[0]
+        else:
+            node_hidden_states = encoded_data
 
-    def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
-        return torch.tensor([self.label_to_id[label] for label in labels], device=device)
+        # [batch size, hidden state]
+        root_hidden_states = node_hidden_states[root_indexes]
+
+        # [1, batch size, vocab size]
+        logits = self.linear(root_hidden_states).unsqueeze(0)
+
+        # [1, batch size]
+        ground_truth = torch.tensor([self.label_to_id[l] for l in labels], device=device).view(1, -1)
+        return logits, ground_truth
 
 
 class LSTMDecoder(_IDecoder):
 
-    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict):
+    def __init__(
+            self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.,
+            teacher_force: float = 0., attention: Dict = None
+    ):
         """Convert label to consequence of sublabels and use lstm cell to predict next
 
-        :param h_enc: size of hidden state of encoder, so it's equal to size of hidden state of lstm cell
-        :param h_dec: size of lstm input/output, so labels embedding size equal to it
+        :param h_enc: encoder hidden state, correspond to hidden state of LSTM cell
+        :param h_dec: size of LSTM cell input/output
+        :param label_to_id: dict for converting labels to ids
+        :param dropout: probability of dropout
+        :param teacher_force: probability of teacher forcing, 0 corresponds to always use previous predicted value
+        :param attention: if passed, init attention with given args
         """
         self.sublabel_to_id = get_dict_of_subtokens(label_to_id)
         super().__init__(h_enc, h_dec, self.sublabel_to_id)
+        self.teacher_force = teacher_force
 
         self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=self.pad_index)
-        self.lstm = nn.LSTM(self.h_dec, self.h_enc)
-        self.linear = nn.Linear(self.h_dec, self.out_size)
+        self.linear = nn.Linear(self.h_enc, self.out_size)
+        self.dropout = nn.Dropout(dropout)
 
-    def forward(self, input_token_id: torch.Tensor, root_hidden_states: torch.Tensor,
-                root_memory_cells: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        # [1, batch size, embedding size]
-        embedded = self.embedding(
-            input_token_id.unsqueeze(0)
-        )
+        if attention is not None:
+            self.use_attention = True
+            attention_class = get_attention(attention['name'])
+            self.attention = attention_class(h_enc=self.h_enc, h_dec=self.h_dec, **attention['params'])
+        else:
+            self.use_attention = False
 
-        output, (root_hidden_states, root_memory_cells) = self.lstm(embedded, (root_hidden_states, root_memory_cells))
+        lstm_input_size = self.h_enc + self.h_dec if self.use_attention else self.h_dec
+        self.lstm_cell = nn.LSTMCell(input_size=lstm_input_size, hidden_size=self.h_enc)
 
-        # [batch size, number of classes]
-        logits = self.linear(output.squeeze(0))
+    def forward(
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor]], labels: List[str],
+            root_indexes: torch.LongTensor, device: torch.device
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        assert len(encoded_data) == 2, f"For LSTM decoder, encoder should produce hidden and memory states"
+        # [number of nodes, encoder hidden state]
+        node_hidden_states, node_memory_states = encoded_data
 
-        return logits, root_hidden_states, root_memory_cells
+        # [batch size, encoder hidden state]
+        root_hidden_states = node_hidden_states[root_indexes]
+        root_memory_states = node_memory_states[root_indexes]
 
-    def convert_labels(self, labels: List[str], device: torch.device) -> torch.Tensor:
-        return convert_label_to_sublabels(labels, self.sublabel_to_id).to(device)
+        # [the longest sequence, batch size]
+        ground_truth = convert_label_to_sublabels(labels, self.sublabel_to_id).to(device)
+
+        max_length, batch_size = ground_truth.shape
+        # [the longest sequence, batch size, vocab size]
+        outputs = torch.zeros(max_length, batch_size, self.out_size, device=device)
+
+        tree_sizes = [(root_indexes[i] - root_indexes[i - 1]).item() for i in range(1, batch_size)]
+        tree_sizes.append(node_hidden_states.shape[0] - root_indexes[-1].item())
+
+        # ground_truth[0] correspond to batch of <SOS> tokens
+        # [batch size]
+        current_input = ground_truth[0]
+        for step in range(1, max_length):
+            # [batch size, decoder hidden state]
+            embedded = self.embedding(current_input)
+
+            if self.use_attention:
+                # [number of nodes]
+                attention = self.attention(root_hidden_states, node_hidden_states, tree_sizes)
+
+                # [number of nodes, encoder hidden size]
+                weighted_hidden_states = node_hidden_states * attention
+
+                # [batch size, encoder hidden size]
+                attended_hidden_states = torch.cat(
+                    [torch.sum(weighted_hidden_states[tree_slice], dim=0, keepdim=True)
+                     for tree_slice in segment_sizes_to_slices(tree_sizes)],
+                    dim=0
+                )
+
+                # [batch size, decoder hidden size + encoder hidden size]
+                lstm_cell_input = torch.cat((embedded, attended_hidden_states), dim=1)
+            else:
+                # [batch size, decoder hidden size]
+                lstm_cell_input = embedded
+
+            lstm_cell_input = self.dropout(lstm_cell_input)
+
+            # [batch size, encoder hidden state]
+            root_hidden_states, root_memory_states = \
+                self.lstm_cell(lstm_cell_input, (root_hidden_states, root_memory_states))
+
+            # [batch size, vocab size]
+            current_output = self.linear(root_hidden_states)
+            outputs[step] = current_output
+
+            if self.training:
+                print('training')
+                current_input = \
+                    ground_truth[step] if torch.rand(1) < self.teacher_force else current_output.argmax(dim=-1)
+            else:
+                print('validating')
+                current_input = current_output.argmax(dim=-1)
+
+        return outputs, ground_truth

@@ -26,27 +26,51 @@ def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
     return root_indexes
 
 
+def _process_data(
+        model: Tree2Seq, graph: dgl.BatchedDGLGraph, labels: List[str],
+        criterion: nn.modules.loss, device: torch.device
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """Make model step
+
+    :param model: Tree2Seq model
+    :param graph: batched dgl graph
+    :param labels: [batch size] list of string labels
+    :param criterion: criterion to optimize
+    :param device: torch device
+    :return: Tuple[
+        loss [1] torch tensor with loss information
+        prediction [the longest sequence, batch size]
+        ground truth [the longest sequence, batch size]
+    ]
+    """
+    root_indexes = get_root_indexes(graph).to(device)
+
+    root_logits, ground_truth = model(graph, root_indexes, labels, device)
+    root_logits = root_logits[1:]
+    ground_truth = ground_truth[1:]
+
+    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    prediction = model.predict(root_logits)
+
+    return loss, prediction, ground_truth
+
+
 def train_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
         graph: dgl.BatchedDGLGraph, labels: List[str],
         params: Dict, device: torch.device
 ) -> Dict:
     model.train()
-    root_indexes = get_root_indexes(graph).to(device)
 
     # Model step
     model.zero_grad()
-    root_logits, ground_truth = model(graph, root_indexes, labels, params['teacher_force'], device)
-    root_logits = root_logits[1:]
-    ground_truth = ground_truth[1:]
-    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    loss, prediction, ground_truth = _process_data(model, graph, labels, criterion, device)
     loss.backward()
     nn.utils.clip_grad_norm_(model.parameters(), params['clip_norm'])
     optimizer.step()
     scheduler.step()
 
     # Calculate metrics
-    prediction = model.predict(root_logits)
     batch_train_info = {
         'loss': loss.item(),
         'learning_rate': scheduler.get_lr()[0],
@@ -62,16 +86,9 @@ def eval_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph, labels: List[str], device: torch.device
 ) -> Tuple[Dict, torch.Tensor]:
     model.eval()
-
-    root_indexes = get_root_indexes(graph).to(device)
-
     # Model step
     with torch.no_grad():
-        root_logits, ground_truth = model(graph, root_indexes, labels, 0.0, device)
-        root_logits = root_logits[1:]
-        ground_truth = ground_truth[1:]
-        loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
-        prediction = model.predict(root_logits)
+        loss, prediction, ground_truth = _process_data(model, graph, labels, criterion, device)
 
     # Calculate metrics
     batch_eval_info = {
@@ -81,7 +98,6 @@ def eval_on_batch(
                 ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
             )
     }
-    del root_logits, ground_truth, loss
     return batch_eval_info, prediction
 
 

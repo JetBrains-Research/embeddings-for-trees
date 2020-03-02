@@ -72,3 +72,11 @@ def scaled_dot_product_attention(
     output = torch.matmul(scores, value)
     return output
 
+
+def get_attention(attention: str) -> _IAttention:
+    attentions = {
+        LuongConcatAttention.__name__: LuongConcatAttention
+    }
+    if attention not in attentions:
+        raise ValueError(f"unknown attention mechanism: {attention}")
+    return attentions[attention]

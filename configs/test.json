@@ -2,16 +2,13 @@
   "paths": {
     "train": "./data/test/training_preprocessed",
     "validate": "./data/test/validation_preprocessed",
-
     "vocabulary": "./data/java-small/vocabulary.pkl"
   },
-
   "hidden_states": {
     "embedding": 64,
     "encoder": 64,
     "decoder": 64
   },
-
   "embedding": {
     "name": "PositionalSubTokenTypeEmbedding",
     "params": {
@@ -19,22 +16,21 @@
       "k": 16
     }
   },
-
   "encoder": {
     "name": "SumEmbedsTreeLSTM",
     "params": {
       "cell_type": "EdgeChildSumTreeLSTMCell"
     }
   },
-
   "decoder": {
-    "name": "LSTMAttentionDecoder",
+    "name": "LSTMDecoder",
     "params": {
-      "dropout_prob": 0.2
-    },
-    "attention": {
-      "name": "LuongConcatAttention",
-      "params": {}
+      "dropout": 0.2,
+      "teacher_force": 0.5,
+      "attention": {
+        "name": "LuongConcatAttention",
+        "params": {}
+      }
     }
   },
 
@@ -43,16 +39,12 @@
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
-  "teacher_force": 0.5,
-
   "scheduler": {
     "name": "step",
     "step_size": 500,
     "step_gamma": 0.1
   },
-
   "evaluation_step": -1,
-
   "logging_step": 10,
   "logging_folder": "logs",
   "checkpoint_step": 50,
