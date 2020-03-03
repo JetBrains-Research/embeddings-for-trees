@@ -99,7 +99,7 @@ class LSTMDecoder(_IDecoder):
             self.use_attention = False
 
         lstm_input_size = self.h_enc + self.h_dec if self.use_attention else self.h_dec
-        self.lstm_cell = nn.LSTMCell(input_size=lstm_input_size, hidden_size=self.h_enc)
+        self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=self.h_enc)
 
     def forward(
             self, encoded_data: Tuple[torch.Tensor, torch.Tensor], labels: List[str],
@@ -109,9 +109,9 @@ class LSTMDecoder(_IDecoder):
         # [number of nodes, encoder hidden state]
         node_hidden_states, node_memory_states = encoded_data
 
-        # [batch size, encoder hidden state]
-        root_hidden_states = node_hidden_states[root_indexes]
-        root_memory_states = node_memory_states[root_indexes]
+        # [1, batch size, encoder hidden state]
+        root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
+        root_memory_states = node_memory_states[root_indexes].unsqueeze(0)
 
         sublabels = [self.label_to_sublabels[label] for label in labels]
         sublabels_len = [len(sl) for sl in sublabels]
@@ -132,37 +132,37 @@ class LSTMDecoder(_IDecoder):
         # [batch size]
         current_input = ground_truth[0]
         for step in range(1, max_length):
-            # [batch size, decoder hidden state]
-            embedded = self.embedding(current_input)
+            # [1, batch size, decoder hidden state]
+            embedded = self.embedding(current_input).unsqueeze(0)
 
             if self.use_attention:
                 # [number of nodes]
-                attention = self.attention(root_hidden_states, node_hidden_states, tree_sizes)
+                attention = self.attention(root_hidden_states[0], node_hidden_states, tree_sizes)
 
                 # [number of nodes, encoder hidden size]
                 weighted_hidden_states = node_hidden_states * attention
 
-                # [batch size, encoder hidden size]
+                # [1, batch size, encoder hidden size]
                 attended_hidden_states = torch.cat(
                     [torch.sum(weighted_hidden_states[tree_slice], dim=0, keepdim=True)
                      for tree_slice in segment_sizes_to_slices(tree_sizes)],
                     dim=0
-                )
+                ).unsqueeze(0)
 
-                # [batch size, decoder hidden size + encoder hidden size]
-                lstm_cell_input = torch.cat((embedded, attended_hidden_states), dim=1)
+                # [1, batch size, decoder hidden size + encoder hidden size]
+                lstm_cell_input = torch.cat((embedded, attended_hidden_states), dim=2)
             else:
-                # [batch size, decoder hidden size]
+                # [1, batch size, decoder hidden size]
                 lstm_cell_input = embedded
 
             lstm_cell_input = self.dropout(lstm_cell_input)
 
-            # [batch size, encoder hidden state]
-            root_hidden_states, root_memory_states = \
-                self.lstm_cell(lstm_cell_input, (root_hidden_states, root_memory_states))
+            # [1, batch size, encoder hidden state]
+            current_output, (root_hidden_states, root_memory_states) = \
+                self.lstm(lstm_cell_input, (root_hidden_states, root_memory_states))
 
             # [batch size, vocab size]
-            current_output = self.linear(root_hidden_states)
+            current_output = self.linear(root_hidden_states.squeeze(0))
             outputs[step] = current_output
 
             if self.training:
