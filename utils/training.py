@@ -29,7 +29,7 @@ def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
 def _process_data(
         model: Tree2Seq, graph: dgl.BatchedDGLGraph, labels: List[str],
         criterion: nn.modules.loss, device: torch.device
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
     """Make model step
 
     :param model: Tree2Seq model
@@ -40,19 +40,31 @@ def _process_data(
     :return: Tuple[
         loss [1] torch tensor with loss information
         prediction [the longest sequence, batch size]
-        ground truth [the longest sequence, batch size]
+        batch info [Dict] dict with statistics
     ]
     """
     root_indexes = get_root_indexes(graph).to(device)
 
     root_logits, ground_truth = model(graph, root_indexes, labels, device)
+    # [the longest sequence, batch size, vocab size]
     root_logits = root_logits[1:]
+    # [the longest sequence, batch size]
     ground_truth = ground_truth[1:]
 
     loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    # [the longest sequence, batch size]
     prediction = model.predict(root_logits)
 
-    return loss, prediction, ground_truth
+    # Calculate metrics
+    batch_info = {
+        'loss': loss.item(),
+        'statistics':
+            calculate_batch_statistics(
+                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
+            )
+    }
+
+    return loss, prediction, batch_info
 
 
 def train_on_batch(
@@ -64,22 +76,14 @@ def train_on_batch(
 
     # Model step
     model.zero_grad()
-    loss, prediction, ground_truth = _process_data(model, graph, labels, criterion, device)
+    loss, _, batch_info = _process_data(model, graph, labels, criterion, device)
+    batch_info['learning_rate'] = scheduler.get_lr()[0]
     loss.backward()
     nn.utils.clip_grad_norm_(model.parameters(), params['clip_norm'])
     optimizer.step()
     scheduler.step()
 
-    # Calculate metrics
-    batch_train_info = {
-        'loss': loss.item(),
-        'learning_rate': scheduler.get_lr()[0],
-        'statistics':
-            calculate_batch_statistics(
-                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
-            )
-    }
-    return batch_train_info
+    return batch_info
 
 
 def eval_on_batch(
@@ -88,17 +92,9 @@ def eval_on_batch(
     model.eval()
     # Model step
     with torch.no_grad():
-        loss, prediction, ground_truth = _process_data(model, graph, labels, criterion, device)
+        _, prediction, batch_info = _process_data(model, graph, labels, criterion, device)
 
-    # Calculate metrics
-    batch_eval_info = {
-        'loss': loss.item(),
-        'statistics':
-            calculate_batch_statistics(
-                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
-            )
-    }
-    return batch_eval_info, prediction
+    return batch_info, prediction
 
 
 def evaluate_dataset(

@@ -3,7 +3,6 @@ from json import load as json_load
 from pickle import load as pkl_load
 from typing import Dict
 
-import dgl
 import torch
 import torch.nn as nn
 from tqdm.auto import tqdm
