@@ -161,11 +161,9 @@ class LSTMDecoder(_IDecoder):
             outputs[step] = current_output
 
             if self.training:
-                print('training')
                 current_input = \
                     ground_truth[step] if torch.rand(1) < self.teacher_force else current_output.argmax(dim=-1)
             else:
-                print('validating')
                 current_input = current_output.argmax(dim=-1)
 
         return outputs, ground_truth
