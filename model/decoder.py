@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from model.attention import get_attention
 from utils.common import PAD, UNK, segment_sizes_to_slices
-from utils.token_processing import convert_label_to_sublabels, get_dict_of_subtokens
+from utils.token_processing import get_dict_of_subtokens
 
 
 class _IDecoder(nn.Module):
@@ -83,7 +83,7 @@ class LSTMDecoder(_IDecoder):
         :param teacher_force: probability of teacher forcing, 0 corresponds to always use previous predicted value
         :param attention: if passed, init attention with given args
         """
-        self.sublabel_to_id = get_dict_of_subtokens(label_to_id)
+        self.sublabel_to_id, self.label_to_sublabels = get_dict_of_subtokens(label_to_id, add_sos_eos=True)
         super().__init__(h_enc, h_dec, self.sublabel_to_id)
         self.teacher_force = teacher_force
 
@@ -113,10 +113,15 @@ class LSTMDecoder(_IDecoder):
         root_hidden_states = node_hidden_states[root_indexes]
         root_memory_states = node_memory_states[root_indexes]
 
+        sublabels = [self.label_to_sublabels[label] for label in labels]
+        sublabels_len = [len(sl) for sl in sublabels]
+        max_length = max(sublabels_len)
+        batch_size = len(labels)
         # [the longest sequence, batch size]
-        ground_truth = convert_label_to_sublabels(labels, self.sublabel_to_id).to(device)
+        ground_truth = torch.full((max_length, batch_size), self.label_to_id[PAD], dtype=torch.long, device=device)
+        for i, (sl, sl_len) in enumerate(zip(sublabels, sublabels_len)):
+            ground_truth[:sl_len, i] = torch.tensor(sl, dtype=torch.long, device=device)
 
-        max_length, batch_size = ground_truth.shape
         # [the longest sequence, batch size, vocab size]
         outputs = torch.zeros(max_length, batch_size, self.out_size, device=device)
 

@@ -7,7 +7,7 @@ from dgl import BatchedDGLGraph
 from numpy import sqrt
 
 from utils.common import UNK, PAD, NAN, METHOD_NAME
-from utils.token_processing import get_dict_of_subtokens, get_token_id_to_subtoken_dict
+from utils.token_processing import get_dict_of_subtokens
 
 
 class _IEmbedding(nn.Module):
@@ -57,26 +57,28 @@ class FullTypeEmbedding(_IEmbedding):
 
 class SubTokenEmbedding(_IEmbedding):
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
-        self.subtoken_to_id = get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN])
+        self.subtoken_to_id, self.token_to_subtokens =\
+            get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN])
+        # subtoken_to_id saved to token_to_id via super class init
         super().__init__(self.subtoken_to_id, type_to_id, h_emb)
         self.subtoken_embedding = nn.Embedding(
             self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index
         )
-        self.token_id_to_full_token = {v: k for k, v in token_to_id.items()}
+        self.full_token_id_to_subtokens = {
+            _id: self.token_to_subtokens[token] for token, _id in token_to_id.items()
+        }
 
     def forward(self, graph: BatchedDGLGraph, device: torch.device) -> BatchedDGLGraph:
-        token_id_to_subtoken = get_token_id_to_subtoken_dict(
-            graph.ndata['token_id'].tolist(), self.token_id_to_full_token, self.token_to_id
-        )
         start_index = 0
         subtoken_ids = []
         node_slices = []
         for node in graph.ndata['token_id']:
-            subtoken_ids.append(token_id_to_subtoken[node.item()])
-            node_slices.append(slice(start_index, start_index + subtoken_ids[-1].shape[0]))
-            start_index += subtoken_ids[-1].shape[0]
+            cur_subtokens = self.full_token_id_to_subtokens[node.item()]
+            subtoken_ids += cur_subtokens
+            node_slices.append(slice(start_index, start_index + len(cur_subtokens)))
+            start_index += len(cur_subtokens)
 
-        full_subtokens_embeds = self.subtoken_embedding(torch.cat(subtoken_ids).to(device))
+        full_subtokens_embeds = self.subtoken_embedding(torch.tensor(subtoken_ids, device=device))
 
         token_embeds = torch.zeros((graph.number_of_nodes(), self.h_emb), device=device)
         for node in range(graph.number_of_nodes()):

@@ -23,12 +23,12 @@ class EmbeddingTest(unittest.TestCase):
         g.add_nodes(3, {'token_id': torch.tensor([0, 1, 2])})
         subtoken_embedding = SubTokenEmbedding(token_to_id, {}, h_emb)
 
-        embed_weight = torch.zeros(len(subtoken_embedding.subtoken_to_id), h_emb)
-        embed_weight[subtoken_embedding.subtoken_to_id['token'], 0] = 1
-        embed_weight[subtoken_embedding.subtoken_to_id['name'], 1] = 1
-        embed_weight[subtoken_embedding.subtoken_to_id['first'], 2] = 1
-        embed_weight[subtoken_embedding.subtoken_to_id['second'], 3] = 1
-        embed_weight[subtoken_embedding.subtoken_to_id['third'], 4] = 1
+        embed_weight = torch.zeros(len(subtoken_embedding.token_to_id), h_emb)
+        embed_weight[subtoken_embedding.token_to_id['token'], 0] = 1
+        embed_weight[subtoken_embedding.token_to_id['name'], 1] = 1
+        embed_weight[subtoken_embedding.token_to_id['first'], 2] = 1
+        embed_weight[subtoken_embedding.token_to_id['second'], 3] = 1
+        embed_weight[subtoken_embedding.token_to_id['third'], 4] = 1
 
         subtoken_embedding.subtoken_embedding.weight = torch.nn.Parameter(embed_weight, requires_grad=True)
 
