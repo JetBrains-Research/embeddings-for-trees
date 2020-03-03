@@ -6,7 +6,7 @@ from model.encoder import _IEncoder
 from utils.common import segment_sizes_to_slices
 
 
-class Transformer(_IEncoder):
+class NaiveTransformer(_IEncoder):
 
     def __init__(self, h_emb: int, h_enc: int, n_head: int, n_layers: int,
                  h_ffd: int = 2048, dropout: float = 0.1, activation: str = "relu") -> None:

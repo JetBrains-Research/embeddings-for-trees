@@ -8,7 +8,7 @@ from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding, \
     PositionalSubTokenTypeEmbedding
 from model.encoder import _IEncoder
-from model.transformer_encoder import Transformer
+from model.transformer_encoder import NaiveTransformer
 from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM, SumEmbedsTreeLSTM
 
 
@@ -61,7 +61,7 @@ class ModelFactory:
         LinearTreeLSTM.__name__: LinearTreeLSTM,
         SumEmbedsTreeLSTM.__name__: SumEmbedsTreeLSTM,
 
-        Transformer.__name__: Transformer
+        NaiveTransformer.__name__: NaiveTransformer
     }
     _decoders = {
         LinearDecoder.__name__: LinearDecoder,
