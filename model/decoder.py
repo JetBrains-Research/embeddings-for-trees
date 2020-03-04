@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from model.attention import get_attention
 from utils.common import PAD, UNK, segment_sizes_to_slices
-from utils.token_processing import get_dict_of_subtokens
+from utils.token_processing import get_dict_of_subtokens, convert_tokens_to_subtokens_id
 
 
 class _IDecoder(nn.Module):
@@ -72,7 +72,7 @@ class LSTMDecoder(_IDecoder):
 
     def __init__(
             self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.,
-            teacher_force: float = 0., attention: Dict = None
+            teacher_force: float = 0., attention: Dict = None, label_delimiter: str = '|'
     ):
         """Convert label to consequence of sublabels and use lstm cell to predict next
 
@@ -86,6 +86,7 @@ class LSTMDecoder(_IDecoder):
         self.sublabel_to_id, self.label_to_sublabels = get_dict_of_subtokens(label_to_id, add_sos_eos=True)
         super().__init__(h_enc, h_dec, self.sublabel_to_id)
         self.teacher_force = teacher_force
+        self.delimiter = label_delimiter
 
         self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=self.pad_index)
         self.linear = nn.Linear(self.h_enc, self.out_size)
@@ -113,10 +114,9 @@ class LSTMDecoder(_IDecoder):
         root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
         root_memory_states = node_memory_states[root_indexes].unsqueeze(0)
 
-        sublabels = [self.label_to_sublabels[label] for label in labels]
-        sublabels_len = [len(sl) for sl in sublabels]
-        max_length = max(sublabels_len)
-        batch_size = len(labels)
+        sublabels, sublabels_len =\
+            convert_tokens_to_subtokens_id(self.sublabel_to_id, labels, delimiter=self.delimiter, add_sos_eos=True)
+        max_length, batch_size = max(sublabels_len), len(sublabels_len)
         # [the longest sequence, batch size]
         ground_truth = torch.full((max_length, batch_size), self.label_to_id[PAD], dtype=torch.long, device=device)
         for i, (sl, sl_len) in enumerate(zip(sublabels, sublabels_len)):

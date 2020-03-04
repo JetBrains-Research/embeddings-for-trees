@@ -56,14 +56,16 @@ class FullTypeEmbedding(_IEmbedding):
 
 
 class SubTokenEmbedding(_IEmbedding):
-    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, delimiter: str = '|') -> None:
+        self.delimiter = delimiter
         self.subtoken_to_id, self.token_to_subtokens =\
-            get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN])
+            get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN], delimiter=delimiter)
         # subtoken_to_id saved to token_to_id via super class init
         super().__init__(self.subtoken_to_id, type_to_id, h_emb)
         self.subtoken_embedding = nn.Embedding(
             self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index
         )
+        self.full_token_id_to_token = {v: k for k, v in token_to_id.items()}
         self.full_token_id_to_subtokens = {
             _id: self.token_to_subtokens[token] for token, _id in token_to_id.items()
         }
@@ -73,7 +75,17 @@ class SubTokenEmbedding(_IEmbedding):
         subtoken_ids = []
         node_slices = []
         for node in graph.ndata['token_id']:
-            cur_subtokens = self.full_token_id_to_subtokens[node.item()]
+            node_id = node.item()
+
+            if node_id in self.full_token_id_to_subtokens:
+                cur_subtokens = self.full_token_id_to_subtokens[node_id]
+            else:
+                unk_id = self.subtoken_to_id[UNK]
+                cur_subtokens = [
+                    self.subtoken_to_id.get(st, unk_id)
+                    for st in self.full_token_id_to_token[node_id].split(self.delimiter)
+                ]
+
             subtoken_ids += cur_subtokens
             node_slices.append(slice(start_index, start_index + len(cur_subtokens)))
             start_index += len(cur_subtokens)

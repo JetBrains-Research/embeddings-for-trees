@@ -51,3 +51,18 @@ def get_dict_of_subtokens(
 
     return subtoken_to_id, token_to_subtokens
 
+
+def convert_tokens_to_subtokens_id(
+        subtoken_to_id: Dict, tokens: List[str], delimiter: str = '|', add_sos_eos: bool = False
+) -> Tuple[List[List[int]], List[int]]:
+    unk_id = subtoken_to_id[UNK]
+    sos_id = subtoken_to_id[SOS]
+    eos_id = subtoken_to_id[EOS]
+    subtokens = [
+        [subtoken_to_id.get(st, unk_id) for st in token.split(delimiter)]
+        for token in tokens
+    ]
+    if add_sos_eos:
+        subtokens = [[sos_id] + st + [eos_id] for st in subtokens]
+    lens = [len(st) for st in subtokens]
+    return subtokens, lens
