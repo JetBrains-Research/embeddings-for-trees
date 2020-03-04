@@ -55,13 +55,15 @@ class FullTypeEmbedding(_IEmbedding):
         type_embeds = self.type_embedding(graph.ndata['type_id'])
         if self.normalize:
             return type_embeds * sqrt(self.h_emb)
+        return type_embeds
 
 
 class SubTokenEmbedding(_IEmbedding):
-    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False, delimiter: str = '|') -> None:
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False,
+                 delimiter: str = '|') -> None:
         self.delimiter = delimiter
         self.normalize = normalize
-        self.subtoken_to_id, self.token_to_subtokens =\
+        self.subtoken_to_id, self.token_to_subtokens = \
             get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN], delimiter=delimiter)
         # subtoken_to_id saved to token_to_id via super class init
         super().__init__(self.subtoken_to_id, type_to_id, h_emb)
@@ -132,7 +134,6 @@ class PositionalEmbedding(nn.Module):
 
 
 class Embedding(nn.Module):
-
     _embeddings = {
         'full_token': FullTokenEmbedding,
         'type': FullTypeEmbedding,
@@ -159,9 +160,9 @@ class Embedding(nn.Module):
         self.token_to_id = token_to_id
         self.type_to_id = type_to_id
         self.h_emb = h_emb
-        self.layers = [
+        self.layers = nn.ModuleList([
             self._init_embedding_layer(name, params) for name, params in embeddings.items()
-        ]
+        ])
 
         if reduction['name'] not in self._reductions:
             raise ValueError(f"unknown embedding reduction: {reduction['name']}")

@@ -120,7 +120,9 @@ def train(params: Dict, logging: str) -> None:
         eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
         logger.log(eval_epoch_info.get_state_dict(), epoch, len(training_set), False)
 
-        logger.save_model(model, f'epoch_{epoch}.pt', configuration)
+        logger.save_model(
+            model, f'epoch_{epoch}.pt', configuration, batch_id=len(training_set)-1
+        )
 
 
 if __name__ == '__main__':
