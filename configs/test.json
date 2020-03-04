@@ -4,24 +4,43 @@
     "validate": "./data/test/validation_preprocessed",
     "vocabulary": "./data/java-small/vocabulary.pkl"
   },
+
   "hidden_states": {
     "embedding": 64,
     "encoder": 64,
     "decoder": 64
   },
+
   "embedding": {
-    "name": "PositionalSubTokenTypeEmbedding",
-    "params": {
-      "n": 4,
-      "k": 16
+    "embeddings": {
+      "subtoken": {
+        "normalize": true
+      },
+      "type": {
+        "normalize": true
+      },
+      "positional": {
+        "n": 4,
+        "k": 16
+      }
+    },
+    "reduction": {
+      "name": "sum",
+      "params": {}
     }
   },
+
   "encoder": {
-    "name": "SumEmbedsTreeLSTM",
+    "name": "TreeLSTM",
     "params": {
-      "cell_type": "EdgeChildSumTreeLSTMCell"
+      "cell": {
+        "name": "EdgeChildSumTreeLSTMCell",
+        "params": {}
+      },
+      "dropout": 0.1
     }
   },
+
   "decoder": {
     "name": "LSTMDecoder",
     "params": {
@@ -39,11 +58,13 @@
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
+
   "scheduler": {
     "name": "step",
     "step_size": 500,
     "step_gamma": 0.1
   },
+
   "evaluation_step": -1,
   "logging_step": 10,
   "logging_folder": "logs",

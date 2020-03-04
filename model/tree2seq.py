@@ -5,15 +5,14 @@ import torch.nn as nn
 from dgl import BatchedDGLGraph
 
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
-from model.embedding import _IEmbedding, FullTokenEmbedding, SubTokenEmbedding, SubTokenTypeEmbedding, \
-    PositionalSubTokenTypeEmbedding
+from model.embedding import Embedding
 from model.encoder import _IEncoder
-from model.transformer_encoder import NaiveTransformer
-from model.treeLSTM import TokenTreeLSTM, TokenTypeTreeLSTM, LinearTreeLSTM, SumEmbedsTreeLSTM
+from model.transformer import NaiveTransformerEncoder
+from model.treeLSTM import TreeLSTM
 
 
 class Tree2Seq(nn.Module):
-    def __init__(self, embedding: _IEmbedding, encoder: _IEncoder, decoder: _IDecoder) -> None:
+    def __init__(self, embedding: Embedding, encoder: _IEncoder, decoder: _IDecoder) -> None:
         super().__init__()
         self.embedding = embedding
         self.encoder = encoder
@@ -49,19 +48,9 @@ class Tree2Seq(nn.Module):
 
 
 class ModelFactory:
-    _embeddings = {
-        FullTokenEmbedding.__name__: FullTokenEmbedding,
-        SubTokenEmbedding.__name__: SubTokenEmbedding,
-        SubTokenTypeEmbedding.__name__: SubTokenTypeEmbedding,
-        PositionalSubTokenTypeEmbedding.__name__: PositionalSubTokenTypeEmbedding,
-    }
     _encoders = {
-        TokenTreeLSTM.__name__: TokenTreeLSTM,
-        TokenTypeTreeLSTM.__name__: TokenTypeTreeLSTM,
-        LinearTreeLSTM.__name__: LinearTreeLSTM,
-        SumEmbedsTreeLSTM.__name__: SumEmbedsTreeLSTM,
-
-        NaiveTransformer.__name__: NaiveTransformer
+        TreeLSTM.__name__: TreeLSTM,
+        NaiveTransformerEncoder.__name__: NaiveTransformerEncoder
     }
     _decoders = {
         LinearDecoder.__name__: LinearDecoder,
@@ -80,7 +69,6 @@ class ModelFactory:
         self.type_to_id = type_to_id
         self.label_to_id = label_to_id
 
-        self.embedding = self._get_module(self.embedding_info['name'], self._embeddings)
         self.encoder = self._get_module(self.encoder_info['name'], self._encoders)
         self.decoder = self._get_module(self.decoder_info['name'], self._decoders)
 
@@ -92,9 +80,9 @@ class ModelFactory:
 
     def construct_model(self, device: torch.device) -> Tree2Seq:
         return Tree2Seq(
-            self.embedding(
+            Embedding(
                 h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
-                type_to_id=self.type_to_id, **self.embedding_info['params']
+                type_to_id=self.type_to_id, **self.embedding_info
             ),
             self.encoder(
                 h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],

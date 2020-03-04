@@ -1,4 +1,3 @@
-from math import sqrt
 from pickle import load as pkl_load
 from typing import Dict, Tuple, Union
 
@@ -447,17 +446,3 @@ class FullMultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
             'u_iou_b': self.U_iou.bias, 'u_f_b': self.U_f.bias
         })
         return params
-
-
-def get_tree_lstm_cell(tree_lstm_type: str) -> _ITreeLSTMCell:
-    tree_lstm_cells = {
-        EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
-        NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
-        EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
-        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell,
-        TypeAttentionTreeLSTMCell.__name__: TypeAttentionTreeLSTMCell,
-        FullMultiHeadAttentionTreeLSTMCell.__name__: FullMultiHeadAttentionTreeLSTMCell
-    }
-    if tree_lstm_type not in tree_lstm_cells:
-        raise ValueError(f"unknown tree lstm cell: {tree_lstm_type}")
-    return tree_lstm_cells[tree_lstm_type]

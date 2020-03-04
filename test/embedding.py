@@ -32,14 +32,14 @@ class EmbeddingTest(unittest.TestCase):
 
         subtoken_embedding.subtoken_embedding.weight = torch.nn.Parameter(embed_weight, requires_grad=True)
 
-        embed_g = subtoken_embedding(g, device)
+        token_embeds = subtoken_embedding(g, device)
         true_embeds = torch.tensor([
             [1, 1, 1, 0, 0],
             [1, 0, 0, 1, 0],
             [1, 1, 0, 0, 1]
         ], device=device, dtype=torch.float)
 
-        self.assertTrue(torch.allclose(true_embeds, embed_g.ndata['token_embeds']))
+        self.assertTrue(torch.allclose(true_embeds, token_embeds))
 
     def test_positional_embedding(self):
         fix_seed()
@@ -47,7 +47,7 @@ class EmbeddingTest(unittest.TestCase):
 
         g = gen_tree(3, 3)
         positional_embedding = PositionalEmbedding(3, 2)
-        g = positional_embedding(g, device)
+        pos_embeds = positional_embedding(g, device)
 
         correct_pos_embedding = torch.tensor([[0., 0., 0., 0., 0., 0.],
                                               [1., 0., 0., 0., 0., 0.],
@@ -63,7 +63,7 @@ class EmbeddingTest(unittest.TestCase):
                                               [0., 1., 0., 0., 0., 1.],
                                               [0., 0., 1., 0., 0., 1.]])
 
-        self.assertTrue(torch.allclose(correct_pos_embedding, g.ndata['pos_embeds']))
+        self.assertTrue(torch.allclose(correct_pos_embedding, pos_embeds))
 
 
 if __name__ == '__main__':
