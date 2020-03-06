@@ -104,24 +104,24 @@ def train(params: Dict, logging: str) -> None:
             train_acc_info.accumulate_info(batch_info)
             # log current train process
             if is_current_step_match(batch_id, params['logging_step']):
-                logger.log(train_acc_info.get_state_dict(), epoch, batch_id)
+                logger.log(train_acc_info.get_state_dict(), epoch, batch_id + epoch * len(training_set))
                 train_acc_info = LearningInfo()
             # validate current model
             if is_current_step_match(batch_id, params['evaluation_step']) and batch_id != 0:
                 eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-                logger.log(eval_epoch_info.get_state_dict(), epoch, batch_id, False)
+                logger.log(eval_epoch_info.get_state_dict(), epoch, batch_id + epoch * len(training_set), False)
             # save current model
             if is_current_step_match(batch_id, params['checkpoint_step']) and batch_id != 0:
                 logger.save_model(
                     model, f'epoch_{epoch}_batch_{batch_id}.pt', configuration, batch_id=batch_id
                 )
 
-        logger.log(train_acc_info.get_state_dict(), epoch, len(training_set))
+        logger.log(train_acc_info.get_state_dict(), epoch, len(training_set) * (epoch + 1) - 1)
         eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-        logger.log(eval_epoch_info.get_state_dict(), epoch, len(training_set), False)
+        logger.log(eval_epoch_info.get_state_dict(), epoch, len(training_set) * (epoch + 1) - 1, False)
 
         logger.save_model(
-            model, f'epoch_{epoch}.pt', configuration, batch_id=len(training_set)-1
+            model, f'epoch_{epoch}.pt', configuration, batch_id=len(training_set) - 1
         )
 
 
