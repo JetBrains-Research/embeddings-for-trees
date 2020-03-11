@@ -62,7 +62,8 @@ def build_project_asts(project_path: str, output_path: str) -> bool:
          '--lang', 'java', '--hide-method-name', '--split-tokens',
          '--filter-modifiers', 'abstract', '--filter-annotations', 'Override',
          '--remove-constructors', '--remove-nodes', 'Javadoc',
-         '--java-parser', 'gumtree']
+         '--java-parser', 'gumtree', '--max-method-name-length', '8',
+         '--max-token-length', '7', '--max-tree-size', '108']
     )
     if completed_process.returncode != 0:
         print(f"can't build ASTs for project {project_path}, failed with:\n{completed_process.stdout}")
