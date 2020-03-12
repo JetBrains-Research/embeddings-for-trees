@@ -6,7 +6,7 @@ import torch.nn as nn
 from dgl import BatchedDGLGraph
 from numpy import sqrt
 
-from model.embedding_reduction import SumReduction, LinearReduction
+from model.embedding_reduction import SumReduction, LinearReduction, ConcatenationReduction
 from utils.common import UNK, PAD, NAN, METHOD_NAME
 from utils.token_processing import get_dict_of_subtokens
 
@@ -142,7 +142,8 @@ class Embedding(nn.Module):
     }
     _reductions = {
         'sum': SumReduction,
-        'linear': LinearReduction
+        'linear': LinearReduction,
+        'cat': ConcatenationReduction
     }
 
     def _init_embedding_layer(self, embedding_name: str, embedding_params: Dict) -> nn.Module:
@@ -160,6 +161,9 @@ class Embedding(nn.Module):
         self.token_to_id = token_to_id
         self.type_to_id = type_to_id
         self.h_emb = h_emb
+        if reduction['name'] == 'cat':
+            assert self.h_emb % len(embeddings) == 0
+            self.h_emb //= len(embeddings)
         self.layers = nn.ModuleList([
             self._init_embedding_layer(name, params) for name, params in embeddings.items()
         ])

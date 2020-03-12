@@ -36,3 +36,12 @@ class LinearReduction(_IReduction):
     def forward(self, embeds: List[torch.Tensor]) -> torch.Tensor:
         cat_embeds = torch.cat(embeds, dim=1)
         return self.activation(self.linear(cat_embeds))
+
+
+class ConcatenationReduction(_IReduction):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, embeds: List[torch.Tensor]) -> torch.Tensor:
+        print(len(embeds))
+        return torch.cat(embeds, dim=1)

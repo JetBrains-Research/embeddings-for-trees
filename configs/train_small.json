@@ -1,6 +1,6 @@
 {
   "paths": {
-    "train": "./data/java_small/training_preprocessed",
+    "train": "./data/java-small/training_preprocessed",
     "validate": "./data/java-small/validation_preprocessed",
     "vocabulary": "./data/java-small/vocabulary.pkl"
   },
@@ -17,11 +17,8 @@
       "type": {}
     },
     "reduction": {
-      "name": "linear",
+      "name": "cat",
       "params": {
-        "n_embeds": 2,
-        "h_emb": 512,
-        "activation": "tanh"
       }
     }
   },
@@ -33,15 +30,15 @@
         "name": "EdgeChildSumTreeLSTMCell",
         "params": {}
       },
-      "dropout": 0.1
+      "dropout": 0.5
     }
   },
 
   "decoder": {
     "name": "LSTMDecoder",
     "params": {
-      "dropout": 0.2,
-      "teacher_force": 0.5,
+      "dropout": 0.5,
+      "teacher_force": 0.0,
       "attention": {
         "name": "LuongConcatAttention",
         "params": {}
@@ -62,8 +59,8 @@
   },
 
   "evaluation_step": -1,
-  "logging_step": 10,
+  "logging_step": 100,
   "logging_folder": "logs",
-  "checkpoint_step": 50,
+  "checkpoint_step": 500,
   "checkpoints_folder": "checkpoints"
 }

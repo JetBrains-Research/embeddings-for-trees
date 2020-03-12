@@ -18,14 +18,10 @@
       },
       "type": {
         "normalize": true
-      },
-      "positional": {
-        "n": 4,
-        "k": 16
       }
     },
     "reduction": {
-      "name": "sum",
+      "name": "cat",
       "params": {}
     }
   },
