@@ -43,5 +43,4 @@ class ConcatenationReduction(_IReduction):
         super().__init__()
 
     def forward(self, embeds: List[torch.Tensor]) -> torch.Tensor:
-        print(len(embeds))
         return torch.cat(embeds, dim=1)
