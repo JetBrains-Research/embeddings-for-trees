@@ -14,6 +14,7 @@ PAD = '<PAD>'
 UNK = '<UNK>'
 NAN = 'NAN'
 METHOD_NAME = 'METHOD_NAME'
+SELF = '<SELF>'
 
 
 def get_device() -> torch.device:
