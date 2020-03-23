@@ -37,9 +37,9 @@ def _move_tokens_to_leaves(graph: DGLGraph, pad_token_index: int, pad_type_index
     mask = np.logical_and(old_token != pad_token_index, type_mask)
     n_new_nodes = mask.sum()
 
-    new_token = np.ndarray(n_old_nodes + n_new_nodes, dtype=np.int)
-    new_token[:n_old_nodes] = old_token[:, 0]
-    new_token[n_old_nodes:] = old_token[mask]
+    new_token = np.full((n_old_nodes + n_new_nodes, 1), pad_token_index, dtype=np.int)
+    new_token[:n_old_nodes] = np.where(~type_mask, old_token, pad_token_index)[:, [0]]
+    new_token[n_old_nodes:] = old_token[mask].reshape(-1, 1)
 
     us, _ = np.nonzero(mask)
     vs = np.arange(n_new_nodes) + n_old_nodes
@@ -48,7 +48,7 @@ def _move_tokens_to_leaves(graph: DGLGraph, pad_token_index: int, pad_type_index
     graph.add_edges(us, vs)
 
     graph.ndata['type'][n_old_nodes:] = pad_type_index
-    graph.ndata['token'] = new_token.reshape(-1, 1)
+    graph.ndata['token'] = new_token
     return graph
 
 
