@@ -1,8 +1,8 @@
 {
   "paths": {
-    "train": "./data/test/training_preprocessed",
-    "validate": "./data/test/validation_preprocessed",
-    "vocabulary": "./data/java-small/vocabulary.pkl"
+    "train": "./data/java-test/training_preprocessed",
+    "validate": "./data/java-test/validation_preprocessed",
+    "vocabulary": "./data/java-test/vocabulary.pkl"
   },
 
   "hidden_states": {
@@ -13,15 +13,11 @@
 
   "embedding": {
     "embeddings": {
-      "subtoken": {
-        "normalize": true
-      },
-      "type": {
-        "normalize": true
-      }
+      "token": {},
+      "type": {}
     },
     "reduction": {
-      "name": "cat",
+      "name": "sum",
       "params": {}
     }
   },
@@ -33,15 +29,15 @@
         "name": "EdgeChildSumTreeLSTMCell",
         "params": {}
       },
-      "dropout": 0.1
+      "dropout": 0.25
     }
   },
 
   "decoder": {
     "name": "LSTMDecoder",
     "params": {
-      "dropout": 0.2,
-      "teacher_force": 0.5,
+      "dropout": 0.5,
+      "teacher_force": 0.0,
       "attention": {
         "name": "LuongConcatAttention",
         "params": {}
@@ -49,7 +45,7 @@
     }
   },
 
-  "batch_size": 8,
+  "batch_size": 64,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,

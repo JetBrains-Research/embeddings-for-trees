@@ -17,14 +17,15 @@ do
             ;;
         "Collect vocabulary")
             # collect vocabulary)
-            PYTHONPATH='.' python data_workers/preprocess.py "$1" --collect_vocabulary --split_vocabulary --n_tokens 190000 --n_labels 27000
+            PYTHONPATH='.' python data_workers/preprocess.py "$1" --collect_vocabulary \
+            --split_vocabulary --n_tokens 190000 --n_labels 27000 --wrap_labels
             break
             ;;
         "Convert to DGL format")
             # convert to dgl format
             PYTHONPATH='.' python data_workers/preprocess.py "$1" \
                 --convert --n_jobs -1 --batch_size 10000 --split_vocabulary \
-                --tokens_to_leaves --max_token_len 5 --max_label_len 6
+                --tokens_to_leaves --max_token_len 5 --max_label_len 6 --wrap_labels
             break
             ;;
         "Upload to S3")
