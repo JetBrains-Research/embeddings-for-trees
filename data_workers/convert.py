@@ -11,7 +11,7 @@ import pandas as pd
 from dgl import DGLGraph, batch, unbatch
 from tqdm.auto import tqdm
 
-from utils.common import create_folder, UNK, PAD
+from utils.common import create_folder, UNK, PAD, SOS, EOS
 
 
 def convert_dot_to_dgl(dot_path: str) -> DGLGraph:
@@ -52,12 +52,19 @@ def _move_tokens_to_leaves(graph: DGLGraph, pad_token_index: int, pad_type_index
     return graph
 
 
-def _split_token(data: pd.Series, to_id: Dict, max_len: int, delimiter: str = '|') -> pd.Series:
+def _split_token(data: pd.Series, to_id: Dict, max_len: int, is_wrap: bool, delimiter: str = '|') -> pd.Series:
     unk_id = to_id[UNK]
     pad_id = to_id[PAD]
+
+    def split_val(val):
+        if is_wrap:
+            return [SOS] + val.split(delimiter) + [EOS]
+        else:
+            return val.split(delimiter)
+
     data = data.apply(
         lambda _token:
-        [to_id.get(t, unk_id) for t in _token.split(delimiter)[:max_len]]
+        [to_id.get(t, unk_id) for t in split_val(_token)[:max_len]]
         if isinstance(_token, str) else []
     ).apply(
         lambda _l: _l + [pad_id] * (max_len - len(_l))
@@ -66,7 +73,8 @@ def _split_token(data: pd.Series, to_id: Dict, max_len: int, delimiter: str = '|
 
 
 def prepare_project_description(project_path: str, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict,
-                                is_split: bool, max_token_len: int = -1, max_label_len: int = -1, delimiter: str = '|'
+                                is_split: bool, max_token_len: int = -1, max_label_len: int = -1,
+                                wrap_tokens: bool = False, wrap_labels: bool = False, delimiter: str = '|'
                                 ) -> pd.DataFrame:
     description = pd.read_csv(os.path.join(project_path, 'description.csv')).sort_values(['dot_file', 'node_id'])
 
@@ -74,8 +82,10 @@ def prepare_project_description(project_path: str, token_to_id: Dict, type_to_id
     description['type_feature'] = description['type'].apply(lambda _type: type_to_id.get(_type, unk_type_id))
     # convert token and label
     if is_split:
-        description['token_feature'] = _split_token(description['token'], token_to_id, max_token_len, delimiter)
-        description['label_feature'] = _split_token(description['label'], label_to_id, max_label_len, delimiter)
+        description['token_feature'] = _split_token(description['token'], token_to_id, max_token_len, wrap_tokens,
+                                                    delimiter)
+        description['label_feature'] = _split_token(description['label'], label_to_id, max_label_len, wrap_labels,
+                                                    delimiter)
     else:
         unk_token_id = token_to_id[UNK]
         unk_label_id = label_to_id[UNK]
@@ -87,10 +97,11 @@ def prepare_project_description(project_path: str, token_to_id: Dict, type_to_id
 
 def convert_project(project_path: str, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict,
                     token_to_leaves: bool, is_split: bool, max_token_len: int = -1, max_label_len: int = -1,
-                    delimiter: str = '|'):
+                    wrap_tokens: bool = False, wrap_labels: bool = False, delimiter: str = '|'):
     # print("node description preparation")
     description = prepare_project_description(
-        project_path, token_to_id, type_to_id, label_to_id, is_split, max_token_len, max_label_len, delimiter
+        project_path, token_to_id, type_to_id, label_to_id, is_split,
+        max_token_len, max_label_len, wrap_tokens, wrap_labels, delimiter
     )
 
     asts = os.listdir(os.path.join(project_path, 'asts'))
@@ -125,8 +136,8 @@ def _convert_project_safe(project_path, **kwargs):
 def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
                     token_to_id: Dict, type_to_id: Dict, label_to_id: Dict,
                     tokens_to_leaves: bool = False, is_split: bool = False,
-                    max_token_len: int = -1, max_label_len: int = -1,
-                    delimiter: str = '|', shuffle: bool = True, n_jobs: int = -1) -> str:
+                    max_token_len: int = -1, max_label_len: int = -1, wrap_tokens: bool = False,
+                    wrap_labels: bool = False, delimiter: str = '|', shuffle: bool = True, n_jobs: int = -1) -> str:
     print(f"Convert asts for {holdout_name} data...")
     holdout_path = os.path.join(data_path, f'{holdout_name}_asts')
     output_holdout_path = os.path.join(data_path, f'{holdout_name}_preprocessed')
@@ -140,7 +151,7 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
         pool_func = partial(
             _convert_project_safe, token_to_id=token_to_id, type_to_id=type_to_id, label_to_id=label_to_id,
             token_to_leaves=tokens_to_leaves, is_split=is_split, max_token_len=max_token_len,
-            max_label_len=max_label_len, delimiter=delimiter
+            max_label_len=max_label_len, wrap_tokens=wrap_tokens, wrap_labels=wrap_labels, delimiter=delimiter
         )
         results = pool.imap(pool_func, projects_paths)
         for _ in tqdm(results, total=len(projects_paths)):

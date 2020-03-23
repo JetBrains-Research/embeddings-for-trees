@@ -49,7 +49,8 @@ def main(args: Namespace) -> None:
         if not os.path.exists(ast_paths[0]):
             raise RuntimeError("build training asts before collecting vocabulary")
         collect_vocabulary(
-            ast_paths[0], vocabulary_path, args.n_tokens, args.n_types, args.n_labels, args.split_vocabulary
+            ast_paths[0], vocabulary_path, args.n_tokens, args.n_types, args.n_labels,
+            args.split_vocabulary, args.wrap_tokens, args.wrap_labels, '|'
         )
 
     if args.convert:
@@ -62,7 +63,8 @@ def main(args: Namespace) -> None:
         token_to_id, type_to_id, label_to_id = vocab['token_to_id'], vocab['type_to_id'], vocab['label_to_id']
         preprocessed_paths = [convert_holdout(
                 data_path, holdout, args.batch_size, token_to_id, type_to_id, label_to_id, args.tokens_to_leaves,
-                args.split_vocabulary, args.max_token_len, args.max_label_len, '|', True, args.n_jobs
+                args.split_vocabulary, args.max_token_len, args.max_label_len, args.wrap_tokens, args.wrap_labels,
+                '|', True, args.n_jobs
             ) for holdout in holdout_folders]
     else:
         preprocessed_paths = [os.path.join(data_path, f'{holdout}_preprocessed') for holdout in holdout_folders]
@@ -90,6 +92,8 @@ if __name__ == '__main__':
     arg_parser.add_argument('--n_types', type=int, default=-1)
     arg_parser.add_argument('--n_labels', type=int, default=-1)
     arg_parser.add_argument('--split_vocabulary', action='store_true')
+    arg_parser.add_argument('--wrap_labels', action='store_true')
+    arg_parser.add_argument('--wrap_tokens', action='store_true')
 
     arg_parser.add_argument('--convert', action='store_true')
     arg_parser.add_argument('--n_jobs', type=int, default=-1)

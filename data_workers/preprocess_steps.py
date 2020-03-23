@@ -8,7 +8,7 @@ import pandas as pd
 from requests import get
 from tqdm.auto import tqdm
 
-from utils.common import extract_tar_gz, create_folder, UNK, PAD
+from utils.common import extract_tar_gz, create_folder, UNK, PAD, SOS, EOS
 from utils.s3_worker import upload_file
 
 
@@ -83,12 +83,19 @@ def _update_vocab_counter(counter: Counter, values: List, is_split: bool = False
 
 
 def collect_vocabulary(
-        train_path: str, vocabulary_path: str, n_tokens: int = -1, n_types: int = -1,
-        n_labels: int = -1, is_split: bool = False, delimiter: str = '|'
+        train_path: str, vocabulary_path: str, n_tokens: int = -1, n_types: int = -1, n_labels: int = -1,
+        is_split: bool = False, wrap_tokens: bool = False, wrap_labels: bool = False, delimiter: str = '|'
 ):
     token_to_id = {UNK: 0, PAD: 1}
     type_to_id = {UNK: 0, PAD: 1}
     label_to_id = {UNK: 0, PAD: 1}
+
+    if wrap_labels:
+        label_to_id[SOS] = 2
+        label_to_id[EOS] = 3
+    if wrap_tokens:
+        token_to_id[SOS] = 2
+        label_to_id[EOS] = 3
 
     projects = os.listdir(train_path)
     print("collect vocabulary from training holdout")
@@ -103,13 +110,14 @@ def collect_vocabulary(
         if n_max == -1:
             n_max = len(counter)
         print(f"found {len(counter)} {column}, use {n_max} most common")
+        st_index = len(id_dict)
         id_dict.update(
-            [(token, num + 2) for num, (token, _) in enumerate(counter.most_common(n_max))]
+            [(token, num + st_index) for num, (token, _) in enumerate(counter.most_common(n_max))]
         )
 
-    assert all([t in token_to_id for t in ['METHOD_NAME', '<SELF>', UNK, PAD]])
+    assert all([t in token_to_id for t in ['METHOD_NAME', '<SELF>', UNK, PAD] + ([SOS, EOS] if wrap_tokens else [])])
     assert all([t in type_to_id for t in [UNK, PAD]])
-    assert all([t in label_to_id for t in [UNK, PAD]])
+    assert all([t in label_to_id for t in [UNK, PAD] + ([SOS, EOS] if wrap_labels else [])])
 
     with open(vocabulary_path, 'wb') as vocab_file:
         pickle_dump({
