@@ -24,19 +24,16 @@ class _IDecoder(nn.Module):
         self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: List[str],
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
             root_indexes: torch.LongTensor, device: torch.device
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         """Decode given encoded vectors of nodes
 
         :param encoded_data: tensor or tuple of tensors with encoded data
-        :param labels: list of string labels
+        :param labels: tensor of labels [sequence len, batch size]
         :param root_indexes: indexes of roots in encoded data
         :param device: torch device object
-        :return: Tuple[
-          logits [sequence len, batch size, labels vocab size],
-          ground truth [sequence len, batch size]
-        ]
+        :return: logits [sequence len, batch size, labels vocab size]
         """
         raise NotImplementedError
 
@@ -48,9 +45,9 @@ class LinearDecoder(_IDecoder):
         self.linear = nn.Linear(h_enc, h_dec)
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: List[str],
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
             root_indexes: torch.LongTensor, device: torch.device
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         # [number of nodes, hidden state]
         if isinstance(encoded_data, tuple):
             node_hidden_states = encoded_data[0]
@@ -63,16 +60,14 @@ class LinearDecoder(_IDecoder):
         # [1, batch size, vocab size]
         logits = self.linear(root_hidden_states).unsqueeze(0)
 
-        # [1, batch size]
-        ground_truth = torch.tensor([self.label_to_id[l] for l in labels], device=device).view(1, -1)
-        return logits, ground_truth
+        return logits
 
 
 class LSTMDecoder(_IDecoder):
 
     def __init__(
             self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.,
-            teacher_force: float = 0., attention: Dict = None, label_delimiter: str = '|'
+            teacher_force: float = 0., attention: Dict = None
     ):
         """Convert label to consequence of sublabels and use lstm cell to predict next
 
@@ -83,10 +78,8 @@ class LSTMDecoder(_IDecoder):
         :param teacher_force: probability of teacher forcing, 0 corresponds to always use previous predicted value
         :param attention: if passed, init attention with given args
         """
-        self.sublabel_to_id, self.label_to_sublabels = get_dict_of_subtokens(label_to_id, add_sos_eos=True)
-        super().__init__(h_enc, h_dec, self.sublabel_to_id)
+        super().__init__(h_enc, h_dec, label_to_id)
         self.teacher_force = teacher_force
-        self.delimiter = label_delimiter
 
         self.embedding = nn.Embedding(self.out_size, self.h_dec, padding_idx=self.pad_index)
         self.linear = nn.Linear(self.h_enc, self.out_size)
@@ -103,9 +96,9 @@ class LSTMDecoder(_IDecoder):
         self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=self.h_enc)
 
     def forward(
-            self, encoded_data: Tuple[torch.Tensor, torch.Tensor], labels: List[str],
+            self, encoded_data: Tuple[torch.Tensor, torch.Tensor], labels: torch.Tensor,
             root_indexes: torch.LongTensor, device: torch.device
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    ) -> torch.Tensor:
         assert len(encoded_data) == 2, f"For LSTM decoder, encoder should produce hidden and memory states"
         # [number of nodes, encoder hidden state]
         node_hidden_states, node_memory_states = encoded_data
@@ -114,23 +107,16 @@ class LSTMDecoder(_IDecoder):
         root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
         root_memory_states = node_memory_states[root_indexes].unsqueeze(0)
 
-        sublabels, sublabels_len =\
-            convert_tokens_to_subtokens_id(self.sublabel_to_id, labels, delimiter=self.delimiter, add_sos_eos=True)
-        max_length, batch_size = max(sublabels_len), len(sublabels_len)
-        # [the longest sequence, batch size]
-        ground_truth = torch.full((max_length, batch_size), self.label_to_id[PAD], dtype=torch.long, device=device)
-        for i, (sl, sl_len) in enumerate(zip(sublabels, sublabels_len)):
-            ground_truth[:sl_len, i] = torch.tensor(sl, dtype=torch.long, device=device)
-
+        max_length, batch_size = labels.shape
         # [the longest sequence, batch size, vocab size]
         outputs = torch.zeros(max_length, batch_size, self.out_size, device=device)
 
         tree_sizes = [(root_indexes[i] - root_indexes[i - 1]).item() for i in range(1, batch_size)]
         tree_sizes.append(node_hidden_states.shape[0] - root_indexes[-1].item())
 
-        # ground_truth[0] correspond to batch of <SOS> tokens
+        # labels[0] correspond to batch of <SOS> tokens
         # [batch size]
-        current_input = ground_truth[0]
+        current_input = labels[0]
         for step in range(1, max_length):
             # [1, batch size, decoder hidden state]
             embedded = self.embedding(current_input).unsqueeze(0)
@@ -166,9 +152,8 @@ class LSTMDecoder(_IDecoder):
             outputs[step] = current_output
 
             if self.training:
-                current_input = \
-                    ground_truth[step] if torch.rand(1) < self.teacher_force else current_output.argmax(dim=-1)
+                current_input = labels[step] if torch.rand(1) < self.teacher_force else current_output.argmax(dim=-1)
             else:
                 current_input = current_output.argmax(dim=-1)
 
-        return outputs, ground_truth
+        return outputs

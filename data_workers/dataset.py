@@ -7,6 +7,7 @@ from typing import Tuple, List
 from dgl import BatchedDGLGraph, unbatch, batch, reverse
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
+import numpy
 
 
 class JavaDataset(Dataset):
@@ -25,7 +26,8 @@ class JavaDataset(Dataset):
         self.n_batches = 0
 
         self.loaded_batch_basename = None
-        self.loaded_batched_graph = None
+        self.loaded_graphs = None
+        self.loaded_labels = None
 
         # iterate over pkl files to aggregate information about batches
         print(f"prepare the {batched_graphs_path} dataset...")
@@ -50,22 +52,21 @@ class JavaDataset(Dataset):
     def __len__(self) -> int:
         return self.n_batches
 
-    def __getitem__(self, item) -> Tuple[BatchedDGLGraph, List[str]]:
+    def __getitem__(self, item) -> Tuple[BatchedDGLGraph, numpy.ndarray]:
         batch_basename, batch_slice = self.batch_desc[item]
 
         # read file only if previous wasn't the same
         if self.loaded_batch_basename != batch_basename:
             with open(path_join(self.batched_graphs_path, batch_basename), 'rb') as pkl_file:
-                self.loaded_batched_graph = pkl_load(pkl_file)
+                cur_batch = pkl_load(pkl_file)
+                self.loaded_graphs = unbatch(cur_batch['batched_graph'])
+                self.loaded_labels = numpy.stack(cur_batch['labels'])
             self.loaded_batch_basename = batch_basename
 
-        graphs = unbatch(self.loaded_batched_graph['batched_graph'])
-
-        graphs_for_batch = graphs[batch_slice]
+        graphs_for_batch = self.loaded_graphs[batch_slice]
         if self.invert_edges:
             graphs_for_batch = list(map(lambda g: reverse(g, share_ndata=True), graphs_for_batch))
 
         batched_graph = batch(graphs_for_batch)
-        batched_labels = self.loaded_batched_graph['labels'][batch_slice]
 
-        return batched_graph, batched_labels
+        return batched_graph, self.loaded_labels[batch_slice]

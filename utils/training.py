@@ -27,14 +27,14 @@ def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
 
 
 def _process_data(
-        model: Tree2Seq, graph: dgl.BatchedDGLGraph, labels: List[str],
+        model: Tree2Seq, graph: dgl.BatchedDGLGraph, labels: torch.Tensor,
         criterion: nn.modules.loss, device: torch.device
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
     """Make model step
 
     :param model: Tree2Seq model
     :param graph: batched dgl graph
-    :param labels: [batch size] list of string labels
+    :param labels: [sequence len, batch size] ground truth labels
     :param criterion: criterion to optimize
     :param device: torch device
     :return: Tuple[
@@ -45,13 +45,14 @@ def _process_data(
     """
     root_indexes = get_root_indexes(graph).to(device)
 
-    root_logits, ground_truth = model(graph, root_indexes, labels, device)
+    root_logits = model(graph, root_indexes, labels, device)
+    # remove <SOS> token
     # [the longest sequence, batch size, vocab size]
     root_logits = root_logits[1:]
     # [the longest sequence, batch size]
-    ground_truth = ground_truth[1:]
+    labels = labels[1:]
 
-    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), ground_truth.view(-1))
+    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), labels.view(-1))
     # [the longest sequence, batch size]
     prediction = model.predict(root_logits)
 
@@ -60,7 +61,7 @@ def _process_data(
         'loss': loss.item(),
         'statistics':
             calculate_batch_statistics(
-                ground_truth.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
+                labels.t(), prediction.t(), [model.decoder.label_to_id[token] for token in [PAD, UNK, EOS]]
             )
     }
 
@@ -69,7 +70,7 @@ def _process_data(
 
 def train_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
-        graph: dgl.BatchedDGLGraph, labels: List[str],
+        graph: dgl.BatchedDGLGraph, labels: torch.Tensor,
         params: Dict, device: torch.device
 ) -> Dict:
     model.train()
@@ -87,7 +88,8 @@ def train_on_batch(
 
 
 def eval_on_batch(
-        model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph, labels: List[str], device: torch.device
+        model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph,
+        labels: torch.Tensor, device: torch.device
 ) -> Tuple[Dict, torch.Tensor]:
     model.eval()
     # Model step
@@ -106,6 +108,8 @@ def evaluate_dataset(
         graph, labels = dataset[batch_id]
         graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
         graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
+        # [sequence len, batch size]
+        labels = torch.tensor(labels.T, device=device)
         batch_info, _ = eval_on_batch(
             model, criterion, graph, labels, device
         )

@@ -36,12 +36,16 @@ class _IEmbedding(nn.Module):
 
 
 class FullTokenEmbedding(_IEmbedding):
-    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
         self.token_embedding = nn.Embedding(self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index)
+        self.normalize = normalize
 
     def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
-        return self.token_embedding(graph.ndata['token_id'])
+        token_embeds = self.token_embedding(graph.ndata['token']).squeeze(1)
+        if self.normalize:
+            return token_embeds * sqrt(self.h_emb)
+        return token_embeds
 
 
 class FullTypeEmbedding(_IEmbedding):
@@ -51,7 +55,7 @@ class FullTypeEmbedding(_IEmbedding):
         self.normalize = normalize
 
     def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
-        type_embeds = self.type_embedding(graph.ndata['type_id'])
+        type_embeds = self.type_embedding(graph.ndata['type'])
         if self.normalize:
             return type_embeds * sqrt(self.h_emb)
         return type_embeds
@@ -134,7 +138,7 @@ class PositionalEmbedding(nn.Module):
 
 class Embedding(nn.Module):
     _embeddings = {
-        'full_token': FullTokenEmbedding,
+        'token': FullTokenEmbedding,
         'type': FullTypeEmbedding,
         'subtoken': SubTokenEmbedding,
         'positional': PositionalEmbedding

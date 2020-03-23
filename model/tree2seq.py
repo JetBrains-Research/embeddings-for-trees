@@ -19,7 +19,7 @@ class Tree2Seq(nn.Module):
         self.decoder = decoder
 
     def forward(
-            self, graph: BatchedDGLGraph, root_indexes: torch.LongTensor, labels: List[str], device: torch.device
+            self, graph: BatchedDGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor, device: torch.device
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Predict sequence of tokens for given batched graph
 
@@ -34,8 +34,8 @@ class Tree2Seq(nn.Module):
         """
         embedded_graph = self.embedding(graph, device)
         encoded_data = self.encoder(embedded_graph, device)
-        outputs, ground_truth = self.decoder(encoded_data, labels, root_indexes, device)
-        return outputs, ground_truth
+        outputs = self.decoder(encoded_data, labels, root_indexes, device)
+        return outputs
 
     @staticmethod
     def predict(logits: torch.Tensor) -> torch.Tensor:
