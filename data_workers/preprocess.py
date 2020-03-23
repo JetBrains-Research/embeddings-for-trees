@@ -31,7 +31,7 @@ def main(args: Namespace) -> None:
     create_folder(data_path, is_clean=False)
 
     if args.download:
-        src_paths = download_dataset(dataset_name, data_path, dataset_url, holdout_folders)
+        src_paths = download_dataset(dataset_name, data_folder, dataset_url, holdout_folders)
     else:
         src_paths = [os.path.join(data_path, folder) for folder in holdout_folders]
 
