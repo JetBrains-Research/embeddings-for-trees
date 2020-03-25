@@ -1,37 +1,19 @@
 import os
 from argparse import ArgumentParser
+from itertools import takewhile
 from pickle import load as pkl_load
-from subprocess import run as subprocess_run
 
 import dgl
-import pandas as pd
-import torch.nn as nn
+import numpy
+import torch
 
-from data_workers.convert import convert_dot_to_dgl, prepare_batch, transform_keys
+from data_workers.convert import convert_project
+from data_workers.preprocess_steps import build_project_asts
 from model.tree2seq import load_model
-from utils.common import fix_seed, get_device, EOS, PAD, create_folder
-from utils.learning_info import LearningInfo
-from utils.training import eval_on_batch
+from utils.common import fix_seed, get_device, create_folder, EOS
 
-TMP_FOLDER = '.tmp'
+tmp_folder = '.tmp'
 astminer_cli_path = 'utils/astminer-cli.jar'
-
-vocab_path = 'data/java-small/vocabulary.pkl'
-labels_path = 'data/java-small/labels.pkl'
-
-
-def build_ast(path_to_function: str) -> bool:
-    completed_process = subprocess_run(
-        ['java', '-jar', astminer_cli_path, 'parse',
-         '--project', path_to_function, '--output', TMP_FOLDER,
-         '--storage', 'dot', '--granularity', 'method',
-         '--lang', 'java', '--hide-method-name', '--split-tokens',
-         '--java-parser', 'antlr']
-    )
-    if completed_process.returncode != 0:
-        print(f"can't build AST for given function, failed with:\n{completed_process.stdout}")
-        return False
-    return True
 
 
 def interactive(path_to_function: str, path_to_model: str):
@@ -39,56 +21,47 @@ def interactive(path_to_function: str, path_to_model: str):
     device = get_device()
     print(f"using {device} device")
 
-    # convert function to dot format
-    print(f"prepare ast...")
-    create_folder(TMP_FOLDER)
-    if not build_ast(path_to_function):
-        return
-    ast_folder = os.path.join(TMP_FOLDER, 'java', 'asts')
-    ast = os.listdir(ast_folder)
-    if len(ast) == 0:
-        print("didn't find any functions in given file")
-        return
-    if len(ast) > 1:
-        print("too many functions in given file, for interactive prediction you need only one")
-        return
-    dgl_ast = convert_dot_to_dgl(os.path.join(ast_folder, ast[0]))
-    ast_desc = pd.read_csv(os.path.join(TMP_FOLDER, 'java', 'description.csv'))
-    ast_desc['token'].fillna('NAN', inplace=True)
-    with open(vocab_path, 'rb') as pkl_file:
-        vocab = pkl_load(pkl_file)
-        token_to_id, type_to_id = vocab['token_to_id'], vocab['type_to_id']
-    ast_desc = transform_keys(ast_desc, token_to_id, type_to_id)
-    batched_graph, labels, paths = prepare_batch(ast_desc, ['ast_0.dot'], lambda: [dgl_ast])
-    batched_graph = dgl.batch(
-        list(map(lambda g: dgl.reverse(g, share_ndata=True), dgl.unbatch(batched_graph)))
-    )
-
     # load model
-    print("loading model..")
-    model, _ = load_model(path_to_model, device)
-    criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
-    info = LearningInfo()
+    print("loading model...")
+    model, checkpoint = load_model(path_to_model, device)
+    token_to_id = checkpoint['configuration']['token_to_id']
+    type_to_id = checkpoint['configuration']['type_to_id']
+    label_to_id = checkpoint['configuration']['label_to_id']
+    id_to_label = {v: k for k, v in label_to_id.items()}
 
-    print("forward pass...")
-    batch_info, prediction = eval_on_batch(model, criterion, batched_graph, labels, device)
+    # convert function to dgl format
+    print("convert function to dgl format...")
+    create_folder(tmp_folder)
+    build_project_asts(path_to_function, tmp_folder, astminer_cli_path)
+    project_folder = os.path.join(tmp_folder, 'java')
+    convert_project(project_folder, token_to_id, type_to_id, label_to_id, True, True, 5, 6, False, True, '|')
 
-    info.accumulate_info(batch_info)
-    id_to_sublabel = {v: k for k, v in model.decoder.label_to_id.items()}
-    label = ''
-    for cur_sublabel in prediction:
-        if cur_sublabel.item() == model.decoder.label_to_id[EOS]:
-            break
-        label += '|' + id_to_sublabel[cur_sublabel.item()]
-    label = label[1:]
-    print(f"Predicted function name is\n{label}")
-    print(f"Calculated metrics with respect to '{labels[0]}' name\n{info.get_state_dict()}")
+    # load function
+    with open(os.path.join(project_folder, 'converted.pkl'), 'rb') as pkl_file:
+        data = pkl_load(pkl_file)
+    assert len(data['labels']) == 1, f"found {len(data['labels'])} functions, instead of 1"
+    ast = dgl.unbatch(data['graphs'])[0]
+    ast = dgl.reverse(ast, share_ndata=True)
+    ast.ndata['token'] = ast.ndata['token'].to(device)
+    ast.ndata['type'] = ast.ndata['type'].to(device)
+    labels = torch.tensor(numpy.stack(data['labels']).T, device=device)
+    root_indexes = torch.tensor([0], dtype=torch.long)
+
+    # forward pass
+    model.eval()
+    with torch.no_grad():
+        logits = model(ast, root_indexes, labels, device)
+    logits = logits[1:]
+    prediction = model.predict(logits).reshape(-1)
+    sublabels = [id_to_label[label_id.item()] for label_id in prediction]
+    label = '|'.join(takewhile(lambda sl: sl != EOS, sublabels))
+    print(f"the predicted label is:\n{label}")
 
 
 if __name__ == '__main__':
     arg_parser = ArgumentParser(description=f"predict function name for given function by given model")
-    arg_parser.add_argument("function", type=str, help="path to file with function")
-    arg_parser.add_argument("model", type=str, help="path to freeze model")
+    arg_parser.add_argument("function", type=str, help="path to the file with function")
+    arg_parser.add_argument("model", type=str, help="path to the frozen model")
 
     args = arg_parser.parse_args()
     interactive(args.function, args.model)
