@@ -57,9 +57,9 @@
     "step_gamma": 0.1
   },
 
-  "evaluation_step": -1,
+  "evaluation_step": 50,
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": 50,
+  "checkpoint_step": -1,
   "checkpoints_folder": "checkpoints"
 }

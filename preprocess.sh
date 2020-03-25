@@ -4,7 +4,7 @@ PS3="Choose data preprocessing step: "
 options=("Download" "Build AST" "Collect vocabulary" "Convert to DGL format" "Upload to S3")
 select opt in "${options[@]}"
 do
-    case $opt in
+    case ${opt} in
         "Download")
             # download data
             PYTHONPATH='.' python data_workers/preprocess.py "$1" --download

@@ -6,10 +6,12 @@ logs/
 wandb/
 checkpoints/
 .tmp/
+notebooks/
 
 *.txt
 *.pt
 *.jar
+*.java
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
