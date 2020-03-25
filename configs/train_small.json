@@ -6,18 +6,18 @@
   },
 
   "hidden_states": {
-    "embedding": 512,
-    "encoder": 512,
-    "decoder": 512
+    "embedding": 256,
+    "encoder": 256,
+    "decoder": 256
   },
 
   "embedding": {
     "embeddings": {
-      "subtoken": {},
+      "token": {},
       "type": {}
     },
     "reduction": {
-      "name": "cat",
+      "name": "sum",
       "params": {
       }
     }
@@ -30,7 +30,7 @@
         "name": "EdgeChildSumTreeLSTMCell",
         "params": {}
       },
-      "dropout": 0.5
+      "dropout": 0.25
     }
   },
 
@@ -46,7 +46,7 @@
     }
   },
 
-  "batch_size": 400,
+  "batch_size": 500,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
@@ -54,12 +54,12 @@
 
   "scheduler": {
     "name": "step",
-    "step_size": 500,
+    "step_size": 1000,
     "step_gamma": 0.1
   },
 
-  "evaluation_step": -1,
-  "logging_step": 100,
+  "evaluation_step": 100,
+  "logging_step": 10,
   "logging_folder": "logs",
   "checkpoint_step": 500,
   "checkpoints_folder": "checkpoints"
