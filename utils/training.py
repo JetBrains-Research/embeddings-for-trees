@@ -106,8 +106,8 @@ def evaluate_dataset(
 
     for batch_id in tqdm(range(len(dataset))):
         graph, labels = dataset[batch_id]
-        graph.ndata['token_id'] = graph.ndata['token_id'].to(device)
-        graph.ndata['type_id'] = graph.ndata['type_id'].to(device)
+        graph.ndata['token'] = graph.ndata['token'].to(device)
+        graph.ndata['type'] = graph.ndata['type'].to(device)
         # [sequence len, batch size]
         labels = torch.tensor(labels.T, device=device)
         batch_info, _ = eval_on_batch(
