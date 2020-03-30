@@ -20,8 +20,8 @@ def train(params: Dict, logging: str) -> None:
     device = get_device()
     print(f"using {device} device")
 
-    training_set = JavaDataset(params['paths']['train'], params['batch_size'], True)
-    validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], True)
+    training_set = JavaDataset(params['paths']['train'], params['batch_size'], device, True)
+    validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], device, True)
 
     with open(params['paths']['vocabulary'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
@@ -97,10 +97,6 @@ def train(params: Dict, logging: str) -> None:
         for batch_id in tqdm_batch_iterator:
             # [batch size, sequence len]
             graph, labels = training_set[batch_id]
-            graph.ndata['token'] = graph.ndata['token'].to(device)
-            graph.ndata['type'] = graph.ndata['type'].to(device)
-            # [sequence len, batch size]
-            labels = torch.tensor(labels.T, device=device)
             batch_info = train_on_batch(
                 model, criterion, optimizer, scheduler, graph, labels, params, device
             )
@@ -130,8 +126,8 @@ def train(params: Dict, logging: str) -> None:
 
 if __name__ == '__main__':
     arg_parse = ArgumentParser()
-    arg_parse.add_argument('--config', type=str, required=True, help='path to config json')
-    arg_parse.add_argument('--logging', choices=get_possible_loggers(), required=True)
+    arg_parse.add_argument('config', type=str, help='path to config json')
+    arg_parse.add_argument('logging', choices=get_possible_loggers())
     args = arg_parse.parse_args()
 
     with open(args.config) as config_file:

@@ -1,14 +1,14 @@
 import os
 import re
-from functools import partial
+from datetime import datetime
 from multiprocessing import Pool, cpu_count
-from pickle import dump as pkl_dump
-from pickle import load as pkl_load
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import pandas as pd
+import torch
 from dgl import DGLGraph, batch, unbatch
+from dgl.data.utils import save_graphs, load_graphs
 from tqdm.auto import tqdm
 
 from utils.common import create_folder, UNK, PAD, SOS, EOS
@@ -97,8 +97,8 @@ def prepare_project_description(project_path: str, token_to_id: Dict, type_to_id
 
 def convert_project(project_path: str, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict,
                     token_to_leaves: bool, is_split: bool, max_token_len: int = -1, max_label_len: int = -1,
-                    wrap_tokens: bool = False, wrap_labels: bool = False, delimiter: str = '|'):
-    # print("node description preparation")
+                    wrap_tokens: bool = False, wrap_labels: bool = False, delimiter: str = '|', n_jobs: int = -1):
+    print("node description preparation")
     description = prepare_project_description(
         project_path, token_to_id, type_to_id, label_to_id, is_split,
         max_token_len, max_label_len, wrap_tokens, wrap_labels, delimiter
@@ -106,30 +106,39 @@ def convert_project(project_path: str, token_to_id: Dict, type_to_id: Dict, labe
 
     asts = os.listdir(os.path.join(project_path, 'asts'))
     asts.sort(key=lambda _ast: int(re.findall(r'\d+', _ast)[0]))
-    # print("converting to dgl format...")
-    graphs = batch([convert_dot_to_dgl(os.path.join(project_path, 'asts', ast)) for ast in asts])
+
+    print("converting to dgl format...")
+    n_jobs = cpu_count() if n_jobs == -1 else n_jobs
+    with Pool(n_jobs) as pool:
+        results = pool.imap(convert_dot_to_dgl, [os.path.join(project_path, 'asts', ast) for ast in asts])
+        graphs = [g for g in tqdm(results, total=len(asts))]
 
     description_ordered = description.set_index('dot_file').loc[asts]
+    graphs = batch(graphs)
     graphs.ndata['token'] = np.vstack(description_ordered['token_feature'])
     graphs.ndata['type'] = description_ordered['type_feature'].to_numpy()
+    graphs = unbatch(graphs)
 
     if token_to_leaves:
-        # print("move tokens to leaves...")
-        graphs = batch([_move_tokens_to_leaves(g, token_to_id[PAD], type_to_id[PAD]) for g in unbatch(graphs)])
+        print("move tokens to leaves...")
+        graphs = [_move_tokens_to_leaves(g, token_to_id[PAD], type_to_id[PAD]) for g in tqdm(graphs)]
 
     mask_per_ast = description_ordered['node_id'] == 0
-    labels = description_ordered[mask_per_ast]['label_feature'].values
-    source_paths = description_ordered[mask_per_ast]['source_file'].values
+    labels = np.stack(description_ordered[mask_per_ast]['label_feature'].values)
+    source_paths = np.stack(description_ordered[mask_per_ast]['source_file'].values)
 
-    with open(os.path.join(project_path, 'converted.pkl'), 'wb') as out_file:
-        pkl_dump({'graphs': graphs, 'labels': labels, 'paths': source_paths}, out_file)
+    # TODO: store source paths
+    save_graphs(
+        os.path.join(project_path, 'converted.dgl'), graphs,
+        {'labels': torch.tensor(labels)}
+    )
 
 
-def _convert_project_safe(project_path, **kwargs):
+def _convert_project_safe(project_path: str, log_file: str,  **kwargs):
     try:
         convert_project(project_path, **kwargs)
     except Exception as err:
-        with open(os.path.join(os.getcwd(), 'convert.txt'), 'a') as log_file:
+        with open(log_file, 'a') as log_file:
             log_file.write(f"can't convert {project_path} project, failed with\n{err}")
 
 
@@ -138,6 +147,8 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
                     tokens_to_leaves: bool = False, is_split: bool = False,
                     max_token_len: int = -1, max_label_len: int = -1, wrap_tokens: bool = False,
                     wrap_labels: bool = False, delimiter: str = '|', shuffle: bool = True, n_jobs: int = -1) -> str:
+    log_file = os.path.join('logs', f"convert_{datetime.now().strftime('%Y_%m_%d_%H:%M:%S')}.txt")
+
     print(f"Convert asts for {holdout_name} data...")
     holdout_path = os.path.join(data_path, f'{holdout_name}_asts')
     output_holdout_path = os.path.join(data_path, f'{holdout_name}_preprocessed')
@@ -146,53 +157,43 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
     projects_paths = [os.path.join(holdout_path, project, 'java') for project in os.listdir(holdout_path)]
 
     print("converting projects...")
-    n_jobs = cpu_count() if n_jobs == -1 else n_jobs
-    with Pool(n_jobs) as pool:
-        pool_func = partial(
-            _convert_project_safe, token_to_id=token_to_id, type_to_id=type_to_id, label_to_id=label_to_id,
+    for project_path in tqdm(projects_paths):
+        print(f"converting {project_path}")
+        _convert_project_safe(
+            project_path, log_file, token_to_id=token_to_id, type_to_id=type_to_id, label_to_id=label_to_id,
             token_to_leaves=tokens_to_leaves, is_split=is_split, max_token_len=max_token_len,
-            max_label_len=max_label_len, wrap_tokens=wrap_tokens, wrap_labels=wrap_labels, delimiter=delimiter
+            max_label_len=max_label_len, wrap_tokens=wrap_tokens, wrap_labels=wrap_labels, delimiter=delimiter,
+            n_jobs=n_jobs
         )
-        results = pool.imap(pool_func, projects_paths)
-        for _ in tqdm(results, total=len(projects_paths)):
-            pass
 
     graphs = []
     labels = []
-    paths = []
-    print("load graph to memory...")
+    print("load graphs to memory...")
     for project_path in tqdm(projects_paths):
-        if not os.path.exists(os.path.join(project_path, 'converted.pkl')):
-            with open(os.path.join(os.getcwd(), 'convert.txt'), 'a') as log_file:
+        store_path = os.path.join(project_path, 'converted.dgl')
+        if not os.path.exists(os.path.join(project_path, 'converted.dgl')):
+            with open(log_file, 'a') as log_file:
                 log_file.write(f"can't load graphs for {project_path} project\n")
             continue
-        with open(os.path.join(project_path, 'converted.pkl'), 'rb') as pkl_file:
-            project_data = pkl_load(pkl_file)
-            graphs += unbatch(project_data['graphs'])
-            labels.append(project_data['labels'])
-            paths.append(project_data['paths'])
+        cur_graphs, cur_labels = load_graphs(store_path)
+        graphs += cur_graphs
+        labels.append(cur_labels['labels'])
     graphs = np.array(graphs)
-    labels = np.concatenate(labels)
-    paths = np.concatenate(paths)
+    labels = torch.cat(labels)
 
-    assert len(graphs) == len(labels) == len(paths), "unequal lengths of graphs, labels and paths"
+    assert len(graphs) == len(labels), "unequal lengths of graphs and labels"
     print(f"total number of graphs: {len(graphs)}")
 
     if shuffle:
         order = np.random.permutation(len(graphs))
         graphs = graphs[order]
         labels = labels[order]
-        paths = paths[order]
 
     print(f"save batches...")
     n_batches = len(graphs) // batch_size + (1 if len(graphs) % batch_size > 0 else 0)
     for batch_num in tqdm(range(n_batches)):
         current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(graphs)))
-        with open(os.path.join(output_holdout_path, f'batch_{batch_num}.pkl'), 'wb') as pkl_file:
-            pkl_dump(
-                {'batched_graph': batch(graphs[current_slice]), 'labels': labels[current_slice],
-                 'paths': paths[current_slice]},
-                pkl_file
-            )
+        output_path = os.path.join(output_holdout_path, f'batch_{batch_num}.dgl')
+        save_graphs(output_path, graphs[current_slice], {'labels': labels[current_slice]})
 
     return output_holdout_path
