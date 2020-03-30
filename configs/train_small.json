@@ -27,7 +27,7 @@
     "name": "TransformerEncoder",
     "params": {
       "dropout": 0.1,
-      "n_heads": 16,
+      "n_head": 16,
       "h_ffd": 512
     }
   },
