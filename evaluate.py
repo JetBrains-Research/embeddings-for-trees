@@ -15,7 +15,7 @@ def evaluate(params: Dict) -> None:
     device = get_device()
     print(f"using {device} device")
 
-    evaluation_set = JavaDataset(params['paths']['evaluate'], params['batch_size'], True)
+    evaluation_set = JavaDataset(params['paths']['evaluate'], params['batch_size'], device, True)
 
     model, _ = load_model(params['paths']['model'], device)
 
