@@ -24,13 +24,11 @@
   },
 
   "encoder": {
-    "name": "TreeLSTM",
+    "name": "TransformerEncoder",
     "params": {
-      "cell": {
-        "name": "EdgeChildSumTreeLSTMCell",
-        "params": {}
-      },
-      "dropout": 0.25
+      "dropout": 0.1,
+      "n_heads": 16,
+      "h_ffd": 512
     }
   },
 

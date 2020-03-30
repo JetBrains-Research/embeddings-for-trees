@@ -7,7 +7,7 @@ from dgl import BatchedDGLGraph
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import Embedding
 from model.encoder import _IEncoder
-from model.transformer import NaiveTransformerEncoder
+from model.transformer import TransformerEncoder
 from model.treeLSTM import TreeLSTM
 
 
@@ -50,7 +50,7 @@ class Tree2Seq(nn.Module):
 class ModelFactory:
     _encoders = {
         TreeLSTM.__name__: TreeLSTM,
-        NaiveTransformerEncoder.__name__: NaiveTransformerEncoder
+        TransformerEncoder.__name__: TransformerEncoder
     }
     _decoders = {
         LinearDecoder.__name__: LinearDecoder,

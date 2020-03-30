@@ -1,36 +1,68 @@
+from typing import Dict
+
 import dgl
 import torch
 import torch.nn as nn
 
 from model.encoder import _IEncoder
-from utils.common import segment_sizes_to_slices
 
 
-class NaiveTransformerEncoder(_IEncoder):
+class TransformerEncoder(_IEncoder):
 
-    def __init__(self, h_emb: int, h_enc: int, n_head: int, n_layers: int,
-                 h_ffd: int = 2048, dropout: float = 0.1, activation: str = "relu") -> None:
+    def __init__(self, h_emb: int, h_enc: int, n_head: int, h_ffd: int = 2048, dropout: float = 0.1) -> None:
         """init transformer encoder
 
         :param h_emb: size of embedding
         :param h_enc: size of encoder
         :param n_head: number of heads in multi-head attention
-        :param n_layers: number of transformer cell layers
         :param h_ffd: size of hidden layer in feedforward part
         :param dropout: probability to be zeroed
-        :param activation: type of activation
         """
-        assert h_emb == h_enc, f"for transformer encoder size of embedding should be equal to size of encoder"
         super().__init__(h_emb, h_enc)
-        self.n_head = n_head
-        self.h_ffd = h_ffd
-        self.n_layers = n_layers
-        self.dropout = dropout
-        self.activation = activation
-        encoder_layers = nn.TransformerEncoderLayer(
-            self.h_emb, self.n_head, dim_feedforward=self.h_ffd, dropout=self.dropout, activation=self.activation
-        )
-        self.transformer_encoder = nn.TransformerEncoder(encoder_layers, self.n_layers)
+        self.multihead_attention = nn.MultiheadAttention(self.h_emb, n_head, dropout)
+        self.dropout1 = nn.Dropout(dropout)
+        self.norm1 = nn.LayerNorm(self.h_emb)
+
+        self.linear1 = nn.Linear(self.h_emb, h_ffd)
+        self.relu = nn.ReLU()
+        self.dropout_ffd = nn.Dropout(dropout)
+        self.linear2 = nn.Linear(h_ffd, self.h_emb)
+
+        self.dropout2 = nn.Dropout(dropout)
+        self.norm2 = nn.LayerNorm(self.h_emb)
+
+        self.linear_h = nn.Linear(self.h_emb, self.h_enc)
+        self.linear_c = nn.Linear(self.h_emb, self.h_enc)
+
+    def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
+        """reduce a batch of incoming nodes
+
+        :param nodes: 'x' is a tensor of shape [batch size, number of children, hidden state]
+        :return: Dict with reduced features
+        """
+        # [n_child, bs, h]
+        x_in_nodes = nodes.mailbox['x_trans'].transpose(0, 1)
+        # [1, bs, h]
+        x_cur = nodes.data['x'].unsqueeze(0)
+
+        # [1, bs, h]
+        x_attn = self.multihead_attention(x_cur, x_in_nodes, x_in_nodes)[0]
+
+        x_add_norm = self.norm1(x_cur + self.dropout1(x_attn))
+        return {
+            'x': x_add_norm.squeeze(0)
+        }
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        # [1, bs, h]
+        x_cur = nodes.data['x'].unsqueeze(0)
+
+        # [1, bs, h]
+        x_linear = self.linear2(self.dropout_ffd(self.relu(self.linear1(x_cur))))
+
+        x_trans = x_cur + self.dropout2(x_linear)
+        x_trans = self.norm2(x_trans)
+        return {'x_trans': x_trans.squeeze(0)}
 
     def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
         """Apply transformer encoder
@@ -39,24 +71,14 @@ class NaiveTransformerEncoder(_IEncoder):
         :param device: torch device
         :return: encoded nodes [max tree size, batch size, hidden state]
         """
-        embeds = [key for key in graph.ndata if 'embeds' in key]
-        graphs = dgl.unbatch(graph)
-        tree_sizes = [g.number_of_nodes() for g in graphs]
-        max_tree_size = max(tree_sizes)
-        tree_slices = segment_sizes_to_slices(tree_sizes)
+        graph.ndata['x_trans'] = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
+        dgl.prop_nodes_topo(
+            graph, message_func=[dgl.function.copy_u('x_trans', 'x_trans')],
+            reduce_func=self.reduce_func, apply_node_func=self.apply_node_func
+        )
 
-        # [number of nodes, embedding hidden state]
-        output = sum([graph.ndata[e] for e in embeds])
-        for e in embeds:
-            del graph.ndata[e]
+        # [n_nodes, h_emb]
+        h = self.linear_h(graph.ndata['x_trans'])
+        c = self.linear_c(graph.ndata['x_trans'])
 
-        # [max tree size, batch size, encoder hidden state]
-        features = torch.zeros(max_tree_size, len(graphs), self.h_enc, device=device)
-
-        for i, tree_slice in enumerate(tree_slices):
-            features[:tree_sizes[i], i, :] = output[tree_slice]
-
-        # [max tree size, batch size, h enc]
-        encoded_nodes = self.transformer_encoder(features)
-
-        return encoded_nodes
+        return h, c
