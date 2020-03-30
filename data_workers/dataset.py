@@ -3,7 +3,7 @@ from typing import Tuple
 
 import torch
 from dgl import BatchedDGLGraph, batch
-from dgl.data.utils import load_graphs
+from dgl.data.utils import load_labels, load_graphs
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
@@ -33,8 +33,8 @@ class JavaDataset(Dataset):
         # iterate over pkl files to aggregate information about batches
         print(f"prepare the {batched_graphs_path} dataset...")
         for batched_graph_file in tqdm(self.batched_graph_files):
-            graphs, _ = load_graphs(os.path.join(batched_graphs_path, batched_graph_file))
-            n_graphs = len(graphs)
+            labels = load_labels(os.path.join(batched_graphs_path, batched_graph_file))
+            n_graphs = len(labels['labels'])
             batches_per_file = n_graphs // self.batch_size + (1 if n_graphs % self.batch_size > 0 else 0)
 
             # collect information from the file
