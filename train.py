@@ -11,7 +11,7 @@ from data_workers.dataset import JavaDataset
 from model.tree2seq import ModelFactory, Tree2Seq, load_model
 from utils.common import fix_seed, get_device, is_current_step_match, vaswani_lr_scheduler_lambda
 from utils.learning_info import LearningInfo
-from utils.logging import get_possible_loggers, FileLogger, WandBLogger, TerminalLogger
+from utils.logger import get_possible_loggers, FileLogger, WandBLogger, TerminalLogger
 from utils.training import train_on_batch, evaluate_dataset
 
 
