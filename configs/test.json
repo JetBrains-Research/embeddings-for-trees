@@ -27,7 +27,8 @@
     "params": {
       "dropout": 0.25,
       "n_head": 4,
-      "h_ffd": 64
+      "h_ffd": 64,
+      "n_layers": 1
     }
   },
 
@@ -45,7 +46,7 @@
 
   "batch_size": 64,
   "n_epochs": 1,
-  "lr": 0.01,
+  "lr": 0.1,
   "weight_decay": 1e-4,
   "clip_norm": 5,
 

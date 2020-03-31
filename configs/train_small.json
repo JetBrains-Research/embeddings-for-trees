@@ -28,7 +28,8 @@
     "params": {
       "dropout": 0.1,
       "n_head": 16,
-      "h_ffd": 512
+      "h_ffd": 512,
+      "n_layers": 1
     }
   },
 

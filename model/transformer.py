@@ -9,7 +9,9 @@ from model.encoder import _IEncoder
 
 class TransformerEncoder(_IEncoder):
 
-    def __init__(self, h_emb: int, h_enc: int, n_head: int, h_ffd: int = 2048, dropout: float = 0.1) -> None:
+    def __init__(
+            self, h_emb: int, h_enc: int, n_head: int, h_ffd: int = 2048, dropout: float = 0.1, n_layers: int = 1
+    ) -> None:
         """init transformer encoder
 
         :param h_emb: size of embedding
@@ -19,20 +21,12 @@ class TransformerEncoder(_IEncoder):
         :param dropout: probability to be zeroed
         """
         super().__init__(h_emb, h_enc)
-        self.multihead_attention = nn.MultiheadAttention(self.h_emb, n_head, dropout)
-        self.dropout1 = nn.Dropout(dropout)
-        self.norm1 = nn.LayerNorm(self.h_emb)
-
-        self.linear1 = nn.Linear(self.h_emb, h_ffd)
-        self.relu = nn.ReLU()
-        self.dropout_ffd = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(h_ffd, self.h_emb)
-
-        self.dropout2 = nn.Dropout(dropout)
-        self.norm2 = nn.LayerNorm(self.h_emb)
+        self.transformer_layer = nn.TransformerEncoderLayer(h_emb, n_head, h_ffd, dropout)
+        self.transformer = nn.TransformerEncoder(self.transformer_layer, n_layers)
 
         self.linear_h = nn.Linear(self.h_emb, self.h_enc)
         self.linear_c = nn.Linear(self.h_emb, self.h_enc)
+        self.tanh = nn.Tanh()
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
         """reduce a batch of incoming nodes
@@ -41,28 +35,20 @@ class TransformerEncoder(_IEncoder):
         :return: Dict with reduced features
         """
         # [n_child, bs, h]
-        x_in_nodes = nodes.mailbox['x_trans'].transpose(0, 1)
+        x_children = nodes.mailbox['x'].transpose(0, 1)
         # [1, bs, h]
         x_cur = nodes.data['x'].unsqueeze(0)
 
-        # [1, bs, h]
-        x_attn = self.multihead_attention(x_cur, x_in_nodes, x_in_nodes)[0]
-
-        x_add_norm = self.norm1(x_cur + self.dropout1(x_attn))
+        # [n_child + 1, bs, h]
+        x = torch.cat([x_cur, x_children], dim=0)
+        # root attend on children
+        mask = torch.full((x.shape[0], x.shape[0]), -1e5)
+        mask[0, 1:] = 0
+        # [n_child + 1, bs, h]
+        x_trans = self.transformer(x, mask=mask)
         return {
-            'x': x_add_norm.squeeze(0)
+            'x': x_trans[0]
         }
-
-    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [1, bs, h]
-        x_cur = nodes.data['x'].unsqueeze(0)
-
-        # [1, bs, h]
-        x_linear = self.linear2(self.dropout_ffd(self.relu(self.linear1(x_cur))))
-
-        x_trans = x_cur + self.dropout2(x_linear)
-        x_trans = self.norm2(x_trans)
-        return {'x_trans': x_trans.squeeze(0)}
 
     def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
         """Apply transformer encoder
@@ -71,14 +57,15 @@ class TransformerEncoder(_IEncoder):
         :param device: torch device
         :return: encoded nodes [max tree size, batch size, hidden state]
         """
-        graph.ndata['x_trans'] = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
+        # graph.ndata['x_trans'] = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
         dgl.prop_nodes_topo(
-            graph, message_func=[dgl.function.copy_u('x_trans', 'x_trans')],
-            reduce_func=self.reduce_func, apply_node_func=self.apply_node_func
+            graph, message_func=[dgl.function.copy_u('x', 'x')],
+            reduce_func=self.reduce_func
         )
+        # print(graph.ndata['x'])
 
         # [n_nodes, h_emb]
-        h = self.linear_h(graph.ndata['x_trans'])
-        c = self.linear_c(graph.ndata['x_trans'])
+        h = self.tanh(self.linear_h(graph.ndata['x']))
+        c = self.tanh(self.linear_c(graph.ndata['x']))
 
         return h, c
