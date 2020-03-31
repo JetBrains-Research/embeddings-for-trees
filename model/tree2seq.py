@@ -2,7 +2,7 @@ from typing import Dict, Tuple, List
 
 import torch
 import torch.nn as nn
-from dgl import BatchedDGLGraph
+from dgl import DGLGraph
 
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import Embedding
@@ -19,7 +19,7 @@ class Tree2Seq(nn.Module):
         self.decoder = decoder
 
     def forward(
-            self, graph: BatchedDGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor, device: torch.device
+            self, graph: DGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor, device: torch.device
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Predict sequence of tokens for given batched graph
 

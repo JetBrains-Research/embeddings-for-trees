@@ -27,6 +27,6 @@ class TreeLSTM(_IEncoder):
         self.cell = self._tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params'])
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph.ndata['x'] = self.dropout(graph.ndata['x'])
         return self.cell(graph, device)

@@ -31,7 +31,7 @@ class _IEmbedding(nn.Module):
         self.token_pad_index = self.token_to_id[PAD] if PAD in self.token_to_id else -1
         self.type_pad_index = self.type_to_id[PAD] if PAD in self.type_to_id else -1
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         raise NotImplementedError
 
 
@@ -41,7 +41,7 @@ class FullTokenEmbedding(_IEmbedding):
         self.token_embedding = nn.Embedding(self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index)
         self.normalize = normalize
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         token_embeds = self.token_embedding(graph.ndata['token']).squeeze(1)
         if self.normalize:
             return token_embeds * sqrt(self.h_emb)
@@ -54,7 +54,7 @@ class FullTypeEmbedding(_IEmbedding):
         self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
         self.normalize = normalize
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         type_embeds = self.type_embedding(graph.ndata['type'])
         if self.normalize:
             return type_embeds * sqrt(self.h_emb)
@@ -78,7 +78,7 @@ class SubTokenEmbedding(_IEmbedding):
             _id: self.token_to_subtokens[token] for token, _id in token_to_id.items()
         }
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         start_index = 0
         subtoken_ids = []
         node_slices = []
@@ -119,7 +119,7 @@ class PositionalEmbedding(nn.Module):
         self.h_emb = self.n * self.k
         self.p_emb = torch.tensor([self.p ** i for i in range(self.h_emb)])
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         """Forward pass for positional embedding
 
         @param graph: a batched graph with oriented edges from leaves to roots
@@ -175,7 +175,7 @@ class Embedding(nn.Module):
             raise ValueError(f"unknown embedding reduction: {reduction['name']}")
         self.reduction = self._reductions[reduction['name']](**reduction['params'])
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> dgl.BatchedDGLGraph:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
         embeds = [embedding(graph, device) for embedding in self.layers]
         graph.ndata['x'] = self.reduction(embeds)
         return graph

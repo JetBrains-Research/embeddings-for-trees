@@ -13,7 +13,7 @@ from utils.learning_info import LearningInfo
 from utils.metrics import calculate_batch_statistics
 
 
-def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
+def get_root_indexes(graph: dgl.DGLGraph) -> torch.Tensor:
     """Get indexes of roots in given graph
 
     :param graph: batched dgl graph
@@ -27,7 +27,7 @@ def get_root_indexes(graph: dgl.BatchedDGLGraph) -> torch.Tensor:
 
 
 def _process_data(
-        model: Tree2Seq, graph: dgl.BatchedDGLGraph, labels: torch.Tensor,
+        model: Tree2Seq, graph: dgl.DGLGraph, labels: torch.Tensor,
         criterion: nn.modules.loss, device: torch.device
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
     """Make model step
@@ -70,7 +70,7 @@ def _process_data(
 
 def train_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
-        graph: dgl.BatchedDGLGraph, labels: torch.Tensor,
+        graph: dgl.DGLGraph, labels: torch.Tensor,
         params: Dict, device: torch.device
 ) -> Dict:
     model.train()
@@ -88,7 +88,7 @@ def train_on_batch(
 
 
 def eval_on_batch(
-        model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.BatchedDGLGraph,
+        model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.DGLGraph,
         labels: torch.Tensor, device: torch.device
 ) -> Tuple[Dict, torch.Tensor]:
     model.eval()

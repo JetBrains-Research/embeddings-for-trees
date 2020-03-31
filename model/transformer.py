@@ -50,7 +50,7 @@ class TransformerEncoder(_IEncoder):
             'x': x_trans[0]
         }
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         """Apply transformer encoder
 
         :param graph: batched dgl graph

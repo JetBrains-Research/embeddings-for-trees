@@ -2,7 +2,7 @@ import os
 from typing import Tuple
 
 import torch
-from dgl import BatchedDGLGraph, batch
+from dgl import DGLGraph, batch
 from dgl.data.utils import load_labels, load_graphs
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
@@ -52,7 +52,7 @@ class JavaDataset(Dataset):
     def __len__(self) -> int:
         return self.n_batches
 
-    def __getitem__(self, item) -> Tuple[BatchedDGLGraph, torch.Tensor]:
+    def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
         batch_basename, batch_slice = self.batch_desc[item]
 
         # read file only if previous wasn't the same

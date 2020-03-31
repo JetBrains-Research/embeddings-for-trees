@@ -37,7 +37,7 @@ class _ITreeLSTMCell(nn.Module):
 
         return {'h': h, 'c': c}
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         """Propagate nodes by defined order,
         assuming graph.ndata['x'] contain features
         """
@@ -49,7 +49,7 @@ class _ITreeLSTMCell(nn.Module):
             'w_f': self.W_f.weight, 'b_f': self.b_f.data
         }
 
-    def _init_matrices(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> dgl.BatchedDGLGraph:
+    def _init_matrices(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
         number_of_nodes = graph.number_of_nodes()
         graph.ndata['x_iou'] = self.W_iou(graph.ndata['x']) + self.b_iou
         graph.ndata['x_f'] = self.W_f(graph.ndata['x']) + self.b_f
@@ -86,7 +86,7 @@ class EdgeChildSumTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph = self._init_matrices(graph, device)
 
         dgl.prop_nodes_topo(
@@ -128,7 +128,7 @@ class NodeChildSumTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph = self._init_matrices(graph, device)
         # propagate
         dgl.prop_nodes_topo(
@@ -200,7 +200,7 @@ class EdgeSpecificTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         matrix_id = torch.zeros(graph.number_of_edges(), dtype=torch.long)
         # because all edges in graph reversed (from child to parent)
         for edge_dst, edge_src, edge_id in zip(*graph.all_edges('all')):
@@ -278,7 +278,7 @@ class TypeSpecificTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         matrix_id = torch.zeros(graph.number_of_edges(), dtype=torch.long)
         # because all edges in graph reversed (from child to parent)
         for node in range(graph.number_of_nodes()):
@@ -346,7 +346,7 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph = self._init_matrices(graph, device)
 
         graph.register_message_func(self.message_func)
@@ -423,7 +423,7 @@ class FullMultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
         return super().apply_node_func(nodes)
 
-    def forward(self, graph: dgl.BatchedDGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph = self._init_matrices(graph, device)
 
         dgl.prop_nodes_topo(

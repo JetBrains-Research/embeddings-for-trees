@@ -13,7 +13,7 @@ class _IEncoder(nn.Module):
         self.h_enc = h_enc
 
     def forward(
-            self, graph: dgl.BatchedDGLGraph, device: torch.device
+            self, graph: dgl.DGLGraph, device: torch.device
     ) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """Produce new states for each node in given graph"""
         raise NotImplementedError
