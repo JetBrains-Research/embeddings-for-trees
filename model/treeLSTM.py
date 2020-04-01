@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from model.encoder import _IEncoder
 from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, \
-    EdgeSpecificTreeLSTMCell, TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell, FullMultiHeadAttentionTreeLSTMCell
+    EdgeSpecificTreeLSTMCell, TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell
 
 
 class TreeLSTM(_IEncoder):
@@ -17,7 +17,7 @@ class TreeLSTM(_IEncoder):
         EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
         TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell,
         TypeAttentionTreeLSTMCell.__name__: TypeAttentionTreeLSTMCell,
-        FullMultiHeadAttentionTreeLSTMCell.__name__: FullMultiHeadAttentionTreeLSTMCell
+        MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell
     }
 
     def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0.):

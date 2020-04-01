@@ -7,7 +7,7 @@ import torch
 
 from model.attention import scaled_dot_product_attention
 from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, EdgeSpecificTreeLSTMCell, \
-    TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell, FullMultiHeadAttentionTreeLSTMCell
+    TypeSpecificTreeLSTMCell, TypeAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell
 from test.test_utils import gen_node_with_children
 from utils.common import get_device, fix_seed
 
@@ -355,58 +355,6 @@ class TreeLSTMCellTest(unittest.TestCase):
                 i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
                 f_root_child = torch.sigmoid(
                     x_root.matmul(params['w_f'].t()) + h_children.matmul(params['u_f']) + params['b_f']
-                )
-                c_root_child = c_children * f_root_child
-                c_root = i * u + torch.sum(c_root_child, 0)
-                h_root = o * torch.tanh(c_root)
-
-                h_calculated = torch.cat((h_root, h_children), 0)
-                c_calculated = torch.cat((c_root, c_children), 0)
-
-                self._state_assert(h_tree_lstm, c_tree_lstm, h_calculated, c_calculated)
-
-    def test_full_multi_head_attention_tree_lstm_cell(self):
-        device = get_device()
-        fix_seed()
-
-        a_sizes = [5, 8, 14, 128, 256]
-        n_heads = [1, 4, 7, 8, 16]
-        for i, (x_size, h_size, number_of_children, a_size, n_head) in enumerate(
-                zip(self.x_sizes, self.h_sizes, self.numbers_of_children, a_sizes, n_heads)
-        ):
-            with self.subTest(i=i):
-                g = gen_node_with_children(number_of_children)
-                g.ndata['x'] = torch.rand(number_of_children + 1, x_size, dtype=torch.float32, device=device)
-
-                tree_lstm_cell = FullMultiHeadAttentionTreeLSTMCell(x_size, h_size, a_size, n_head).to(device)
-                h_tree_lstm, c_tree_lstm = tree_lstm_cell(g, device)
-
-                params = tree_lstm_cell.get_params()
-
-                nodes_x = g.ndata['x'][1:]
-                iou_children = nodes_x.matmul(params['w_iou'].t()) + params['b_iou']
-                i, o, u = torch.chunk(iou_children, 3, 1)
-                i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
-                c_children = i * u
-                h_children = o * torch.tanh(c_children)
-
-                x_root = g.ndata['x'][0]
-
-                _Q = torch.addmm(params['w_query_bias'], x_root.view(1, -1), params['w_query'].t())
-                _K = torch.addmm(params['w_key_bias'], h_children, params['w_key'].t())
-                _V = torch.addmm(params['w_value_bias'], h_children, params['w_value'].t())
-
-                h_attn = _apply_multi_head_attention(_Q, _K, _V, n_head, params['w_linear'], params['b_linear'])
-
-                iou_root = x_root.matmul(params['w_iou'].t()) + \
-                    torch.addmm(params['u_iou_b'], h_attn, params['u_iou_w'].t()) + \
-                    params['b_iou']
-                i, o, u = torch.chunk(iou_root, 3, 1)
-                i, o, u = torch.sigmoid(i), torch.sigmoid(o), torch.tanh(u)
-                f_root_child = torch.sigmoid(
-                    x_root.matmul(params['w_f'].t()) +
-                    torch.addmm(params['u_f_b'], h_attn, params['u_f_w'].t()) +
-                    params['b_f']
                 )
                 c_root_child = c_children * f_root_child
                 c_root = i * u + torch.sum(c_root_child, 0)

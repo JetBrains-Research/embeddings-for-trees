@@ -4,13 +4,11 @@
     "validate": "./data/java-small/validation_preprocessed",
     "vocabulary": "./data/java-small/vocabulary.pkl"
   },
-
   "hidden_states": {
     "embedding": 256,
     "encoder": 256,
     "decoder": 256
   },
-
   "embedding": {
     "embeddings": {
       "token": {},
@@ -22,44 +20,41 @@
       }
     }
   },
-
   "encoder": {
-    "name": "TransformerEncoder",
+    "name": "TreeLSTM",
     "params": {
-      "dropout": 0.1,
-      "n_head": 16,
-      "h_ffd": 512,
-      "n_layers": 1
-    }
-  },
-
-  "decoder": {
-    "name": "LSTMDecoder",
-    "params": {
-      "dropout": 0.5,
-      "teacher_force": 0.0,
-      "attention": {
-        "name": "LuongConcatAttention",
-        "params": {}
+      "cell": {
+        "name": "MultiHeadAttentionTreeLSTMCell",
+        "params": {
+          "n_heads": 16,
+          "dropout": 0.25
+        }
       }
-    }
-  },
-
-  "batch_size": 500,
-  "n_epochs": 1,
-  "lr": 0.01,
-  "weight_decay": 1e-4,
-  "clip_norm": 5,
-
-  "scheduler": {
-    "name": "step",
-    "step_size": 750,
-    "step_gamma": 0.1
-  },
-
-  "evaluation_step": 100,
-  "logging_step": 10,
-  "logging_folder": "logs",
-  "checkpoint_step": 500,
-  "checkpoints_folder": "checkpoints"
-}
+    },
+    "decoder": {
+      "name": "LSTMDecoder",
+      "params": {
+        "dropout": 0.5,
+        "teacher_force": 0.0,
+        "attention": {
+          "name": "LuongConcatAttention",
+          "params": {}
+        }
+      }
+    },
+    "batch_size": 500,
+    "n_epochs": 1,
+    "lr": 0.01,
+    "weight_decay": 1e-4,
+    "clip_norm": 5,
+    "scheduler": {
+      "name": "step",
+      "step_size": 750,
+      "step_gamma": 0.1
+    },
+    "evaluation_step": 100,
+    "logging_step": 10,
+    "logging_folder": "logs",
+    "checkpoint_step": 500,
+    "checkpoints_folder": "checkpoints"
+  }

@@ -23,12 +23,15 @@
   },
 
   "encoder": {
-    "name": "TransformerEncoder",
+    "name": "TreeLSTM",
     "params": {
-      "dropout": 0.25,
-      "n_head": 4,
-      "h_ffd": 64,
-      "n_layers": 1
+      "cell": {
+        "name": "MultiHeadAttentionTreeLSTMCell",
+        "params": {
+          "n_heads": 4,
+          "dropout": 0.25
+        }
+      }
     }
   },
 

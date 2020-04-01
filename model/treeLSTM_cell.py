@@ -367,50 +367,32 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
         }
 
 
-class FullMultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
+class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size, h_size, a_size, n_heads):
+    def __init__(self, x_size: int, h_size: int, n_heads: int, dropout: float = 0):
         super().__init__(x_size, h_size)
-        assert a_size % n_heads == 0
-        self.a_size = a_size
-        self.n_heads = n_heads
-        self.a_k = self.a_size // self.n_heads
+        assert x_size == h_size
+        self.multihead_attention = nn.MultiheadAttention(x_size, n_heads, dropout)
 
-        self.W_query = nn.Linear(self.x_size, self.a_size)
-        self.W_key = nn.Linear(self.h_size, self.a_size)
-        self.W_value = nn.Linear(self.h_size, self.a_size)
-        self.attn_linear = nn.Linear(self.a_size, self.a_size)
-
-        self.U_iou = nn.Linear(self.a_size, 3 * self.h_size)
-        self.U_f = nn.Linear(self.a_size, self.h_size)
+        self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
+        self.U_f = nn.Linear(self.h_size, self.h_size)
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
         """use built-in functions"""
         raise NotImplementedError
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        bs = nodes.batch_size()
-        # [n; 1; n_heads; a_k]
-        _Q = self.W_query(nodes.data['x']).view(bs, 1, self.n_heads, self.a_k)
-        # [n; k; n_heads; a_k]
-        _K = self.W_key(nodes.mailbox['h']).view(bs, -1, self.n_heads, self.a_k)
-        # [n; k; n_heads; a_k]
-        _V = self.W_value(nodes.mailbox['h']).view(bs, -1, self.n_heads, self.a_k)
+        # [1, bs, x size]
+        query = nodes.data['x'].unsqueeze(0)
+        # [n children, bs, h size]
+        key_value = nodes.mailbox['h']
 
-        # [n; n_heads; -1; a_k]
-        _Q = _Q.transpose(1, 2)
-        _K = _K.transpose(1, 2)
-        _V = _V.transpose(1, 2)
+        # [bs, h size]
+        h_attn = self.multihead_attention(query, key_value, key_value)[0].squeeze(0)
 
-        # [n; n_heads; 1; a_k]
-        scores = scaled_dot_product_attention(_Q, _K, _V)
-        # [n; a_size]
-        concat = scores.transpose(1, 2).contiguous().view(bs, self.a_size)
-        h_attn = self.attn_linear(concat)
-
-        # [n; 3 * h_size]
+        # [bs; 3 * h_size]
         h_iou = self.U_iou(h_attn)
-        # [n; h_size]
+        # [bs; h_size]
         h_f = self.U_f(h_attn)
 
         f = torch.sigmoid(nodes.data['x_f'] + h_f).unsqueeze(1)
