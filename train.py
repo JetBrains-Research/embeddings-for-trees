@@ -61,7 +61,7 @@ def train(params: Dict, logger_name: str) -> None:
     if logger_name == FileLogger.name:
         logger = FileLogger(params['checkpoints_folder'], params, params['logging_folder'])
     elif logger_name == WandBLogger.name:
-        logger = WandBLogger(params['checkpoints_folder'], params, params.get('resume_wandb_id', is_resumed))
+        logger = WandBLogger(params['checkpoints_folder'], params, params.get('resume_wandb_id', False))
     else:
         logger = Logger(params['checkpoints_folder'], params)
     logger.additional_save_info['configuration'] = model_factory.save_configuration()
