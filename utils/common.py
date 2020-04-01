@@ -4,6 +4,7 @@ from shutil import rmtree
 from tarfile import open as tar_open
 from typing import List, Callable
 
+import dgl
 import numpy as np
 import torch
 from tqdm.auto import tqdm
@@ -55,11 +56,18 @@ def segment_sizes_to_slices(sizes: List) -> List:
     return [slice(start, end) for start, end in zip(start_of_segments, cum_sums)]
 
 
-def is_current_step_match(current_step: int, template: int) -> bool:
-    return template != -1 and current_step % template == 0
+def get_root_indexes(tree_sizes: List[int]) -> np.ndarray:
+    """Get indexes of roots in given graph
+
+    :param tree_sizes: list with tree sizes
+    :return: list with indexes of roots [batch size]
+    """
+    idx_of_roots = np.cumsum([0] + tree_sizes)[:-1]
+    return idx_of_roots
 
 
-def vaswani_lr_scheduler_lambda(warm_start: int, d_model: int) -> Callable[[int], float]:
-    d_model_cf = np.power(d_model, -0.5)
-    warm_start_cf = np.power(warm_start, -1.5)
-    return lambda cur_step: d_model_cf * min(np.power(cur_step, -0.5), warm_start_cf * cur_step)
+def is_step_match(current_step: int, template: int, ignore_zero: bool = True) -> bool:
+    match_template = template != -1 and current_step % template == 0
+    if ignore_zero:
+        return match_template and current_step != 0
+    return match_template

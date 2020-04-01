@@ -7,7 +7,7 @@ import torch.nn as nn
 from data_workers.dataset import JavaDataset
 from model.tree2seq import load_model
 from utils.common import fix_seed, get_device
-from utils.training import evaluate_dataset
+from utils.training import evaluate_on_dataset
 
 
 def evaluate(params: Dict) -> None:
@@ -24,7 +24,7 @@ def evaluate(params: Dict) -> None:
 
     # evaluation loop
     print("ok, let's evaluate it")
-    eval_epoch_info = evaluate_dataset(evaluation_set, model, criterion, device)
+    eval_epoch_info = evaluate_on_dataset(evaluation_set, model, criterion, device)
 
     print(eval_epoch_info.get_state_dict())
 

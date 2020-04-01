@@ -5,20 +5,25 @@ from typing import Dict
 
 import torch
 import torch.nn as nn
-from tqdm.auto import tqdm
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import ModelFactory, Tree2Seq, load_model
-from utils.common import fix_seed, get_device, is_current_step_match, vaswani_lr_scheduler_lambda
-from utils.learning_info import LearningInfo
-from utils.logger import get_possible_loggers, FileLogger, WandBLogger, TerminalLogger
-from utils.training import train_on_batch, evaluate_dataset
+from model.tree2seq import ModelFactory
+from utils.common import fix_seed, get_device, PAD
+from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
+from utils.scheduler import get_scheduler
+from utils.training import evaluate_on_dataset, train_on_dataset
 
 
-def train(params: Dict, logging: str) -> None:
+def train(params: Dict, logger_name: str) -> None:
     fix_seed()
     device = get_device()
     print(f"using {device} device")
+
+    is_resumed = 'resume' in params
+    checkpoint = {}
+    if is_resumed:
+        checkpoint = torch.load(params['resume'], map_location=device)
+        params = checkpoint['config']
 
     training_set = JavaDataset(params['paths']['train'], params['batch_size'], device, True)
     validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], device, True)
@@ -30,98 +35,58 @@ def train(params: Dict, logging: str) -> None:
         label_to_id = vocabulary['label_to_id']
 
     print('model initializing...')
-    is_resumed = 'resume' in params
-    if is_resumed:
-        # load model
-        model, checkpoint = load_model(params['resume'], device)
-        start_batch_id = checkpoint['batch_id'] + 1
-        configuration = checkpoint['configuration']
-    else:
-        # create model
-        model_factory = ModelFactory(
-            params['embedding'], params['encoder'], params['decoder'],
-            params['hidden_states'], token_to_id, type_to_id, label_to_id
-        )
-        model: Tree2Seq = model_factory.construct_model(device)
-        configuration = model_factory.save_configuration()
-        start_batch_id = 0
+    # create model
+    model_factory = ModelFactory(
+        params['embedding'], params['encoder'], params['decoder'],
+        params['hidden_states'], token_to_id, type_to_id, label_to_id
+    )
+    model = model_factory.construct_model(device)
+    if 'state_dict' in checkpoint:
+        model.load_state_dict(checkpoint['state_dict'])
 
     # create optimizer
-    optimizer = torch.optim.Adam(
-        model.parameters(), lr=params['lr'], weight_decay=params['weight_decay']
-    )
+    optimizer = torch.optim.Adam(model.parameters(), lr=params['lr'], weight_decay=params['weight_decay'])
+    if 'optimizer_state_dict' in checkpoint:
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
     # create scheduler
-    if params['scheduler']['name'] == 'vaswani':
-        warm_start = int(len(training_set) * params['n_epochs'] / 100 * params['scheduler']['warm_start_percent'])
-        scheduler = torch.optim.lr_scheduler.LambdaLR(
-            optimizer, lr_lambda=vaswani_lr_scheduler_lambda(warm_start, params['hidden_states']['encoder'])
-        )
-    elif params['scheduler']['name'] == 'step':
-        scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=params['scheduler']['step_size'], gamma=params['scheduler']['step_gamma']
-        )
-    else:
-        raise NotImplementedError
-    # set current lr
-    for i in range(start_batch_id):
-        scheduler.step()
+    scheduler = get_scheduler(params['scheduler'], optimizer)
+    if 'scheduler_state_dict' in checkpoint:
+        scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
     # define loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=label_to_id[PAD]).to(device)
 
-    # init logging class
-    logger = None
-    if logging == TerminalLogger.name:
-        logger = TerminalLogger(params['checkpoints_folder'])
-    elif logging == FileLogger.name:
-        logger = FileLogger(params, params['logging_folder'], params['checkpoints_folder'])
-    elif logging == WandBLogger.name:
-        logger_args = ['treeLSTM', params, model, params['checkpoints_folder']]
-        if 'resume_wandb_id' in params:
-            logger_args.append(params['resume_wandb_id'])
-        logger = WandBLogger(*logger_args)
+    # init logger class
+    if logger_name == FileLogger.name:
+        logger = FileLogger(params['checkpoints_folder'], params, params['logging_folder'])
+    elif logger_name == WandBLogger.name:
+        logger = WandBLogger(params['checkpoints_folder'], params, params.get('resume_wandb_id', is_resumed))
+    else:
+        logger = Logger(params['checkpoints_folder'], params)
+    logger.additional_save_info['configuration'] = model_factory.save_configuration()
 
+    start_batch_id = checkpoint.get('batch_id', -1) + 1
     # train loop
     print("ok, let's train it")
     for epoch in range(params['n_epochs']):
-        train_acc_info = LearningInfo()
+        logger.epoch = epoch
 
-        if epoch > 0:
-            # specify start batch id only for first epoch
-            start_batch_id = 0
-        tqdm_batch_iterator = tqdm(range(start_batch_id, len(training_set)), total=len(training_set))
-        tqdm_batch_iterator.update(start_batch_id)
-        tqdm_batch_iterator.refresh()
-
-        # iterate over training set
-        for batch_id in tqdm_batch_iterator:
-            # [batch size, sequence len]
-            graph, labels = training_set[batch_id]
-            batch_info = train_on_batch(
-                model, criterion, optimizer, scheduler, graph, labels, params, device
-            )
-            train_acc_info.accumulate_info(batch_info)
-            # log current train process
-            if is_current_step_match(batch_id, params['logging_step']):
-                logger.log(train_acc_info.get_state_dict(), epoch, batch_id + epoch * len(training_set))
-                train_acc_info = LearningInfo()
-            # validate current model
-            if is_current_step_match(batch_id, params['evaluation_step']) and batch_id != 0:
-                eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-                logger.log(eval_epoch_info.get_state_dict(), epoch, batch_id + epoch * len(training_set), False)
-            # save current model
-            if is_current_step_match(batch_id, params['checkpoint_step']) and batch_id != 0:
-                logger.save_model(
-                    model, f'epoch_{epoch}_batch_{batch_id}.pt', configuration, batch_id=batch_id
-                )
-
-        logger.log(train_acc_info.get_state_dict(), epoch, len(training_set) * (epoch + 1) - 1)
-        eval_epoch_info = evaluate_dataset(validation_set, model, criterion, device)
-        logger.log(eval_epoch_info.get_state_dict(), epoch, len(training_set) * (epoch + 1) - 1, False)
-
-        logger.save_model(
-            model, f'epoch_{epoch}.pt', configuration, batch_id=len(training_set) - 1
+        # train 1 epoch
+        train_on_dataset(
+            training_set, validation_set, model, criterion, optimizer, scheduler, params['clip_norm'], logger, device,
+            start_batch_id, params['logging_step'], params['evaluation_step'], params['checkpoint_step']
         )
+
+        eval_epoch_info = evaluate_on_dataset(validation_set, model, criterion, device)
+        logger.log(eval_epoch_info.get_state_dict(), len(training_set), is_train=False)
+
+        model_dump = {
+            'state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+        }
+        logger.save_model(f'epoch_{epoch}.pt', model_dump)
 
 
 if __name__ == '__main__':
