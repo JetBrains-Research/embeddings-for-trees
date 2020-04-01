@@ -106,11 +106,11 @@ def train_on_dataset(
 ):
     train_epoch_info = LearningInfo()
 
-    progress_bar = tqdm(range(start_batch_id, len(train_dataset)), total=len(train_dataset))
-    progress_bar.update(start_batch_id)
-    progress_bar.refresh()
+    batch_iterator_pb = tqdm(range(start_batch_id, len(train_dataset)), total=len(train_dataset))
+    batch_iterator_pb.update(start_batch_id)
+    batch_iterator_pb.refresh()
 
-    for batch_id in tqdm(range(start_batch_id, len(train_dataset))):
+    for batch_id in batch_iterator_pb:
         graph, labels = train_dataset[batch_id]
         batch_info = train_on_batch(model, criterion, optimizer, scheduler, graph, labels, clip_norm, device)
         train_epoch_info.accumulate_info(batch_info)
