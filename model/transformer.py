@@ -41,11 +41,11 @@ class TransformerEncoder(_IEncoder):
 
         # [n_child + 1, bs, h]
         x = torch.cat([x_cur, x_children], dim=0)
-        # root attend on children
-        mask = torch.full((x.shape[0], x.shape[0]), -1e5, device=x.device)
-        mask[0, 1:] = 0
+        # # root attend on children
+        # mask = torch.full((x.shape[0], x.shape[0]), -1e5, device=x.device)
+        # mask[0, 1:] = 0
         # [n_child + 1, bs, h]
-        x_trans = self.transformer(x, mask=mask)
+        x_trans = self.transformer(x)
         return {
             'x': x_trans[0]
         }
@@ -57,12 +57,10 @@ class TransformerEncoder(_IEncoder):
         :param device: torch device
         :return: encoded nodes [max tree size, batch size, hidden state]
         """
-        # graph.ndata['x_trans'] = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
         dgl.prop_nodes_topo(
             graph, message_func=[dgl.function.copy_u('x', 'x')],
             reduce_func=self.reduce_func
         )
-        # print(graph.ndata['x'])
 
         # [n_nodes, h_emb]
         h = self.tanh(self.linear_h(graph.ndata['x']))
