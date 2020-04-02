@@ -63,7 +63,7 @@ def train_on_batch(
     # Model step
     model.zero_grad()
     loss, _, batch_info = _forward_pass(model, graph, labels, criterion, device)
-    batch_info['learning_rate'] = scheduler.get_lr()[0]
+    batch_info['learning_rate'] = scheduler.get_last_lr()[0]
     loss.backward()
     nn.utils.clip_grad_norm_(model.parameters(), clip_norm)
     optimizer.step()
