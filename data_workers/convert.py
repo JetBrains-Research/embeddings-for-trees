@@ -135,6 +135,8 @@ def convert_project(project_path: str, token_to_id: Dict, type_to_id: Dict, labe
 
 
 def _convert_project_safe(project_path: str, log_file: str,  **kwargs):
+    if os.path.exists(os.path.join(project_path, 'converted.dgl')):
+        return
     try:
         convert_project(project_path, **kwargs)
     except Exception as err:
