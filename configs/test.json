@@ -26,12 +26,11 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "MultiHeadAttentionTreeLSTMCell",
+        "name": "EdgeChildSumTreeLSTMCell",
         "params": {
-          "n_heads": 4,
-          "dropout": 0.25
         }
-      }
+      },
+      "dropout": 0.25
     }
   },
 

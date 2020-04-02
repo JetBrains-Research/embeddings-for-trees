@@ -27,14 +27,13 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "MultiHeadAttentionTreeLSTMCell",
+        "name": "EdgeChildSumTreeLSTMCell",
         "params": {
-          "n_heads": 16,
-          "dropout": 0.1
-        },
-        "dropout": 0.1
-      }
+        }
+      },
+      "dropout": 0.25
     }
+
   },
 
   "decoder": {
