@@ -36,10 +36,7 @@ class TransformerEncoderTest(unittest.TestCase):
 
                 h_model, c_model = my_model(g, device)
 
-                mask = torch.full((n_children + 1, n_children + 1), -1e5)
-                mask[0, 1:] = 0
-                mask[torch.arange(1, n_children + 1), torch.arange(1, n_children + 1)] = 0
-                x_trans = my_model.transformer_layer(x.unsqueeze(1), src_mask=mask).squeeze(1)
+                x_trans = my_model.transformer_layer(x.unsqueeze(1)).squeeze(1)
 
                 x_attn = torch.zeros_like(x)
                 x_attn[0] = x_trans[0]

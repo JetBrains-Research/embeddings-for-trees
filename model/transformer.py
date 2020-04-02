@@ -41,9 +41,7 @@ class TransformerEncoder(_IEncoder):
 
         # [n_child + 1, bs, h]
         x = torch.cat([x_cur, x_children], dim=0)
-        # # root attend on children
-        # mask = torch.full((x.shape[0], x.shape[0]), -1e5, device=x.device)
-        # mask[0, 1:] = 0
+
         # [n_child + 1, bs, h]
         x_trans = self.transformer(x)
         return {
