@@ -11,66 +11,49 @@ from tqdm.auto import tqdm
 class JavaDataset(Dataset):
 
     def __init__(
-            self, batched_graphs_path: str, batch_size: int, device: torch.device, invert_edges: bool = False
+            self, dataset_path: str, batch_size: int, device: torch.device, invert_edges: bool = False
     ) -> None:
+        assert os.path.exists(dataset_path)
+
         self.device = device
-        self.batched_graphs_path = batched_graphs_path
         self.batch_size = batch_size
         self.invert_edges = invert_edges
-        assert os.path.exists(self.batched_graphs_path)
 
-        self.batched_graph_files = sorted(list(filter(
-            lambda filename: filename.endswith('.dgl'), os.listdir(self.batched_graphs_path)
-        )), key=lambda name: int(name[6:-4]))
+        graph_files = filter(lambda _f: _f.endswith('.dgl'), os.listdir(dataset_path))
+        graph_files = sorted(graph_files, key=lambda name: int(name[6:-4]))
+        self.graph_files = [os.path.join(dataset_path, gf) for gf in graph_files]
 
-        self.batch_desc = {}
-        self.n_batches = 0
-
-        self.loaded_batch_basename = None
-        self.loaded_graphs = None
-        self.loaded_labels = None
+        self.batch_description = []
 
         # iterate over pkl files to aggregate information about batches
-        print(f"prepare the {batched_graphs_path} dataset...")
-        for batched_graph_file in tqdm(self.batched_graph_files):
-            labels = load_labels(os.path.join(batched_graphs_path, batched_graph_file))
+        print(f"prepare the {dataset_path} dataset...")
+        for graph_file in tqdm(self.graph_files):
+            labels = load_labels(graph_file)
             n_graphs = len(labels['labels'])
+
             batches_per_file = n_graphs // self.batch_size + (1 if n_graphs % self.batch_size > 0 else 0)
 
             # collect information from the file
             for batch_id in range(batches_per_file):
-                batch_slice = slice(
-                    batch_id * self.batch_size,
-                    min((batch_id + 1) * self.batch_size, n_graphs)
-                )
-                self.batch_desc[self.n_batches + batch_id] = (
-                    batched_graph_file, batch_slice
-                )
-
-            self.n_batches += batches_per_file
+                start_index = batch_id * self.batch_size
+                end_index = min(n_graphs, (batch_id + 1) * self.batch_size)
+                self.batch_description.append((graph_file, start_index, end_index))
 
     def __len__(self) -> int:
-        return self.n_batches
+        return len(self.batch_description)
 
     def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
-        batch_basename, batch_slice = self.batch_desc[item]
+        graph_filename, start_index, end_index = self.batch_description[item]
 
-        # read file only if previous wasn't the same
-        if self.loaded_batch_basename != batch_basename:
-            self.loaded_graphs, labels = load_graphs(
-                os.path.join(self.batched_graphs_path, batch_basename)
-            )
-            self.loaded_labels = labels['labels']
-            self.loaded_batch_basename = batch_basename
+        graphs, labels = load_graphs(graph_filename, list(range(start_index, end_index)))
 
-        graphs_for_batch = self.loaded_graphs[batch_slice]
         if self.invert_edges:
-            graphs_for_batch = list(map(lambda g: g.reverse(share_ndata=True), graphs_for_batch))
+            graphs = [g.reverse(share_ndata=True) for g in graphs]
 
-        graph = batch(graphs_for_batch)
+        graph = batch(graphs)
         graph.ndata['token'] = graph.ndata['token'].to(self.device)
         graph.ndata['type'] = graph.ndata['type'].to(self.device)
         # [sequence len, batch size]
-        labels = self.loaded_labels[batch_slice].t().contiguous().to(self.device)
+        labels = labels['labels'][start_index:end_index].t().contiguous().to(self.device)
 
         return graph, labels
