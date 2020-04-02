@@ -10,14 +10,21 @@ def get_scheduler(scheduler_info: Dict, optimizer, total_steps: int):
         scheduler = torch.optim.lr_scheduler.StepLR(
             optimizer, step_size=scheduler_info['step_size'], gamma=scheduler_info['step_gamma']
         )
+    # LambdaLR multiply lr by function result
+    # setting initial lr to 1.0 correspond to regularize lr throw lambda
     elif name == 'vaswani':
+        for g in optimizer.param_groups:
+            g['lr'] = 1
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lr_lambda=_vaswani_lambda(scheduler_info['warm_up_cf'], scheduler_info['d_model'], total_steps)
         )
     elif name == 'cosine_warm_up':
+        for g in optimizer.param_groups:
+            g['lr'] = 1
         scheduler = torch.optim.lr_scheduler.LambdaLR(
             optimizer, lr_lambda=_cosine_warm_up_lambda(
-                scheduler_info['warm_up_cf'], scheduler_info['max_lr'], scheduler_info['min_lr'], total_steps)
+                scheduler_info['warm_up_cf'], scheduler_info['max_lr'], scheduler_info['min_lr'], total_steps
+            )
         )
     else:
         raise ValueError(f"unknown scheduler name: {name}")
