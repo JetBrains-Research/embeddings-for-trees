@@ -50,7 +50,7 @@ def train(params: Dict, logger_name: str) -> None:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     # create scheduler
-    scheduler = get_scheduler(params['scheduler'], optimizer)
+    scheduler = get_scheduler(params['scheduler'], optimizer, len(training_set))
     if 'scheduler_state_dict' in checkpoint:
         scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
 
