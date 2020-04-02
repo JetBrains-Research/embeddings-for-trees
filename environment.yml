@@ -115,6 +115,7 @@ dependencies:
     - click==7.1.1
     - colorama==0.4.3
     - configparser==5.0.0
+    - cycler==0.10.0
     - docker-pycreds==0.4.0
     - docutils==0.15.2
     - gitdb==4.0.2
@@ -123,11 +124,14 @@ dependencies:
     - graphql-core==1.1
     - idna==2.9
     - jmespath==0.9.5
+    - kiwisolver==1.2.0
+    - matplotlib==3.2.1
     - nvidia-ml-py3==7.352.0
     - pathtools==0.1.2
     - promise==2.3
     - psutil==5.7.0
     - pyasn1==0.4.8
+    - pyparsing==2.4.6
     - pyyaml==5.3.1
     - requests==2.23.0
     - rsa==3.4.2
