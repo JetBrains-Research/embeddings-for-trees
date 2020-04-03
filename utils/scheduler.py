@@ -43,7 +43,7 @@ def _vaswani_lambda(warm_up_cf: float, d_model: int, total_steps: int) -> Callab
 def _cosine_warm_up_lambda(warm_up_cf: float, max_lr: float, min_lr: float, total_steps: int) -> Callable[[int], float]:
     warm_up_steps = int(warm_up_cf * total_steps)
     return lambda cur_step: \
-        max_lr * cur_step / warm_up_steps \
+        min_lr + (max_lr - min_lr) * cur_step / warm_up_steps \
         if cur_step < warm_up_steps else \
         min_lr + 0.5 * (max_lr - min_lr) * (1 + numpy.cos(
                 numpy.pi * (cur_step - warm_up_steps) / (total_steps - warm_up_steps)
