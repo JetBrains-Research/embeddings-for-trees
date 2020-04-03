@@ -174,8 +174,8 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
     for project_path in tqdm(projects_paths):
         store_path = os.path.join(project_path, 'converted.dgl')
         if not os.path.exists(os.path.join(project_path, 'converted.dgl')):
-            with open(log_file, 'a') as log_file:
-                log_file.write(f"can't load graphs for {project_path} project\n")
+            with open(log_file, 'a') as file:
+                file.write(f"can't load graphs for {project_path} project\n")
             continue
         cur_graphs, cur_labels = load_graphs(store_path)
         graphs += cur_graphs
