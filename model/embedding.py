@@ -114,6 +114,12 @@ class PositionalEmbedding(nn.Module):
     """
 
     def __init__(self, n: int, k: int, p: float = 1.) -> None:
+        """
+
+        :param n: the degree of tree
+        :param k: the depth of tree
+        :param p: regularization (Not Implemented)
+        """
         super().__init__()
         self.n, self.k, self.p = n, k, p
         self.h_emb = self.n * self.k
