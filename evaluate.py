@@ -2,11 +2,12 @@ from argparse import ArgumentParser
 from json import load as json_load
 from typing import Dict
 
+import torch
 import torch.nn as nn
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import load_model
-from utils.common import fix_seed, get_device
+from model.tree2seq import ModelFactory
+from utils.common import fix_seed, get_device, PAD
 from utils.training import evaluate_on_dataset
 
 
@@ -15,12 +16,19 @@ def evaluate(params: Dict) -> None:
     device = get_device()
     print(f"using {device} device")
 
-    evaluation_set = JavaDataset(params['paths']['evaluate'], params['batch_size'], device, True)
+    checkpoint = torch.load(params['model'], map_location=device)
+    params = checkpoint['config']
 
-    model, _ = load_model(params['paths']['model'], device)
+    print('model initializing...')
+    # create model
+    model_factory = ModelFactory(**checkpoint['configuration'])
+    model = model_factory.construct_model(device)
+    model.load_state_dict(checkpoint['state_dict'])
+
+    evaluation_set = JavaDataset(params['dataset'], params['batch_size'], device, True)
 
     # define loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=model.decoder.pad_index).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=params['configuration']['label_to_id'][PAD]).to(device)
 
     # evaluation loop
     print("ok, let's evaluate it")
