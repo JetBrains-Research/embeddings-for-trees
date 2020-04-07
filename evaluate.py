@@ -28,7 +28,7 @@ def evaluate(params: Dict) -> None:
     evaluation_set = JavaDataset(params['dataset'], params['batch_size'], device, True)
 
     # define loss function
-    criterion = nn.CrossEntropyLoss(ignore_index=config['configuration']['label_to_id'][PAD]).to(device)
+    criterion = nn.CrossEntropyLoss(ignore_index=checkpoint['configuration']['label_to_id'][PAD]).to(device)
 
     # evaluation loop
     print("ok, let's evaluate it")
