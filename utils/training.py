@@ -38,7 +38,7 @@ def _forward_pass(
     # [the longest sequence, batch size]
     labels = labels[1:]
 
-    loss = criterion(root_logits.view(-1, root_logits.shape[-1]), labels.view(-1))
+    loss = criterion(root_logits.reshape(-1, root_logits.shape[-1]), labels.reshape(-1))
     # [the longest sequence, batch size]
     prediction = model.predict(root_logits)
 

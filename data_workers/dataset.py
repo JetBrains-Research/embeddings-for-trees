@@ -16,28 +16,31 @@ class JavaDataset(Dataset):
         assert os.path.exists(dataset_path)
 
         self.device = device
-        self.batch_size = batch_size
         self.invert_edges = invert_edges
 
         graph_files = filter(lambda _f: _f.endswith('.dgl'), os.listdir(dataset_path))
         graph_files = sorted(graph_files, key=lambda name: int(name[6:-4]))
-        self.graph_files = [os.path.join(dataset_path, gf) for gf in graph_files]
+        graph_files = [os.path.join(dataset_path, gf) for gf in graph_files]
 
         self.batch_description = []
 
         # iterate over pkl files to aggregate information about batches
         print(f"prepare the {dataset_path} dataset...")
-        for graph_file in tqdm(self.graph_files):
+        for graph_file in tqdm(graph_files):
             labels = load_labels(graph_file)
             n_graphs = len(labels['labels'])
 
-            batches_per_file = n_graphs // self.batch_size + (1 if n_graphs % self.batch_size > 0 else 0)
+            batches_per_file = n_graphs // batch_size + (1 if n_graphs % batch_size > 0 else 0)
 
             # collect information from the file
             for batch_id in range(batches_per_file):
-                start_index = batch_id * self.batch_size
-                end_index = min(n_graphs, (batch_id + 1) * self.batch_size)
+                start_index = batch_id * batch_size
+                end_index = min(n_graphs, (batch_id + 1) * batch_size)
                 self.batch_description.append((graph_file, start_index, end_index))
+
+        self.loaded_file = ''
+        self.loaded_graphs = None
+        self.loaded_labels = None
 
     def __len__(self) -> int:
         return len(self.batch_description)
@@ -45,15 +48,18 @@ class JavaDataset(Dataset):
     def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
         graph_filename, start_index, end_index = self.batch_description[item]
 
-        graphs, labels = load_graphs(graph_filename, list(range(start_index, end_index)))
+        if self.loaded_file != graph_filename:
+            self.loaded_file = graph_filename
+            self.loaded_graphs, labels = load_graphs(graph_filename)
+            self.loaded_labels = labels['labels'].t()
 
-        if self.invert_edges:
-            graphs = [g.reverse(share_ndata=True) for g in graphs]
+            if self.invert_edges:
+                self.loaded_graphs = [g.reverse(share_ndata=True) for g in self.loaded_graphs]
 
-        graph = batch(graphs)
+        graph = batch(self.loaded_graphs[start_index:end_index])
         graph.ndata['token'] = graph.ndata['token'].to(self.device)
         graph.ndata['type'] = graph.ndata['type'].to(self.device)
         # [sequence len, batch size]
-        labels = labels['labels'][start_index:end_index].t().contiguous().to(self.device)
+        labels = self.loaded_labels[:, start_index:end_index].to(self.device)
 
         return graph, labels
