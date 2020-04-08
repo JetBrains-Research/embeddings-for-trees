@@ -51,10 +51,7 @@ class JavaDataset(Dataset):
         graphs, label_dict = load_graphs(graph_filename, list(range(start_index, end_index)))
         if self.loaded_file != graph_filename:
             self.loaded_file = graph_filename
-            # free memory
-            del self.loaded_labels
-            gc.collect()
-            self.loaded_labels = label_dict['labels'].t()
+            self.loaded_labels = label_dict['labels'].t().to(self.device)
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]
@@ -63,6 +60,6 @@ class JavaDataset(Dataset):
         graph.ndata['token'] = graph.ndata['token'].to(self.device)
         graph.ndata['type'] = graph.ndata['type'].to(self.device)
         # [sequence len, batch size]
-        labels = self.loaded_labels[:, start_index:end_index].to(self.device)
+        labels = self.loaded_labels[:, start_index:end_index]
 
         return graph, labels
