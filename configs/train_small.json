@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "EdgeChildSumTreeLSTMCell",
+        "name": "LuongAttentionTreeLSTMCell",
         "params": {
         }
       },
@@ -55,10 +55,9 @@
   "clip_norm": 5,
 
   "scheduler": {
-    "name": "cosine_warm_up",
-    "warm_up_cf": 0.1,
-    "max_lr": 0.1,
-    "min_lr": 0.0
+    "name": "step",
+    "step_size": 400,
+    "step_gamma": 0.5
   },
 
   "evaluation_step": 100,

@@ -26,7 +26,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "EdgeChildSumTreeLSTMCell",
+        "name": "LuongAttentionTreeLSTMCell",
         "params": {
         }
       },
