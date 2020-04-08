@@ -1,3 +1,4 @@
+import gc
 import os
 from typing import Tuple
 
@@ -47,10 +48,13 @@ class JavaDataset(Dataset):
     def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
         graph_filename, start_index, end_index = self.batch_description[item]
 
-        graphs, labels = load_graphs(graph_filename, list(range(start_index, end_index)))
+        graphs, label_dict = load_graphs(graph_filename, list(range(start_index, end_index)))
         if self.loaded_file != graph_filename:
             self.loaded_file = graph_filename
-            self.loaded_labels = labels['labels'].t()
+            # free memory
+            del self.loaded_labels
+            gc.collect()
+            self.loaded_labels = label_dict['labels'].t()
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]
