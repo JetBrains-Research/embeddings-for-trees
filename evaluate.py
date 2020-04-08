@@ -17,7 +17,6 @@ def evaluate(params: Dict) -> None:
     print(f"using {device} device")
 
     checkpoint = torch.load(params['model'], map_location=device)
-    config = checkpoint['config']
 
     print('model initializing...')
     # create model

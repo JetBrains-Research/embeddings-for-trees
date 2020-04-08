@@ -1,15 +1,13 @@
 import os
 from argparse import ArgumentParser
 from itertools import takewhile
-from pickle import load as pkl_load
 
-import dgl
-import numpy
 import torch
+from dgl.data.utils import load_graphs
 
 from data_workers.convert import convert_project
 from data_workers.preprocess_steps import build_project_asts
-from model.tree2seq import load_model
+from model.tree2seq import ModelFactory
 from utils.common import fix_seed, get_device, create_folder, EOS
 
 tmp_folder = '.tmp'
@@ -23,7 +21,12 @@ def interactive(path_to_function: str, path_to_model: str):
 
     # load model
     print("loading model...")
-    model, checkpoint = load_model(path_to_model, device)
+    checkpoint = torch.load(path_to_model, map_location=device)
+
+    model_factory = ModelFactory(**checkpoint['configuration'])
+    model = model_factory.construct_model(device)
+    model.load_state_dict(checkpoint['state_dict'])
+
     token_to_id = checkpoint['configuration']['token_to_id']
     type_to_id = checkpoint['configuration']['type_to_id']
     label_to_id = checkpoint['configuration']['label_to_id']
@@ -37,14 +40,13 @@ def interactive(path_to_function: str, path_to_model: str):
     convert_project(project_folder, token_to_id, type_to_id, label_to_id, True, True, 5, 6, False, True, '|')
 
     # load function
-    with open(os.path.join(project_folder, 'converted.pkl'), 'rb') as pkl_file:
-        data = pkl_load(pkl_file)
-    assert len(data['labels']) == 1, f"found {len(data['labels'])} functions, instead of 1"
-    ast = dgl.unbatch(data['graphs'])[0]
-    ast = dgl.reverse(ast, share_ndata=True)
+    graph, labels = load_graphs(os.path.join(project_folder, 'converted.dgl'))
+    labels = labels['labels']
+    assert len(labels) == 1, f"found {len('labels')} functions, instead of 1"
+    ast = graph[0].reverse(share_ndata=True)
     ast.ndata['token'] = ast.ndata['token'].to(device)
     ast.ndata['type'] = ast.ndata['type'].to(device)
-    labels = torch.tensor(numpy.stack(data['labels']).T, device=device)
+    labels = labels.t().to(device)
     root_indexes = torch.tensor([0], dtype=torch.long)
 
     # forward pass
