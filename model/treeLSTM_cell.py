@@ -6,8 +6,6 @@ import dgl.function as fn
 import torch
 import torch.nn as nn
 
-from model.attention import scaled_dot_product_attention
-
 
 class _ITreeLSTMCell(nn.Module):
     def __init__(self, x_size: int, h_size: int):
@@ -307,40 +305,50 @@ class TypeSpecificTreeLSTMCell(_ITreeLSTMCell):
         }
 
 
-class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
+class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size, h_size, a_size):
+    def __init__(self, x_size, h_size):
         super().__init__(x_size, h_size)
-        self.U_iou = nn.Linear(3 * self.h_size, 3 * self.h_size, bias=False)
+        self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
         self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
 
-        self.a_size = a_size
-        self.W_query = nn.Linear(self.x_size, self.a_size, bias=False)
-        self.W_key = nn.Linear(self.x_size, self.a_size, bias=False)
-        self.W_value = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
+        self.W_a = nn.Linear(self.x_size + self.h_size, self.h_size, bias=False)
+        self.v_a = nn.Linear(self.h_size, 1, bias=False)
 
     def message_func(self, edges: dgl.EdgeBatch) -> Dict:
-        h_f = self.U_f(edges.src['h'])
-        f = torch.sigmoid(edges.dst['x_f'] + h_f)
-        return {
-            'h': edges.src['h'],
-            'type_embeds': edges.src['type_embeds'],
-            'fc': edges.src['c'] * f
-        }
+        """use built-in functions"""
+        raise NotImplementedError
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [n; a]
-        _Q = self.W_query(nodes.data['type_embeds'])
-        # [n; k; a]
-        _K = self.W_key(nodes.mailbox['type_embeds'])
-        # [n; k; 3 * h]
-        _V = self.W_value(nodes.mailbox['h'])
+        # [bs; n children; h size]
+        h_children = nodes.mailbox['h']
 
-        h = scaled_dot_product_attention(_Q, _K, _V).squeeze(1)
+        # [bs; n children; x size]
+        x = nodes.data['x'].unsqueeze(1).expand(-1, h_children.shape[1], -1)
+
+        # [bs; n children; h size]
+        energy = torch.tanh(self.W_a(
+            # [bs; n children; x size + h size]
+            torch.cat([x, h_children], dim=2)
+        ))
+
+        # [bs; n children]
+        scores = self.v_a(energy).squeeze(2)
+
+        # [bs; n children]
+        align = nn.functional.softmax(scores, dim=1)
+
+        # [bs; h size]
+        h_attn = torch.bmm(align.unsqueeze(1), h_children).squeeze(1)
+
+        # [bs; n children; h size]
+        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['x_f'].unsqueeze(1))
+        # [bs; h size]
+        fc_sum = torch.sum(f * nodes.mailbox['c'], 1)
 
         return {
-            'Uh_sum': self.U_iou(h),  # name for using with super functions
-            'fc_sum': torch.sum(nodes.mailbox['fc'], 1)
+            'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
+            'fc_sum': fc_sum
         }
 
     def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
@@ -349,11 +357,10 @@ class TypeAttentionTreeLSTMCell(_ITreeLSTMCell):
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph = self._init_matrices(graph, device)
 
-        graph.register_message_func(self.message_func)
-        graph.register_reduce_func(self.reduce_func)
-        graph.register_apply_node_func(self.apply_node_func)
-
-        dgl.prop_nodes_topo(graph)
+        dgl.prop_nodes_topo(
+            graph, reduce_func=self.reduce_func, apply_node_func=self.apply_node_func,
+            message_func=[fn.copy_u('h', 'h'), fn.copy_u('c', 'c')]
+        )
 
         h = graph.ndata.pop('h')
         c = graph.ndata.pop('c')
