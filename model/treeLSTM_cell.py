@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict
 
 import dgl
 import torch
@@ -143,16 +143,13 @@ class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [bs, h size]
         h_attn = self.multihead_attention(query, key_value, key_value)[0].squeeze(0)
 
-        # [bs; 3 * h_size]
-        h_iou = self.U_iou(h_attn)
-        # [bs; h_size]
-        h_f = self.U_f(h_attn)
+        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['x_f'].unsqueeze(1))
+        # [bs; h size]
+        fc_sum = torch.sum(f * nodes.mailbox['c'], 1)
 
-        f = torch.sigmoid(nodes.data['x_f'] + h_f).unsqueeze(1)
-        fc = nodes.mailbox['c'] * f
         return {
-            'Uh_sum': h_iou,  # name for using with super functions
-            'fc_sum': torch.sum(fc, 1)
+            'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
+            'fc_sum': fc_sum
         }
 
     def get_reduce_func(self):
