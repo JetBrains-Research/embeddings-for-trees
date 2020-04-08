@@ -5,17 +5,13 @@ import torch
 import torch.nn as nn
 
 from model.encoder import _IEncoder
-from model.treeLSTM_cell import EdgeChildSumTreeLSTMCell, NodeChildSumTreeLSTMCell, \
-    EdgeSpecificTreeLSTMCell, TypeSpecificTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell
+from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell
 
 
 class TreeLSTM(_IEncoder):
 
     _tree_lstm_cells = {
-        EdgeChildSumTreeLSTMCell.__name__: EdgeChildSumTreeLSTMCell,
-        NodeChildSumTreeLSTMCell.__name__: NodeChildSumTreeLSTMCell,
-        EdgeSpecificTreeLSTMCell.__name__: EdgeSpecificTreeLSTMCell,
-        TypeSpecificTreeLSTMCell.__name__: TypeSpecificTreeLSTMCell,
+        ChildSumTreeLSTMCell.__name__: ChildSumTreeLSTMCell,
         LuongAttentionTreeLSTMCell.__name__: LuongAttentionTreeLSTMCell,
         MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell
     }
@@ -29,4 +25,16 @@ class TreeLSTM(_IEncoder):
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph.ndata['x'] = self.dropout(graph.ndata['x'])
-        return self.cell(graph, device)
+
+        graph = self.cell.init_matrices(graph, device)
+
+        dgl.prop_nodes_topo(
+            graph,
+            reduce_func=self.cell.get_reduce_func(),
+            message_func=self.cell.get_message_func(),
+            apply_node_func=self.cell.get_apply_node_func()
+        )
+
+        h = graph.ndata.pop('h')
+        c = graph.ndata.pop('c')
+        return h, c
