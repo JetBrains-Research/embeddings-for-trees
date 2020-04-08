@@ -39,7 +39,6 @@ class JavaDataset(Dataset):
                 self.batch_description.append((graph_file, start_index, end_index))
 
         self.loaded_file = ''
-        self.loaded_graphs = None
         self.loaded_labels = None
 
     def __len__(self) -> int:
@@ -48,15 +47,15 @@ class JavaDataset(Dataset):
     def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
         graph_filename, start_index, end_index = self.batch_description[item]
 
+        graphs, labels = load_graphs(graph_filename, list(range(start_index, end_index)))
         if self.loaded_file != graph_filename:
             self.loaded_file = graph_filename
-            self.loaded_graphs, labels = load_graphs(graph_filename)
             self.loaded_labels = labels['labels'].t()
 
-            if self.invert_edges:
-                self.loaded_graphs = [g.reverse(share_ndata=True) for g in self.loaded_graphs]
+        if self.invert_edges:
+            graphs = [g.reverse(share_ndata=True) for g in graphs]
 
-        graph = batch(self.loaded_graphs[start_index:end_index])
+        graph = batch(graphs)
         graph.ndata['token'] = graph.ndata['token'].to(self.device)
         graph.ndata['type'] = graph.ndata['type'].to(self.device)
         # [sequence len, batch size]
