@@ -79,8 +79,7 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
         self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
 
-        self.W_a = nn.Linear(self.x_size + self.h_size, self.h_size, bias=False)
-        self.v_a = nn.Linear(self.h_size, 1, bias=False)
+        self.W = nn.Linear(self.x_size, self.h_size, bias=False)
 
     def get_message_func(self):
         return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
@@ -89,22 +88,14 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [bs; n children; h size]
         h_children = nodes.mailbox['h']
 
-        # # [bs; n children; x size]
-        # x = nodes.data['x'].unsqueeze(1).expand(-1, h_children.shape[1], -1)
-        #
-        # # [bs; n children; h size]
-        # energy = torch.tanh(self.W_a(
-        #     # [bs; n children; x size + h size]
-        #     torch.cat([x, h_children], dim=2)
-        # ))
-        #
-        # # [bs; n children]
-        # scores = self.v_a(energy).squeeze(2)
-        # [bs; n children]
-        scores = self.v_a(h_children).squeeze(2)
+        # [bs; 1; x size]
+        x = nodes.data['x'].unsqueeze(1)
+
+        # [bs; n_children]
+        scores = torch.bmm(self.W(h_children), x.transpose(1, 2)).squeeze(2)
 
         # [bs; n children]
-        align = nn.functional.softmax(scores, dim=1)
+        align = nn.functional.softmax(scores, dim=-1)
 
         # [bs; h size]
         h_attn = torch.bmm(align.unsqueeze(1), h_children).squeeze(1)
