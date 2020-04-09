@@ -29,7 +29,7 @@ class _IAttention(nn.Module):
 class LuongConcatAttention(_IAttention):
     def __init__(self, h_enc: int, h_dec: int) -> None:
         super().__init__(h_enc, h_dec)
-        self.linear = nn.Linear(self.h_dec + self.h_enc, self.h_enc)
+        self.linear = nn.Linear(self.h_dec + self.h_enc, self.h_enc, bias=False)
         self.v = nn.Parameter(torch.rand(self.h_enc, 1), requires_grad=True)
 
     def forward(self, prev_hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
