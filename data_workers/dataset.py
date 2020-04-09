@@ -38,9 +38,6 @@ class JavaDataset(Dataset):
                 end_index = min(n_graphs, (batch_id + 1) * batch_size)
                 self.batch_description.append((graph_file, start_index, end_index))
 
-        self.loaded_file = ''
-        self.loaded_labels = None
-
     def __len__(self) -> int:
         return len(self.batch_description)
 
@@ -48,9 +45,6 @@ class JavaDataset(Dataset):
         graph_filename, start_index, end_index = self.batch_description[item]
 
         graphs, label_dict = load_graphs(graph_filename, list(range(start_index, end_index)))
-        if self.loaded_file != graph_filename:
-            self.loaded_file = graph_filename
-            self.loaded_labels = label_dict['labels'].t().to(self.device)
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]
@@ -59,6 +53,6 @@ class JavaDataset(Dataset):
         graph.ndata['token'] = graph.ndata['token'].to(self.device)
         graph.ndata['type'] = graph.ndata['type'].to(self.device)
         # [sequence len, batch size]
-        labels = self.loaded_labels[:, start_index:end_index]
+        labels = label_dict['labels'][start_index:end_index, :].t().to(self.device)
 
         return graph, labels

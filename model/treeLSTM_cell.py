@@ -89,17 +89,19 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [bs; n children; h size]
         h_children = nodes.mailbox['h']
 
-        # [bs; n children; x size]
-        x = nodes.data['x'].unsqueeze(1).expand(-1, h_children.shape[1], -1)
-
-        # [bs; n children; h size]
-        energy = torch.tanh(self.W_a(
-            # [bs; n children; x size + h size]
-            torch.cat([x, h_children], dim=2)
-        ))
-
+        # # [bs; n children; x size]
+        # x = nodes.data['x'].unsqueeze(1).expand(-1, h_children.shape[1], -1)
+        #
+        # # [bs; n children; h size]
+        # energy = torch.tanh(self.W_a(
+        #     # [bs; n children; x size + h size]
+        #     torch.cat([x, h_children], dim=2)
+        # ))
+        #
+        # # [bs; n children]
+        # scores = self.v_a(energy).squeeze(2)
         # [bs; n children]
-        scores = self.v_a(energy).squeeze(2)
+        scores = self.v_a(h_children).squeeze(2)
 
         # [bs; n children]
         align = nn.functional.softmax(scores, dim=1)
