@@ -23,10 +23,10 @@ class TreeLSTM(_IEncoder):
         self.dropout = nn.Dropout(dropout)
         self.n_layers = n_layers
 
-        self.norm = [nn.LayerNorm(h_enc) for _ in range(self.n_layers)]
-        self.cell = [
+        self.norm = nn.ModuleList([nn.LayerNorm(h_enc) for _ in range(self.n_layers)])
+        self.cell = nn.ModuleList([
             self._tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params']) for _ in range(self.n_layers)
-        ]
+        ])
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.dropout(graph.ndata['x'])
