@@ -27,13 +27,13 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "LuongAttentionTreeLSTMCell",
+        "name": "ChildSumTreeLSTMCell",
         "params": {
         }
       },
-      "dropout": 0.25
+      "dropout": 0.25,
+      "n_layers": 3
     }
-
   },
 
   "decoder": {
@@ -52,12 +52,12 @@
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
-  "clip_norm": 5,
+  "clip_norm": 20,
 
   "scheduler": {
     "name": "step",
-    "step_size": 400,
-    "step_gamma": 0.5
+    "step_size": 750,
+    "step_gamma": 0.1
   },
 
   "evaluation_step": 100,
