@@ -24,10 +24,13 @@ class TreeLSTM(_IEncoder):
         self.dropout = nn.Dropout(dropout)
         self.n_layers = n_layers
 
+        self.norm = [nn.LayerNorm(h_enc) for _ in range(self.n_layers)]
+
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
-        graph.ndata['x'] = self.dropout(graph.ndata['x'])
+        x = self.dropout(graph.ndata['x'])
 
         for layer in range(self.n_layers):
+            graph.ndata['x'] = x
             graph = self.cell.init_matrices(graph, device)
 
             dgl.prop_nodes_topo(
@@ -37,9 +40,7 @@ class TreeLSTM(_IEncoder):
                 apply_node_func=self.cell.get_apply_node_func()
             )
 
-            if layer != self.n_layers - 1:
-                graph.ndata['x'] = graph.ndata.pop('h')
+            x = self.norm[layer](graph.ndata.pop('h') + x)
 
-        h = graph.ndata.pop('h')
         c = graph.ndata.pop('c')
-        return h, c
+        return x, c
