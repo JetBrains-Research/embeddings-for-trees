@@ -16,24 +16,29 @@ class TreeLSTM(_IEncoder):
         MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell
     }
 
-    def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0.):
+    def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0., n_layers: int = 1):
         super().__init__(h_emb, h_enc)
         if cell['name'] not in self._tree_lstm_cells:
             raise ValueError(f"unknown TreeLSTM cell: {cell['name']}")
         self.cell = self._tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params'])
         self.dropout = nn.Dropout(dropout)
+        self.n_layers = n_layers
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         graph.ndata['x'] = self.dropout(graph.ndata['x'])
 
-        graph = self.cell.init_matrices(graph, device)
+        for layer in range(self.n_layers):
+            graph = self.cell.init_matrices(graph, device)
 
-        dgl.prop_nodes_topo(
-            graph,
-            reduce_func=self.cell.get_reduce_func(),
-            message_func=self.cell.get_message_func(),
-            apply_node_func=self.cell.get_apply_node_func()
-        )
+            dgl.prop_nodes_topo(
+                graph,
+                reduce_func=self.cell.get_reduce_func(),
+                message_func=self.cell.get_message_func(),
+                apply_node_func=self.cell.get_apply_node_func()
+            )
+
+            if layer != self.n_layers - 1:
+                graph.ndata['x'] = graph.ndata.pop('h')
 
         h = graph.ndata.pop('h')
         c = graph.ndata.pop('c')
