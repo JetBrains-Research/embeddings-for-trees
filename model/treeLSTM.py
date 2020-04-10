@@ -20,24 +20,26 @@ class TreeLSTM(_IEncoder):
         super().__init__(h_emb, h_enc)
         if cell['name'] not in self._tree_lstm_cells:
             raise ValueError(f"unknown TreeLSTM cell: {cell['name']}")
-        self.cell = self._tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params'])
         self.dropout = nn.Dropout(dropout)
         self.n_layers = n_layers
 
         self.norm = [nn.LayerNorm(h_enc) for _ in range(self.n_layers)]
+        self.cell = [
+            self._tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params']) for _ in range(self.n_layers)
+        ]
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.dropout(graph.ndata['x'])
 
         for layer in range(self.n_layers):
             graph.ndata['x'] = x
-            graph = self.cell.init_matrices(graph, device)
 
+            graph = self.cell[layer].init_matrices(graph, device)
             dgl.prop_nodes_topo(
                 graph,
-                reduce_func=self.cell.get_reduce_func(),
-                message_func=self.cell.get_message_func(),
-                apply_node_func=self.cell.get_apply_node_func()
+                reduce_func=self.cell[layer].get_reduce_func(),
+                message_func=self.cell[layer].get_message_func(),
+                apply_node_func=self.cell[layer].get_apply_node_func()
             )
 
             x = self.norm[layer](graph.ndata.pop('h') + x)
