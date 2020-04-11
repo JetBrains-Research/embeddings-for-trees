@@ -82,32 +82,28 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
         self.W = nn.Linear(self.x_size, self.h_size, bias=False)
 
     def get_message_func(self):
-        return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
+        def message_func(edges: dgl.EdgeBatch) -> Dict:
+            # [n edges in batch]
+            scores = torch.bmm(self.W(edges.src['h']).unsqueeze(1), edges.dst['x'].unsqueeze(2)).view(-1)
+
+            f = torch.sigmoid(edges.dst['x_f'] + self.U_f(edges.src['h']))
+            return {
+                'fc': edges.src['c'] * f,
+                'scores': scores,
+                'h': edges.src['h']
+            }
+        return message_func
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [bs; n children; h size]
-        h_children = nodes.mailbox['h']
-
-        # [bs; 1; x size]
-        x = nodes.data['x'].unsqueeze(1)
-
         # [bs; n_children]
-        scores = torch.bmm(self.W(h_children), x.transpose(1, 2)).squeeze(2)
-
-        # [bs; n children]
+        scores = nodes.mailbox['scores']
         align = nn.functional.softmax(scores, dim=-1)
 
-        # [bs; h size]
-        h_attn = torch.bmm(align.unsqueeze(1), h_children).squeeze(1)
-
-        # [bs; n children; h size]
-        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['x_f'].unsqueeze(1))
-        # [bs; h size]
-        fc_sum = torch.sum(f * nodes.mailbox['c'], 1)
+        h_attn = torch.bmm(align.unsqueeze(1), nodes.mailbox['h']).squeeze(1)
 
         return {
             'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
-            'fc_sum': fc_sum
+            'fc_sum': torch.sum(nodes.mailbox['fc'], dim=1)
         }
 
     def get_reduce_func(self):
