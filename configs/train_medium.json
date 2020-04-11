@@ -2,52 +2,66 @@
   "paths": {
     "train": "./data/java-med/training_preprocessed",
     "validate": "./data/java-med/validation_preprocessed",
-
     "vocabulary": "./data/java-med/vocabulary.pkl"
   },
 
   "hidden_states": {
-    "embedding": 128,
-    "encoder": 128,
-    "decoder": 128
+    "embedding": 256,
+    "encoder": 256,
+    "decoder": 256
   },
 
-
   "embedding": {
-    "name": "SubTokenTypeEmbedding",
-    "params": {}
+    "embeddings": {
+      "token": {},
+      "type": {}
+    },
+    "reduction": {
+      "name": "sum",
+      "params": {
+      }
+    }
   },
 
   "encoder": {
-    "name": "TokenTypeTreeLSTM",
+    "name": "TreeLSTM",
     "params": {
-      "dropout_prob": 0.2,
-      "cell_type": "EdgeChildSumTreeLSTMCell"
+      "cell": {
+        "name": "LuongAttentionTreeLSTMCell",
+        "params": {
+        }
+      },
+      "dropout": 0.25
     }
   },
 
   "decoder": {
-    "name": "LSTMAttentionDecoder",
+    "name": "LSTMDecoder",
     "params": {
-      "dropout_prob": 0.2
-    },
-    "attention": {
-      "name": "LuongConcatAttention",
-      "params": {}
+      "dropout": 0.5,
+      "teacher_force": 0.0,
+      "attention": {
+        "name": "LuongConcatAttention",
+        "params": {}
+      }
     }
   },
 
-  "batch_size": 400,
+  "batch_size": 500,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 5,
-  "teacher_force": 0.5,
 
-  "evaluation_step": 1500,
+  "scheduler": {
+    "name": "step",
+    "step_size": 1000,
+    "step_gamma": 0.5
+  },
 
+  "evaluation_step": 500,
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": 1500,
+  "checkpoint_step": 500,
   "checkpoints_folder": "checkpoints"
 }
