@@ -5,7 +5,8 @@ import torch
 import torch.nn as nn
 
 from model.encoder import _IEncoder
-from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell
+from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell, \
+    MultiWayTreeLSTMCell
 
 
 class TreeLSTM(_IEncoder):
@@ -13,7 +14,8 @@ class TreeLSTM(_IEncoder):
     _tree_lstm_cells = {
         ChildSumTreeLSTMCell.__name__: ChildSumTreeLSTMCell,
         LuongAttentionTreeLSTMCell.__name__: LuongAttentionTreeLSTMCell,
-        MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell
+        MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell,
+        MultiWayTreeLSTMCell.__name__: MultiWayTreeLSTMCell
     }
 
     def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0., n_layers: int = 1):
