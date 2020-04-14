@@ -27,12 +27,12 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "ChildSumTreeLSTMCell",
+        "name": "MultiWayTreeLSTMCell",
         "params": {
         }
       },
       "dropout": 0.25,
-      "n_layers": 3
+      "n_layers": 1
     }
   },
 
