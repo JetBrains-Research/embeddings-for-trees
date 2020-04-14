@@ -50,9 +50,9 @@ class JavaDataset(Dataset):
             graphs = [g.reverse(share_ndata=True) for g in graphs]
 
         graph = batch(graphs)
-        graph.ndata['token'] = graph.ndata['token'].to(self.device)
-        graph.ndata['type'] = graph.ndata['type'].to(self.device)
+        graph.ndata['token'] = graph.ndata['token'].to(self.device).detach()
+        graph.ndata['type'] = graph.ndata['type'].to(self.device).detach()
         # [sequence len, batch size]
-        labels = label_dict['labels'][start_index:end_index, :].t().to(self.device)
+        labels = label_dict['labels'][start_index:end_index, :].t().to(self.device).detach()
 
         return graph, labels

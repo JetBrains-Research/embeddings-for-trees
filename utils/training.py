@@ -95,7 +95,6 @@ def evaluate_on_dataset(
             model, criterion, graph, labels, device
         )
         eval_epoch_info.accumulate_info(batch_info)
-        del graph, labels
 
     return eval_epoch_info
 
@@ -115,7 +114,6 @@ def train_on_dataset(
         graph, labels = train_dataset[batch_id]
         batch_info = train_on_batch(model, criterion, optimizer, scheduler, graph, labels, clip_norm, device)
         train_epoch_info.accumulate_info(batch_info)
-        del graph, labels
 
         if is_step_match(batch_id, log_step):
             logger.log(train_epoch_info.get_state_dict(), batch_id, is_train=True)
