@@ -127,7 +127,7 @@ class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [1, bs, x size]
         query = nodes.data['x'].unsqueeze(0)
         # [n children, bs, h size]
-        key_value = nodes.mailbox['h']
+        key_value = nodes.mailbox['h'].transpose(0, 1)
 
         # [bs, h size]
         h_attn = self.multihead_attention(query, key_value, key_value)[0].squeeze(0)
