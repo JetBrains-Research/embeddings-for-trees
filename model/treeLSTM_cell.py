@@ -121,7 +121,13 @@ class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
         self.U_f = nn.Linear(self.h_size, self.h_size)
 
     def get_message_func(self):
-        return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
+        def message_func(edges: dgl.EdgeBatch) -> Dict:
+            f = torch.sigmoid(edges.dst['x_f'] + self.U_f(edges.src['h']))
+            return {
+                'fc': edges.src['c'] * f,
+                'h': edges.src['h']
+            }
+        return message_func
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
         # [1, bs, x size]
@@ -132,9 +138,8 @@ class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [bs, h size]
         h_attn = self.multihead_attention(query, key_value, key_value)[0].squeeze(0)
 
-        f = torch.sigmoid(self.U_f(nodes.mailbox['h']) + nodes.data['x_f'].unsqueeze(1))
         # [bs; h size]
-        fc_sum = torch.sum(f * nodes.mailbox['c'], 1)
+        fc_sum = torch.sum(nodes.mailbox['fc'], 1)
 
         return {
             'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
