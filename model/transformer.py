@@ -10,58 +10,51 @@ from model.encoder import _IEncoder
 class TransformerEncoder(_IEncoder):
 
     def __init__(
-            self, h_emb: int, h_enc: int, n_head: int, h_ffd: int = 2048, dropout: float = 0.1, n_layers: int = 1
+            self, h_emb: int, h_enc: int, n_heads: int, h_ffd: int = 2048, dropout: float = 0.1, n_layers: int = 1
     ) -> None:
         """init transformer encoder
 
         :param h_emb: size of embedding
         :param h_enc: size of encoder
-        :param n_head: number of heads in multi-head attention
+        :param n_heads: number of heads in multi-head attention
         :param h_ffd: size of hidden layer in feedforward part
         :param dropout: probability to be zeroed
         """
         super().__init__(h_emb, h_enc)
-        self.transformer_layer = nn.TransformerEncoderLayer(h_emb, n_head, h_ffd, dropout)
+        self.transformer_layer = nn.TransformerEncoderLayer(h_emb, n_heads, h_ffd, dropout)
         self.transformer = nn.TransformerEncoder(self.transformer_layer, n_layers)
-
-        self.linear_h = nn.Linear(self.h_emb, self.h_enc)
-        self.linear_c = nn.Linear(self.h_emb, self.h_enc)
-        self.tanh = nn.Tanh()
+        self.norm = nn.LayerNorm(h_enc)
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
         """reduce a batch of incoming nodes
 
-        :param nodes: 'x' is a tensor of shape [batch size, number of children, hidden state]
+        :param nodes:
+            mailbox -- tensor [batch size, number of children, hidden state]
+            data -- tensor [batch size, hidden state]
         :return: Dict with reduced features
         """
-        # [n_child, bs, h]
-        x_children = nodes.mailbox['x'].transpose(0, 1)
-        # [1, bs, h]
-        x_cur = nodes.data['x'].unsqueeze(0)
-
-        # [n_child + 1, bs, h]
-        x = torch.cat([x_cur, x_children], dim=0)
-
-        # [n_child + 1, bs, h]
-        x_trans = self.transformer(x)
+        # [n_children, bs, h]
+        h_children = nodes.mailbox['h'].transpose(0, 1)
+        h_trans = self.transformer(h_children).transpose(0, 1)
         return {
-            'x': x_trans[0]
+            'h': h_trans.sum(1)
         }
+
+    def apply_node_func(self, nodes: dgl.NodeBatch) -> Dict:
+        h = self.norm(nodes.data['x'] + nodes.data['h'])
+        return {'h': h}
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
         """Apply transformer encoder
 
         :param graph: batched dgl graph
         :param device: torch device
-        :return: encoded nodes [max tree size, batch size, hidden state]
+        :return: encoded nodes [number of nodes, hidden size]
         """
+        graph.ndata['h'] = torch.zeros((graph.number_of_nodes(), self.h_enc), device=device)
         dgl.prop_nodes_topo(
-            graph, message_func=[dgl.function.copy_u('x', 'x')],
-            reduce_func=self.reduce_func
+            graph, message_func=[dgl.function.copy_u('h', 'h')],
+            reduce_func=self.reduce_func,
+            apply_node_func=self.apply_node_func
         )
-
-        # [n_nodes, h_emb]
-        h = self.tanh(self.linear_h(graph.ndata['x']))
-        c = self.tanh(self.linear_c(graph.ndata['x']))
-
-        return h, c
+        return graph.ndata.pop('h')
