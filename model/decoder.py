@@ -1,11 +1,10 @@
-from typing import Dict, Tuple, List, Union
+from typing import Dict, Tuple, Union
 
 import torch
 import torch.nn as nn
 
 from model.attention import get_attention
 from utils.common import PAD, UNK, segment_sizes_to_slices
-from utils.token_processing import get_dict_of_subtokens, convert_tokens_to_subtokens_id
 
 
 class _IDecoder(nn.Module):
@@ -96,12 +95,19 @@ class LSTMDecoder(_IDecoder):
         self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=self.h_enc)
 
     def forward(
-            self, encoded_data: Tuple[torch.Tensor, torch.Tensor], labels: torch.Tensor,
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
             root_indexes: torch.LongTensor, device: torch.device
     ) -> torch.Tensor:
-        assert len(encoded_data) == 2, f"For LSTM decoder, encoder should produce hidden and memory states"
-        # [number of nodes, encoder hidden state]
-        node_hidden_states, node_memory_states = encoded_data
+        if isinstance(encoded_data, torch.Tensor):
+            encoded_data = (encoded_data,)
+        if len(encoded_data) == 1:
+            node_hidden_states = encoded_data[0]
+            node_memory_states = torch.zeros_like(encoded_data[0], requires_grad=False)
+        elif len(encoded_data) == 2:
+            # [number of nodes, encoder hidden state]
+            node_hidden_states, node_memory_states = encoded_data
+        else:
+            raise ValueError(f"Passed too much tensors to LSTM decoder: {len(encoded_data)}")
 
         # [1, batch size, encoder hidden state]
         root_hidden_states = node_hidden_states[root_indexes].unsqueeze(0)
