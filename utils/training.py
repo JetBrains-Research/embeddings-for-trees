@@ -30,7 +30,9 @@ def _forward_pass(
         batch info [Dict] dict with statistics
     ]
     """
-    root_indexes = torch.tensor(get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device)
+    root_indexes = torch.tensor(
+        get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False
+    )
     root_logits = model(graph, root_indexes, labels, device)
     # remove <SOS> token
     # [the longest sequence, batch size, vocab size]
