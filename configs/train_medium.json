@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "LuongAttentionTreeLSTMCell",
+        "name": "ChildSumTreeLSTMCell",
         "params": {
         }
       },
@@ -47,16 +47,17 @@
     }
   },
 
-  "batch_size": 500,
+  "batch_size": 400,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
-  "clip_norm": 5,
+  "clip_norm": 20,
 
   "scheduler": {
-    "name": "step",
-    "step_size": 1000,
-    "step_gamma": 0.5
+    "name": "cosine_warm_up",
+    "max_lr": 0.015,
+    "min_lr": 0.0,
+    "warm_up_cf": 0.0
   },
 
   "evaluation_step": 500,
