@@ -23,7 +23,9 @@ def train(params: Dict, logger_name: str) -> None:
     checkpoint = {}
     if is_resumed:
         checkpoint = torch.load(params['resume'], map_location=device)
+        resume_wandb_id = params.get('resume_wandb_id', False)
         params = checkpoint['config']
+        params['resume_wandb_id'] = resume_wandb_id
 
     training_set = JavaDataset(params['paths']['train'], params['batch_size'], device, True)
     validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], device, True)
