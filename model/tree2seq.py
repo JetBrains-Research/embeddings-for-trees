@@ -1,4 +1,4 @@
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -47,7 +47,7 @@ class Tree2Seq(nn.Module):
         return logits.argmax(dim=-1)
 
 
-class ModelFactory:
+class ModelBuilder:
     _encoders = {
         TreeLSTM.__name__: TreeLSTM,
         TransformerEncoder.__name__: TransformerEncoder
@@ -104,12 +104,3 @@ class ModelFactory:
             'type_to_id': self.type_to_id,
             'label_to_id': self.label_to_id
         }
-
-
-def load_model(path_to_model: str, device: torch.device) -> Tuple[Tree2Seq, Dict]:
-    checkpoint: Dict = torch.load(path_to_model, map_location=device)
-    configuration = checkpoint['configuration']
-    model_factory = ModelFactory(**configuration)
-    model: Tree2Seq = model_factory.construct_model(device)
-    model.load_state_dict(checkpoint['state_dict'])
-    return model, checkpoint

@@ -7,7 +7,7 @@ from dgl.data.utils import load_graphs
 
 from data_workers.convert import convert_project
 from data_workers.preprocess_steps import build_project_asts
-from model.tree2seq import ModelFactory
+from model.tree2seq import ModelBuilder
 from utils.common import fix_seed, get_device, create_folder, EOS
 
 tmp_folder = '.tmp'
@@ -23,7 +23,7 @@ def interactive(path_to_function: str, path_to_model: str):
     print("loading model...")
     checkpoint = torch.load(path_to_model, map_location=device)
 
-    model_factory = ModelFactory(**checkpoint['configuration'])
+    model_factory = ModelBuilder(**checkpoint['configuration'])
     model = model_factory.construct_model(device)
     model.load_state_dict(checkpoint['state_dict'])
 

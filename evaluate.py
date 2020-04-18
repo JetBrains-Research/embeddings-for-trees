@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import ModelFactory
+from model.tree2seq import ModelBuilder
 from utils.common import fix_seed, get_device, PAD
 from utils.training import evaluate_on_dataset
 
@@ -20,7 +20,7 @@ def evaluate(params: Dict) -> None:
 
     print('model initializing...')
     # create model
-    model_factory = ModelFactory(**checkpoint['configuration'])
+    model_factory = ModelBuilder(**checkpoint['configuration'])
     model = model_factory.construct_model(device)
     model.load_state_dict(checkpoint['state_dict'])
 

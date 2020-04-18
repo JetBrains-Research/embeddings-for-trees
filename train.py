@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import ModelFactory
+from model.tree2seq import ModelBuilder
 from utils.common import fix_seed, get_device, PAD
 from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
 from utils.scheduler import get_scheduler
@@ -38,7 +38,7 @@ def train(params: Dict, logger_name: str) -> None:
 
     print('model initializing...')
     # create model
-    model_factory = ModelFactory(
+    model_factory = ModelBuilder(
         params['embedding'], params['encoder'], params['decoder'],
         params['hidden_states'], token_to_id, type_to_id, label_to_id
     )
