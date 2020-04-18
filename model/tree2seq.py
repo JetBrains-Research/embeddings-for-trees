@@ -8,7 +8,7 @@ from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import Embedding
 from model.encoder import _IEncoder
 from model.transformer import TransformerEncoder
-from model.treeLSTM import TreeLSTM, TwoOrderLSTM
+from model.treeLSTM import TreeLSTM, TwoOrderLSTM, DfsLSTM
 
 
 class Tree2Seq(nn.Module):
@@ -51,6 +51,7 @@ class ModelBuilder:
     _encoders = {
         TreeLSTM.__name__: TreeLSTM,
         TransformerEncoder.__name__: TransformerEncoder,
+        DfsLSTM.__name__: DfsLSTM,
         TwoOrderLSTM.__name__: TwoOrderLSTM
     }
     _decoders = {
