@@ -100,6 +100,6 @@ class TwoOrderLSTM(_IEncoder):
         c_lstm = graph.ndata.pop('c_lstm')
 
         h = self.blend_alpha[0] * h_tree_lstm + (1 - self.blend_alpha[0]) * h_lstm
-        c = self.blend_alpha[1] * c_tree_lstm + (1 - self.blend_alpha[0]) * c_lstm
+        c = self.blend_alpha[1] * c_tree_lstm + (1 - self.blend_alpha[1]) * c_lstm
 
         return nn.functional.relu(self.linear_h(h)), nn.functional.relu(self.linear_c(c))
