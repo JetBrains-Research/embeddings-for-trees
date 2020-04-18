@@ -4,10 +4,10 @@ import dgl
 import torch
 import torch.nn as nn
 
-from common import get_root_indexes
 from model.encoder import _IEncoder
 from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell, \
     MultiWayTreeLSTMCell
+from utils.common import get_root_indexes
 
 
 class TreeLSTM(_IEncoder):
