@@ -58,14 +58,24 @@ class DfsLSTM(_IEncoder):
         self.lstm = nn.LSTMCell(self.h_emb, self.h_enc)
         self.dropout = nn.Dropout(dropout)
 
-    def dfs_lstm_reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [bs; h]
-        h = nodes.mailbox['h'].squeeze(1)
-        c = nodes.mailbox['c'].squeeze(1)
-        # [bs; h]
-        x = nodes.data['x']
+    def message_func(self, edges: dgl.EdgeBatch) -> Dict:
+        # [bs; h size]
+        h = edges.src['h']
+        c = edges.src['c']
+        # [bs; x size]
+        x = edges.dst['x']
         h_cur, c_cur = self.lstm(x, (h, c))
-        return {'h': h_cur, 'c': c_cur}
+        return {
+            'h': h_cur,
+            'c': c_cur
+        }
+
+    @staticmethod
+    def reduce_func(nodes: dgl.NodeBatch) -> Dict:
+        return {
+            'h': nodes.mailbox['h'].squeeze(1),
+            'c': nodes.mailbox['c'].squeeze(1)
+        }
 
     def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         graph.ndata['x'] = self.dropout(graph.ndata['x'])
@@ -79,8 +89,8 @@ class DfsLSTM(_IEncoder):
 
         dgl.prop_edges_dfs(
             graph, root_indexes, True,
-            message_func=[dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')],
-            reduce_func=self.dfs_lstm_reduce_func
+            message_func=self.message_func,
+            reduce_func=self.reduce_func
         )
 
         return graph.ndata.pop('h'), graph.ndata.pop('c')

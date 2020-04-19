@@ -23,7 +23,7 @@
   },
 
   "encoder": {
-    "name": "DfsLSTM",
+    "name": "TwoOrderLSTM",
     "params": {
       "dropout": 0.25
     }
