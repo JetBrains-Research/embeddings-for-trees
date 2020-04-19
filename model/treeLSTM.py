@@ -78,7 +78,7 @@ class DfsLSTM(_IEncoder):
             self.lstm(graph.ndata['x'][root_indexes])
 
         dgl.prop_edges_dfs(
-            graph, root_indexes,
+            graph, root_indexes, True,
             message_func=[dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')],
             reduce_func=self.dfs_lstm_reduce_func
         )

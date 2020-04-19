@@ -23,13 +23,8 @@
   },
 
   "encoder": {
-    "name": "TreeLSTM",
+    "name": "DfsLSTM",
     "params": {
-      "cell": {
-        "name": "LuongAttentionTreeLSTMCell",
-        "params": {
-        }
-      },
       "dropout": 0.25
     }
   },
@@ -40,8 +35,10 @@
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongConcatAttention",
-        "params": {}
+        "name": "LuongAttention",
+        "params": {
+          "score": "general"
+        }
       }
     }
   },
