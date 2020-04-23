@@ -1,10 +1,10 @@
+import random
 from os import mkdir
 from os.path import exists
 from shutil import rmtree
 from tarfile import open as tar_open
-from typing import List, Callable
+from typing import List
 
-import dgl
 import numpy as np
 import torch
 from tqdm.auto import tqdm
@@ -26,9 +26,13 @@ def get_device() -> torch.device:
 
 
 def fix_seed(seed: int = 7) -> None:
-    torch.manual_seed(seed)
-    torch.backends.cudnn.deterministic = True
+    random.seed(seed)
     np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
 
 def extract_tar_gz(tar_path: str, extract_path: str) -> None:
