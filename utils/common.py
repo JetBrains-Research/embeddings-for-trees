@@ -1,3 +1,4 @@
+import os
 import random
 from os import mkdir
 from os.path import exists
@@ -26,6 +27,7 @@ def get_device() -> torch.device:
 
 
 def fix_seed(seed: int = 7) -> None:
+    os.environ['PYTHONHASHSEED'] = str(seed)
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
