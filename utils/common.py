@@ -6,6 +6,7 @@ from shutil import rmtree
 from tarfile import open as tar_open
 from typing import List
 
+import dgl
 import numpy as np
 import torch
 from tqdm.auto import tqdm
@@ -31,6 +32,7 @@ def fix_seed(seed: int = 7) -> None:
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
+    dgl.random.seed(seed)
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
         torch.backends.cudnn.deterministic = True
