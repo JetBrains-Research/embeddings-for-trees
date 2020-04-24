@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "MultiWayTreeLSTMCell",
+        "name": "ChildSumTreeLSTMCell",
         "params": {
         }
       },
@@ -42,22 +42,25 @@
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongConcatAttention",
-        "params": {}
+        "name": "LuongAttention",
+        "params": {
+            "score": "general"
+        }
       }
     }
   },
 
-  "batch_size": 500,
+  "batch_size": 400,
   "n_epochs": 1,
   "lr": 0.01,
   "weight_decay": 1e-4,
   "clip_norm": 20,
 
   "scheduler": {
-    "name": "step",
-    "step_size": 750,
-    "step_gamma": 0.1
+    "name": "cosine_warm_up",
+    "max_lr": 0.01,
+    "min_lr": 0.0,
+    "warm_up_cf": 0.0
   },
 
   "evaluation_step": 100,
