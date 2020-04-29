@@ -18,14 +18,22 @@
     },
     "reduction": {
       "name": "sum",
-      "params": {}
+      "params": {
+      }
     }
   },
 
   "encoder": {
-    "name": "TwoOrderLSTM",
+    "name": "TreeLSTM",
     "params": {
-      "dropout": 0.25
+      "cell": {
+        "name": "SelfAttentionTreeLSTMCell",
+        "params": {
+          "a_size": 64
+        }
+      },
+      "dropout": 0.25,
+      "n_layers": 1
     }
   },
 
@@ -37,7 +45,7 @@
       "attention": {
         "name": "LuongAttention",
         "params": {
-          "score": "general"
+            "score": "general"
         }
       }
     }

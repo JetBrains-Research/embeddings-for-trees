@@ -110,12 +110,16 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
         return self._reduce_func
 
 
-class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
+class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size: int, h_size: int, n_heads: int, dropout: float = 0):
+    def __init__(self, x_size: int, h_size: int, a_size: int):
         super().__init__(x_size, h_size)
-        assert x_size == h_size
-        self.multihead_attention = nn.MultiheadAttention(x_size, n_heads, dropout)
+        self.a_size = a_size
+        self.scale = self.a_size ** 0.5
+        self.W_q = nn.Linear(self.h_size, self.a_size, bias=False)
+        self.W_k = nn.Linear(self.h_size, self.a_size, bias=False)
+        self.W_v = nn.Linear(self.h_size, self.a_size, bias=False)
+        self.W_o = nn.Linear(self.a_size, self.h_size, bias=False)
 
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
         self.U_f = nn.Linear(self.h_size, self.h_size)
@@ -125,24 +129,35 @@ class MultiHeadAttentionTreeLSTMCell(_ITreeLSTMCell):
             f = torch.sigmoid(edges.dst['x_f'] + self.U_f(edges.src['h']))
             return {
                 'fc': edges.src['c'] * f,
-                'h': edges.src['h']
+                'h_q': self.W_q(edges.src['h']),
+                'h_k': self.W_f(edges.src['h']),
+                'h_v': self.W_v(edges.src['h'])
             }
         return message_func
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [1, bs, x size]
-        query = nodes.data['x'].unsqueeze(0)
-        # [n children, bs, h size]
-        key_value = nodes.mailbox['h'].transpose(0, 1)
+        # [bs; n children; a size]
+        h_q = nodes.mailbox['h_q']
+        h_k = nodes.mailbox['h_k']
+        h_v = nodes.mailbox['h_v']
 
-        # [bs, h size]
-        h_attn = self.multihead_attention(query, key_value, key_value)[0].squeeze(0)
+        # [bs; n children; n children]
+        align = torch.bmm(h_k, h_q.transpose(1, 2)) / self.scale
+        # [bs; n children; n children]
+        align = nn.functional.softmax(align, -1)
+
+        # [bs; n children; a size]
+        h = torch.bmm(align, h_v)
+        # [bs; a size]
+        h = torch.sum(h, 1)
+        # [bs; h size]
+        h = self.W_o(h)
 
         # [bs; h size]
         fc_sum = torch.sum(nodes.mailbox['fc'], 1)
 
         return {
-            'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
+            'Uh_sum': self.U_iou(h),  # name for using with super functions
             'fc_sum': fc_sum
         }
 

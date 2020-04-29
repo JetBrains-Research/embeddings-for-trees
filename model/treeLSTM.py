@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 
 from model.encoder import _IEncoder
-from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, MultiHeadAttentionTreeLSTMCell, \
+from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, SelfAttentionTreeLSTMCell, \
     MultiWayTreeLSTMCell
 from utils.common import get_root_indexes
 
@@ -15,7 +15,7 @@ class TreeLSTM(_IEncoder):
     _tree_lstm_cells = {
         ChildSumTreeLSTMCell.__name__: ChildSumTreeLSTMCell,
         LuongAttentionTreeLSTMCell.__name__: LuongAttentionTreeLSTMCell,
-        MultiHeadAttentionTreeLSTMCell.__name__: MultiHeadAttentionTreeLSTMCell,
+        SelfAttentionTreeLSTMCell.__name__: SelfAttentionTreeLSTMCell,
         MultiWayTreeLSTMCell.__name__: MultiWayTreeLSTMCell
     }
 
