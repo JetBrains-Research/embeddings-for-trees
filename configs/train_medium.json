@@ -31,7 +31,8 @@
         "params": {
         }
       },
-      "dropout": 0.25
+      "dropout": 0.25,
+      "n_layers": 1
     }
   },
 
@@ -41,8 +42,10 @@
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongConcatAttention",
-        "params": {}
+        "name": "LuongAttention",
+        "params": {
+          "score": "general"
+        }
       }
     }
   },
@@ -55,14 +58,14 @@
 
   "scheduler": {
     "name": "cosine_warm_up",
-    "max_lr": 0.015,
+    "max_lr": 0.01,
     "min_lr": 0.0,
     "warm_up_cf": 0.0
   },
 
-  "evaluation_step": 500,
+  "evaluation_step": 1500,
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": 500,
+  "checkpoint_step": 1500,
   "checkpoints_folder": "checkpoints"
 }
