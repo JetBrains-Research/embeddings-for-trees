@@ -53,7 +53,7 @@
   "batch_size": 500,
   "n_epochs": 1,
   "lr": 0.01,
-  "weight_decay": 5e-4,
+  "weight_decay": 1e-4,
   "clip_norm": 20,
 
   "scheduler": {
