@@ -49,11 +49,10 @@ class Logger:
 
 class WandBLogger(Logger):
     name = 'wandb'
-    project_name = 'treeLSTM'
 
     def __init__(self, checkpoints_folder: str, config: Dict, resume: Union[bool, str] = False) -> None:
         super().__init__(checkpoints_folder, config)
-        wandb.init(project=self.project_name, config=config, resume=resume)
+        wandb.init(project=config['wandb_project'], config=config, resume=resume)
 
     def log(self, state_dict: Dict, batch_id: int, is_train: bool = True) -> None:
         group = 'train' if is_train else 'validation'

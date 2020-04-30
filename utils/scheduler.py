@@ -8,7 +8,7 @@ def get_scheduler(scheduler_info: Dict, optimizer, total_steps: int):
     name = scheduler_info.get('name', '')
     if name == 'step':
         scheduler = torch.optim.lr_scheduler.StepLR(
-            optimizer, step_size=scheduler_info['step_size'], gamma=scheduler_info['step_gamma']
+            optimizer, step_size=scheduler_info['size'], gamma=scheduler_info['gamma']
         )
     # LambdaLR multiply lr by function result
     # setting initial lr to 1.0 correspond to regularize lr throw lambda

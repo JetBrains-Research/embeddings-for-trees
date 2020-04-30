@@ -50,22 +50,22 @@
     }
   },
 
-  "batch_size": 400,
+  "batch_size": 500,
   "n_epochs": 1,
   "lr": 0.01,
-  "weight_decay": 1e-4,
+  "weight_decay": 5e-4,
   "clip_norm": 20,
 
   "scheduler": {
-    "name": "cosine_warm_up",
-    "max_lr": 0.01,
-    "min_lr": 0.0,
-    "warm_up_cf": 0.0
+    "name": "step",
+    "size": 350,
+    "gamma": 0.5
   },
 
   "evaluation_step": 100,
   "logging_step": 10,
   "logging_folder": "logs",
   "checkpoint_step": 500,
-  "checkpoints_folder": "checkpoints"
+  "checkpoints_folder": "checkpoints",
+  "wandb_project": "TreeLSTM-small"
 }
