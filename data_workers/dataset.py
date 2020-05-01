@@ -45,6 +45,7 @@ class JavaDataset(Dataset):
         graph_filename, start_index, end_index = self.batch_description[item]
 
         graphs, label_dict = load_graphs(graph_filename, list(range(start_index, end_index)))
+        graphs, mask = zip(*[(g, i) for i, g in enumerate(graphs) if g.number_of_nodes() < 10000])
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]
@@ -53,6 +54,7 @@ class JavaDataset(Dataset):
         graph.ndata['token'] = graph.ndata['token'].to(self.device).detach()
         graph.ndata['type'] = graph.ndata['type'].to(self.device).detach()
         # [sequence len, batch size]
-        labels = label_dict['labels'][start_index:end_index, :].t().to(self.device).detach()
+        labels = label_dict['labels'][start_index:end_index, :][list(mask)]
+        labels = labels.t().to(self.device).detach()
 
         return graph, labels
