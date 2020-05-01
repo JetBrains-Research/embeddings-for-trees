@@ -7,6 +7,8 @@ from dgl.data.utils import load_labels, load_graphs
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
+from common import get_tree_depth
+
 
 class JavaDataset(Dataset):
 
@@ -45,7 +47,10 @@ class JavaDataset(Dataset):
         graph_filename, start_index, end_index = self.batch_description[item]
 
         graphs, label_dict = load_graphs(graph_filename, list(range(start_index, end_index)))
-        graphs, mask = zip(*[(g, i) for i, g in enumerate(graphs) if g.number_of_nodes() < 10000])
+        graphs, mask = zip(*[
+            (g, i) for i, g in enumerate(graphs)
+            if g.number_of_nodes() < 10000 and get_tree_depth(g) < 100
+        ])
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]

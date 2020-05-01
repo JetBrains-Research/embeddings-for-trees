@@ -80,3 +80,7 @@ def is_step_match(current_step: int, template: int, ignore_zero: bool = True) ->
     if ignore_zero:
         return match_template and current_step != 0
     return match_template
+
+
+def get_tree_depth(tree: dgl.DGLGraph) -> int:
+    return len(dgl.topological_nodes_generator(tree))
