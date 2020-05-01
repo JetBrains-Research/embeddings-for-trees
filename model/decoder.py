@@ -162,4 +162,9 @@ class LSTMDecoder(_IDecoder):
             else:
                 current_input = current_output.argmax(dim=-1)
 
+        del weighted_hidden_states
+        del attention
+        del embedded
+        del attended_hidden_states
+        del current_output
         return outputs

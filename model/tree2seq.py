@@ -32,10 +32,12 @@ class Tree2Seq(nn.Module):
             ground truth [the longest sequence, batch size]
         ]
         """
-        embedded_graph = self.embedding(graph, device)
-        encoded_data = self.encoder(embedded_graph, device)
-        outputs = self.decoder(encoded_data, labels, root_indexes, device)
-        return outputs
+        return self.decoder(
+            self.encoder(
+                self.embedding(graph, device), device
+            ),
+            labels, root_indexes, device
+        )
 
     @staticmethod
     def predict(logits: torch.Tensor) -> torch.Tensor:

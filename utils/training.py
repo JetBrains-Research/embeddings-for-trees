@@ -30,10 +30,11 @@ def _forward_pass(
         batch info [Dict] dict with statistics
     ]
     """
-    root_indexes = torch.tensor(
-        get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False
+    root_logits = model(
+        graph,
+        torch.tensor(get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False),
+        labels, device
     )
-    root_logits = model(graph, root_indexes, labels, device)
     # remove <SOS> token
     # [the longest sequence, batch size, vocab size]
     root_logits = root_logits[1:]
@@ -64,12 +65,15 @@ def train_on_batch(
 
     # Model step
     model.zero_grad()
-    loss, _, batch_info = _forward_pass(model, graph, labels, criterion, device)
+    loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion, device)
     batch_info['learning_rate'] = scheduler.get_last_lr()[0]
     loss.backward()
     nn.utils.clip_grad_value_(model.parameters(), clip_norm)
     optimizer.step()
     scheduler.step()
+    del loss
+    del prediction
+    torch.cuda.empty_cache()
 
     return batch_info
 
@@ -81,7 +85,8 @@ def eval_on_batch(
     model.eval()
     # Model step
     with torch.no_grad():
-        _, prediction, batch_info = _forward_pass(model, graph, labels, criterion, device)
+        loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion, device)
+        del loss
 
     return batch_info, prediction
 
@@ -93,10 +98,11 @@ def evaluate_on_dataset(
 
     for batch_id in tqdm(range(len(dataset))):
         graph, labels = dataset[batch_id]
-        batch_info, _ = eval_on_batch(
+        batch_info, prediction = eval_on_batch(
             model, criterion, graph, labels, device
         )
         eval_epoch_info.accumulate_info(batch_info)
+        del prediction
 
     return eval_epoch_info
 
