@@ -7,7 +7,7 @@ from dgl.data.utils import load_labels, load_graphs
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
-from common import get_tree_depth
+from utils.common import get_tree_depth
 
 
 class JavaDataset(Dataset):
