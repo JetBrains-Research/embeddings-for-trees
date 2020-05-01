@@ -165,19 +165,17 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
         return self._reduce_func
 
 
-# https://arxiv.org/pdf/1906.08094.pdf
-class MultiWayTreeLSTMCell(_ITreeLSTMCell):
+class SequenceTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size: int, h_size: int, n_layers: int = 1, bidirectional: bool = True):
+    def __init__(self, x_size: int, h_size: int, bidirectional: bool = True):
         super().__init__(x_size, h_size)
-        self.lstm_iou = nn.LSTM(self.h_size, 3 * self.h_size, num_layers=n_layers, bidirectional=bidirectional)
-        self.lstm_f = nn.LSTM(self.h_size, self.h_size, num_layers=n_layers, bidirectional=bidirectional)
+        self.lstm = nn.LSTM(self.h_size, self.h_size, num_layers=1, bidirectional=bidirectional)
 
         if bidirectional:
-            self.U_iou = nn.Linear(2 * 3 * self.h_size, 3 * self.h_size, bias=False)
+            self.U_iou = nn.Linear(2 * self.h_size, 3 * self.h_size, bias=False)
             self.U_f = nn.Linear(2 * self.h_size, self.h_size, bias=False)
         else:
-            self.U_iou = nn.Linear(3 * self.h_size, 3 * self.h_size, bias=False)
+            self.U_iou = nn.Linear(self.h_size, 3 * self.h_size, bias=False)
             self.U_f = nn.Linear(self.h_size, self.h_size, bias=False)
 
     def get_message_func(self):
@@ -188,14 +186,12 @@ class MultiWayTreeLSTMCell(_ITreeLSTMCell):
             # [n children; bs; h size]
             h = nodes.mailbox['h'].transpose(0, 1)
 
-            # [n children; bs; h size * 1/2]
-            h_f = self.lstm_f(h)[0]
+            # [n children; bs; h size * 1 or 2]
+            h_lstm = self.lstm(h)[0]
             # [bs; n children; h size]
-            h_f = self.U_f(h_f).transpose(0, 1)
-
+            h_f = self.U_f(h_lstm).transpose(0, 1)
             # [bs; 3 * h size]
-            h_iou = self.lstm_iou(h)[0][-1]
-            h_iou = self.U_iou(h_iou)
+            h_iou = self.U_iou(h_lstm[-1])
 
             # [bs; n children; h size]
             fc = torch.sigmoid(h_f + nodes.data['x_f'].unsqueeze(1))
