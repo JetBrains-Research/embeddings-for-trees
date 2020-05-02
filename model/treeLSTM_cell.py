@@ -74,9 +74,8 @@ class ChildSumTreeLSTMCell(_ITreeLSTMCell):
 
 class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
     """
-    align = softmax(xWh)
-    [1; x] * [x; h] * [h; bs] = [1; bs]
-
+    align = softmax(hWx)
+    [bs; h] * [h; x] * [x; 1] = [bs; 1]
     """
 
     def __init__(self, x_size, h_size):
