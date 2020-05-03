@@ -134,7 +134,7 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
     def __init__(self, x_size: int, h_size: int, a_size: int):
         super().__init__(x_size, h_size)
         self.scale = 1.0 / (a_size ** 0.5)
-        self.W_q = nn.Linear(self.h_size, a_size, bias=False)
+        self.W_q = nn.Linear(self.x_size, a_size, bias=False)
         self.W_k = nn.Linear(self.h_size, a_size, bias=False)
         self.W_v = nn.Linear(self.h_size, a_size, bias=False)
         self.W_o = nn.Linear(a_size, self.h_size, bias=False)
@@ -149,7 +149,7 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
             f = torch.sigmoid(x_f + h_f)
             return {
                 'fc': edges.src['c'] * f,
-                'h_q': self.W_q(edges.src['h']),
+                'x_q': self.W_q(edges.dst['x']),
                 'h_k': self.W_k(edges.src['h']),
                 'h_v': self.W_v(edges.src['h'])
             }
@@ -157,12 +157,12 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
         # [bs; n children; a size]
-        h_q = nodes.mailbox['h_q']
+        x_q = nodes.mailbox['x_q']
         h_k = nodes.mailbox['h_k']
         h_v = nodes.mailbox['h_v']
 
         # [bs; n children; n children]
-        align = torch.bmm(h_q, h_k.transpose(1, 2))
+        align = torch.bmm(x_q, h_k.transpose(1, 2))
         # [bs; n children; n children]
         align = nn.functional.softmax(align * self.scale, dim=-1)
 
