@@ -139,26 +139,29 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
         self.U_f = nn.Linear(self.h_size, self.h_size)
 
     def get_message_func(self):
-        return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
+        def message_func(edges: dgl.EdgeBatch) -> Dict:
+            f = torch.sigmoid(edges.dst['x_f'] + self.U_f(edges.src['h']))
+            return {
+                'fc': edges.src['c'] * f,
+                'h': edges.src['h']
+            }
+        return message_func
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [n children; bs; h size]
-        h = nodes.mailbox['h'].transpose(0, 1)
-        # [bs; n children; h size]
-        h_attn = self.mha(h, h, h)[0].transpose(0, 1)
+        # [1, bs, x size]
+        query = nodes.data['x'].unsqueeze(0)
+        # [n children, bs, h size]
+        key_value = nodes.mailbox['h'].transpose(0, 1)
+
+        # [bs, h size]
+        h_attn = self.mha(query, key_value, key_value)[0].squeeze(0)
 
         # [bs; h size]
-        h_iou = torch.sum(h_attn, 1)
-        # [bs; n children, h size]
-        h_f = self.U_f(h_attn)
-
-        # [bs; n children; h size]
-        fc = torch.sigmoid(h_f + nodes.data['x_f'].unsqueeze(1))
-        fc = fc * nodes.mailbox['c']
+        fc_sum = torch.sum(nodes.mailbox['fc'], 1)
 
         return {
-            'Uh_sum': self.U_iou(h_iou),
-            'fc_sum': torch.sum(fc, dim=1)
+            'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
+            'fc_sum': fc_sum
         }
 
     def get_reduce_func(self):
