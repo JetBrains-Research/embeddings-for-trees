@@ -148,7 +148,7 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
             return {
                 'c': edges.src['c'],
                 'h_q': self.W_q(edges.src['h']),
-                'h_k': self.W_f(edges.src['h']),
+                'h_k': self.W_k(edges.src['h']),
                 'h_v': self.W_v(edges.src['h'])
             }
         return message_func
@@ -160,7 +160,7 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
         h_v = nodes.mailbox['h_v']
 
         # [bs; n children; n children]
-        align = torch.bmm(h_k, h_q.transpose(1, 2)) / self.scale
+        align = torch.bmm(h_q, h_k.transpose(1, 2)) / self.scale
         # [bs; n children; n children]
         align = nn.functional.softmax(align, -1)
 
