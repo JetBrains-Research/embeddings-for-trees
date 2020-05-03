@@ -131,41 +131,24 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
 
 class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size: int, h_size: int, a_size: int):
+    def __init__(self, x_size: int, h_size: int):
         super().__init__(x_size, h_size)
-        self.a_size = a_size
-        self.scale = self.a_size ** 0.5
-        self.W_q = nn.Linear(self.h_size, self.a_size, bias=False)
-        self.W_k = nn.Linear(self.h_size, self.a_size, bias=False)
-        self.W_v = nn.Linear(self.h_size, self.a_size, bias=False)
-        self.W_o = nn.Linear(self.a_size, self.h_size, bias=False)
+        self.mha = torch.nn.MultiheadAttention(self.h_size, 1)
 
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
         self.U_f = nn.Linear(self.h_size, self.h_size)
 
     def get_message_func(self):
-        def message_func(edges: dgl.EdgeBatch) -> Dict:
-            return {
-                'c': edges.src['c'],
-                'h_q': self.W_q(edges.src['h']),
-                'h_k': self.W_k(edges.src['h']),
-                'h_v': self.W_v(edges.src['h'])
-            }
-        return message_func
+        return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [bs; n children; a size]
-        h_q = nodes.mailbox['h_q']
-        h_k = nodes.mailbox['h_k']
-        h_v = nodes.mailbox['h_v']
-
-        # [bs; n children; n children]
-        align = torch.bmm(h_q, h_k.transpose(1, 2)) / self.scale
-        # [bs; n children; n children]
-        align = nn.functional.softmax(align, -1)
-
+        # [n children; bs; h size]
+        h = nodes.mailbox['h'].transpose(0, 1)
+        # [n children; bs; h size]
+        h_attn = self.mha(h, h, h)[0]
         # [bs; n children; h size]
-        h_attn = self.W_o(torch.bmm(align, h_v))
+        h_attn = h_attn.transpose(0, 1)
+
         # [bs; h size]
         h_iou = torch.sum(h_attn, 1)
         # [bs; n children; h size]
