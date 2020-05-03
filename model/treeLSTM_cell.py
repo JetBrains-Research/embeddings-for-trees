@@ -131,49 +131,34 @@ class LuongAttentionTreeLSTMCell(_ITreeLSTMCell):
 
 class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
 
-    def __init__(self, x_size: int, h_size: int, a_size: int):
+    def __init__(self, x_size: int, h_size: int, n_heads: int):
         super().__init__(x_size, h_size)
-        self.scale = 1.0 / (a_size ** 0.5)
-        self.W_q = nn.Linear(self.x_size, a_size, bias=False)
-        self.W_k = nn.Linear(self.h_size, a_size, bias=False)
-        self.W_v = nn.Linear(self.h_size, a_size, bias=False)
-        self.W_o = nn.Linear(a_size, self.h_size, bias=False)
+        self.mha = torch.nn.MultiheadAttention(self.h_size, n_heads)
 
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
         self.U_f = nn.Linear(self.h_size, self.h_size)
 
     def get_message_func(self):
-        def message_func(edges: dgl.EdgeBatch) -> Dict:
-            h_f = self.U_f(edges.src['h'])
-            x_f = edges.dst['x_f']
-            f = torch.sigmoid(x_f + h_f)
-            return {
-                'fc': edges.src['c'] * f,
-                'x_q': self.W_q(edges.dst['x']),
-                'h_k': self.W_k(edges.src['h']),
-                'h_v': self.W_v(edges.src['h'])
-            }
-        return message_func
+        return [dgl.function.copy_u('h', 'h'), dgl.function.copy_u('c', 'c')]
 
     def _reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
-        # [bs; n children; a size]
-        x_q = nodes.mailbox['x_q']
-        h_k = nodes.mailbox['h_k']
-        h_v = nodes.mailbox['h_v']
-
-        # [bs; n children; n children]
-        align = torch.bmm(x_q, h_k.transpose(1, 2))
-        # [bs; n children; n children]
-        align = nn.functional.softmax(align * self.scale, dim=-1)
-
+        # [n children; bs; h size]
+        h = nodes.mailbox['h'].transpose(0, 1)
         # [bs; n children; h size]
-        h_attn = self.W_o(torch.bmm(align, h_v))
+        h_attn = self.mha(h, h, h)[0].transpose(0, 1)
+
         # [bs; h size]
         h_iou = torch.sum(h_attn, 1)
+        # [bs; n children, h size]
+        h_f = self.U_f(h_attn)
+
+        # [bs; n children; h size]
+        fc = torch.sigmoid(h_f + nodes.data['x_f'].unsqueeze(1))
+        fc = fc * nodes.mailbox['c']
 
         return {
             'Uh_sum': self.U_iou(h_iou),
-            'fc_sum': torch.sum(nodes.mailbox['fc'], dim=1)
+            'fc_sum': torch.sum(fc, dim=1)
         }
 
     def get_reduce_func(self):
