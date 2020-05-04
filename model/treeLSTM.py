@@ -6,7 +6,7 @@ import torch.nn as nn
 
 from model.encoder import _IEncoder
 from model.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, SelfAttentionTreeLSTMCell, \
-    SequenceTreeLSTMCell
+    SequenceTreeLSTMCell, ConvolutionalTreeLSTMCell
 from utils.common import get_root_indexes
 
 
@@ -16,7 +16,8 @@ class TreeLSTM(_IEncoder):
         ChildSumTreeLSTMCell.__name__: ChildSumTreeLSTMCell,
         LuongAttentionTreeLSTMCell.__name__: LuongAttentionTreeLSTMCell,
         SelfAttentionTreeLSTMCell.__name__: SelfAttentionTreeLSTMCell,
-        SequenceTreeLSTMCell.__name__: SequenceTreeLSTMCell
+        SequenceTreeLSTMCell.__name__: SequenceTreeLSTMCell,
+        ConvolutionalTreeLSTMCell.__name__: ConvolutionalTreeLSTMCell
     }
 
     def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0., n_layers: int = 1):
