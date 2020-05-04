@@ -133,8 +133,7 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
 
     def __init__(self, x_size: int, h_size: int, n_heads: int):
         super().__init__(x_size, h_size)
-        self.mha_h = torch.nn.MultiheadAttention(self.h_size, n_heads)
-        self.mha_fc = torch.nn.MultiheadAttention(self.h_size, n_heads)
+        self.mha = torch.nn.MultiheadAttention(self.h_size, n_heads)
 
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
         self.U_f = nn.Linear(self.h_size, self.h_size)
@@ -152,12 +151,11 @@ class SelfAttentionTreeLSTMCell(_ITreeLSTMCell):
         # [1, bs, x size]
         query = nodes.data['x'].unsqueeze(0)
         # [n children, bs, h size]
-        h_kv = nodes.mailbox['h'].transpose(0, 1)
-        fc_kv = nodes.mailbox['fc'].transpose(0, 1)
+        key_value = nodes.mailbox['h'].transpose(0, 1)
 
         # [bs, h size]
-        h_attn = self.mha_h(query, h_kv, h_kv)[0].squeeze(0)
-        fc_sum = self.mha_fc(query, fc_kv, fc_kv)[0].squeeze(0)
+        h_attn = self.mha(query, key_value, key_value)[0].squeeze(0)
+        fc_sum = torch.sum(nodes.mailbox['fc'], 1)
 
         return {
             'Uh_sum': self.U_iou(h_attn),  # name for using with super functions
