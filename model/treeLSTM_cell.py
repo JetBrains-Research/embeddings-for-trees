@@ -229,7 +229,7 @@ class ConvolutionalTreeLSTMCell(_ITreeLSTMCell):
         # [bs; 1; n children; h size]
         h = nodes.mailbox['h'].unsqueeze(1)
         # [bs; h size]
-        h = self.convolution(h).sum(2).squeeze(1)
+        h = self.convolution(h).max(2)[0].squeeze(1)
 
         return {
             'Uh_sum': self.U_iou(h),
