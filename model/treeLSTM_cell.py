@@ -211,7 +211,7 @@ class ConvolutionalTreeLSTMCell(_ITreeLSTMCell):
         assert kernel % 2 == 1, f"Kernel size should be odd for keeping the same size after convolutional"
         super().__init__(x_size, h_size)
         padding = (kernel - 1) // 2
-        self.convolutional = nn.Conv2d(1, 1, kernel, padding=padding)
+        self.convolution = nn.Conv2d(1, 1, kernel, padding=padding)
 
         self.U_iou = nn.Linear(self.h_size, 3 * self.h_size)
         self.U_f = nn.Linear(self.h_size, self.h_size)
@@ -229,7 +229,7 @@ class ConvolutionalTreeLSTMCell(_ITreeLSTMCell):
         # [bs; 1; n children; h size]
         h = nodes.mailbox['h'].unsqueeze(1)
         # [bs; h size]
-        h = self.convolutional(h).sum(2).squeeze(1)
+        h = self.convolution(h).sum(2).squeeze(1)
 
         return {
             'Uh_sum': self.U_iou(h),
