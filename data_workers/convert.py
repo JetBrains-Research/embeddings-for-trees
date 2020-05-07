@@ -2,11 +2,11 @@ import os
 import re
 from datetime import datetime
 from multiprocessing import Pool, cpu_count
-from typing import Dict, List
+from pickle import dump, load
+from typing import Dict
 
 import numpy as np
 import pandas as pd
-import torch
 from dgl import DGLGraph, batch, unbatch
 from dgl.data.utils import save_graphs, load_graphs
 from tqdm.auto import tqdm
@@ -127,11 +127,11 @@ def convert_project(project_path: str, token_to_id: Dict, type_to_id: Dict, labe
     labels = np.stack(description_ordered[mask_per_ast]['label_feature'].values)
     source_paths = np.stack(description_ordered[mask_per_ast]['source_file'].values)
 
-    # TODO: store source paths
-    save_graphs(
-        os.path.join(project_path, 'converted.dgl'), graphs,
-        {'labels': torch.tensor(labels)}
-    )
+    save_graphs(os.path.join(project_path, 'converted.dgl'), graphs)
+    with open(os.path.join(project_path, 'converted.pkl'), 'wb') as pkl_file:
+        dump({
+            'labels': labels, 'source_paths': source_paths
+        }, pkl_file)
 
 
 def _convert_project_safe(project_path: str, log_file: str,  **kwargs):
@@ -170,32 +170,46 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
 
     graphs = []
     labels = []
+    source_paths = []
     print("load graphs to memory...")
     for project_path in tqdm(projects_paths):
-        store_path = os.path.join(project_path, 'converted.dgl')
-        if not os.path.exists(os.path.join(project_path, 'converted.dgl')):
+        graph_path = os.path.join(project_path, 'converted.dgl')
+        labels_path = os.path.join(project_path, 'converted.pkl')
+        if not os.path.exists(graph_path) or not os.path.exists(labels_path):
             with open(log_file, 'a') as file:
                 file.write(f"can't load graphs for {project_path} project\n")
             continue
-        cur_graphs, cur_labels = load_graphs(store_path)
+        cur_graphs, _ = load_graphs(graph_path)
+        with open(labels_path, 'rb') as pkl_file:
+            pkl_data = load(pkl_file)
+            cur_labels, cur_source_paths = pkl_data['labels'], pkl_data['source_paths']
         graphs += cur_graphs
-        labels.append(cur_labels['labels'])
+        labels.append(cur_labels)
+        source_paths.append(cur_source_paths)
     graphs = np.array(graphs)
-    labels = torch.cat(labels)
+    labels = np.vstack(labels)
+    source_paths = np.concatenate(source_paths)
 
     assert len(graphs) == len(labels), "unequal lengths of graphs and labels"
+    assert len(graphs) == len(source_paths), "unequal lengths of graphs and source paths"
     print(f"total number of graphs: {len(graphs)}")
 
     if shuffle:
         order = np.random.permutation(len(graphs))
         graphs = graphs[order]
         labels = labels[order]
+        source_paths = source_paths[order]
 
     print(f"save batches...")
     n_batches = len(graphs) // batch_size + (1 if len(graphs) % batch_size > 0 else 0)
     for batch_num in tqdm(range(n_batches)):
         current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(graphs)))
-        output_path = os.path.join(output_holdout_path, f'batch_{batch_num}.dgl')
-        save_graphs(output_path, graphs[current_slice], {'labels': labels[current_slice]})
+        output_graph_path = os.path.join(output_holdout_path, f'batch_{batch_num}.dgl')
+        output_labels_path = os.path.join(output_holdout_path, f'batch_{batch_num}.pkl')
+        save_graphs(output_graph_path, graphs[current_slice])
+        with open(output_labels_path, 'wb') as pkl_file:
+            dump({
+                'labels': labels[current_slice], 'source_paths': source_paths[current_slice]
+            }, pkl_file)
 
     return output_holdout_path
