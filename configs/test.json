@@ -27,9 +27,8 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "SelfAttentionTreeLSTMCell",
+        "name": "ChildSumTreeLSTMCell",
         "params": {
-          "a_size": 64
         }
       },
       "dropout": 0.25,
@@ -63,6 +62,9 @@
     "max_lr": 0.1,
     "min_lr": 0.0
   },
+
+  "max_n_nodes": 250,
+  "max_depth": 20,
 
   "evaluation_step": 50,
   "logging_step": 10,

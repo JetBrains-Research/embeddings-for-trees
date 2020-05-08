@@ -21,11 +21,17 @@ def _get_batches(path: str, ext: str) -> List[str]:
 class JavaDataset(Dataset):
 
     def __init__(
-            self, dataset_path: str, batch_size: int, device: torch.device, invert_edges: bool = False
+            self, dataset_path: str, batch_size: int, device: torch.device,
+            invert_edges: bool = False, max_n_nodes: int = -1, max_depth: int = -1
     ) -> None:
-        assert os.path.exists(dataset_path)
+        if not os.path.exists(dataset_path):
+            raise ValueError(f"no dataset found on {dataset_path}")
+
         self.device = device
         self.invert_edges = invert_edges
+        self.max_n_nodes = max_n_nodes
+        self.max_depth = max_depth
+
         label_files = _get_batches(dataset_path, 'pkl')
         graph_files = _get_batches(dataset_path, 'dgl')
         self.batch_description = []
@@ -52,6 +58,10 @@ class JavaDataset(Dataset):
     def __len__(self) -> int:
         return len(self.batch_description)
 
+    def _is_tree_suitable(self, tree: DGLGraph) -> bool:
+        return (self.max_n_nodes == -1 or tree.number_of_nodes() < self.max_n_nodes) and\
+               (self.max_depth == -1 or get_tree_depth(tree) < self.max_depth)
+
     def __getitem__(self, item) -> Tuple[DGLGraph, torch.Tensor]:
         graph_filename, label_filename, start_index, end_index = self.batch_description[item]
 
@@ -62,10 +72,7 @@ class JavaDataset(Dataset):
             self.labels = torch.tensor(pkl_data['labels'].T, device=self.device).detach()
 
         graphs, _ = load_graphs(graph_filename, list(range(start_index, end_index)))
-        graphs, mask = zip(*[
-            (g, i) for i, g in enumerate(graphs)
-            if g.number_of_nodes() < 10000 and get_tree_depth(g) < 100
-        ])
+        graphs, mask = zip(*[(g, i) for i, g in enumerate(graphs) if self._is_tree_suitable(g)])
 
         if self.invert_edges:
             graphs = [g.reverse(share_ndata=True) for g in graphs]

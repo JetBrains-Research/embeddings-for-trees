@@ -62,6 +62,9 @@
     "gamma": 0.5
   },
 
+  "max_n_nodes": 250,
+  "max_depth": 20,
+
   "evaluation_step": 1500,
   "logging_step": 10,
   "logging_folder": "logs",

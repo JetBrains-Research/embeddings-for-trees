@@ -27,7 +27,10 @@ def train(params: Dict, logger_name: str) -> None:
         params = checkpoint['config']
         params['resume_wandb_id'] = resume_wandb_id
 
-    training_set = JavaDataset(params['paths']['train'], params['batch_size'], device, True)
+    training_set = JavaDataset(
+        params['paths']['train'], params['batch_size'], device, True,
+        params.get('max_n_nodes', -1), params.get('max_depth', -1)
+    )
     validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], device, True)
 
     with open(params['paths']['vocabulary'], 'rb') as pkl_file:
