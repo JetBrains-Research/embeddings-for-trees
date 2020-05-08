@@ -136,7 +136,7 @@ dependencies:
     - googleapis-common-protos==1.51.0
     - gql==0.2.0
     - graphql-core==1.1
-    - httplib2==0.17.3
+    - httplib2==0.15.0
     - jmespath==0.9.5
     - kiwisolver==1.2.0
     - matplotlib==3.2.1
