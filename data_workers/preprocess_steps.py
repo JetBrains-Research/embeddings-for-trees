@@ -1,15 +1,16 @@
 import os
 from collections import Counter
-from subprocess import run as subprocess_run
-from typing import Tuple, Dict, List
 from pickle import dump as pickle_dump
+from subprocess import run as subprocess_run
+from typing import List
 
 import pandas as pd
 from requests import get
 from tqdm.auto import tqdm
 
+from data_workers.drive_workers import upload_file as drive_upload_file
+from data_workers.s3_worker import upload_file as s3_upload_file
 from utils.common import extract_tar_gz, create_folder, UNK, PAD, SOS, EOS
-from utils.s3_worker import upload_file
 
 
 def _download_dataset(name: str, download_path: str, dataset_url: str, block_size: int = 1024) -> str:
@@ -126,8 +127,7 @@ def collect_vocabulary(
 
 
 def upload_dataset(
-        dataset_name: str, tar_suffix: str, data_path: str, vocabulary_name: str,
-        holdout_folders: List[str], s3_bucket_name: str
+        dataset_name: str, store: str, tar_suffix: str, data_path: str, vocabulary_name: str, holdout_folders: List[str]
 ):
     tar_file_name = f'{dataset_name}_{tar_suffix}.tar.gz'
     completed_process = subprocess_run(
@@ -138,4 +138,7 @@ def upload_dataset(
     if completed_process.returncode != 0:
         print(f"can't create tar for preprocessed data, failed with\n{completed_process.stdout}")
     else:
-        upload_file(os.path.join(data_path, tar_file_name), s3_bucket_name, tar_file_name)
+        if store == 's3':
+            s3_upload_file(os.path.join(data_path, tar_file_name), tar_file_name)
+        elif store == 'drive':
+            drive_upload_file(os.path.join(data_path, tar_file_name))

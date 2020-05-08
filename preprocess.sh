@@ -1,7 +1,7 @@
 #!/bin/bash
 
 PS3="Choose data preprocessing step: "
-options=("Download" "Build AST" "Collect vocabulary" "Convert to DGL format" "Upload to S3")
+options=("Download" "Build AST" "Collect vocabulary" "Convert to DGL format" "Upload to cloud")
 select opt in "${options[@]}"
 do
     case ${opt} in
@@ -28,9 +28,8 @@ do
                 --tokens_to_leaves --max_token_len 5 --max_label_len 6 --wrap_labels
             break
             ;;
-        "Upload to S3")
-            # upload to s3
-            PYTHONPATH='.' python data_workers/preprocess.py "$1" --upload --tar_suffix "$2"
+        "Upload to cloud")
+            PYTHONPATH='.' python data_workers/preprocess.py "$1" --upload --store drive --tar_suffix "$2"
             break
             ;;
          *) echo "invalid option $REPLY";;

@@ -19,6 +19,7 @@ dependencies:
   - decorator=4.4.2=py_0
   - defusedxml=0.6.0=py_0
   - dgl=0.4.3=py37_0
+  - docutils=0.15.2=py37_0
   - entrypoints=0.3=py37_0
   - expat=2.2.6=he6710b0_0
   - fontconfig=2.13.0=h9420a91_0
@@ -96,7 +97,6 @@ dependencies:
   - qtconsole=4.7.2=py_0
   - qtpy=1.9.0=py_0
   - readline=8.0=h7b6447c_0
-  - s3transfer=0.1.13=py37_0
   - scipy=1.4.1=py37h0b6359f_0
   - send2trash=1.5.0=py37_0
   - setuptools=46.1.3=py37_0
@@ -120,34 +120,46 @@ dependencies:
   - pip:
     - boto3==1.12.31
     - botocore==1.15.31
+    - cachetools==4.1.0
     - chardet==3.0.4
     - click==7.1.1
     - colorama==0.4.3
     - configparser==5.0.0
     - cycler==0.10.0
     - docker-pycreds==0.4.0
-    - docutils==0.15.2
     - gitdb==4.0.2
     - gitpython==3.1.0
+    - google-api-core==1.17.0
+    - google-api-python-client==1.8.2
+    - google-auth==1.14.2
+    - google-auth-httplib2==0.0.3
+    - googleapis-common-protos==1.51.0
     - gql==0.2.0
     - graphql-core==1.1
+    - httplib2==0.17.3
     - jmespath==0.9.5
     - kiwisolver==1.2.0
     - matplotlib==3.2.1
     - nvidia-ml-py3==7.352.0
+    - oauth2client==4.1.3
     - pathtools==0.1.2
     - promise==2.3
+    - protobuf==3.11.3
     - psutil==5.7.0
     - pyasn1==0.4.8
+    - pyasn1-modules==0.2.8
+    - pydrive==1.3.1
     - pyparsing==2.4.6
     - pyyaml==5.3.1
     - requests==2.23.0
     - rsa==3.4.2
+    - s3transfer==0.3.3
     - sentry-sdk==0.14.3
     - shortuuid==1.0.1
     - smmap==3.0.1
     - subprocess32==3.5.4
     - tqdm==4.44.1
+    - uritemplate==3.0.1
     - wandb==0.8.31
     - watchdog==0.10.2
 prefix: /home/spirin/anaconda3/envs/tree_embedding

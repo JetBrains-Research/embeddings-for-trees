@@ -13,8 +13,6 @@ holdout_folders = ['training', 'validation', 'test']
 dataset_url = 'https://s3.amazonaws.com/code2seq/datasets/{}.tar.gz'
 astminer_cli_path = 'utils/astminer-cli.jar'
 
-s3_bucket_name = 'voudy'
-
 dataset_mapping = {
     'small': 'java-small',
     'medium': 'java-med',
@@ -72,7 +70,7 @@ def main(args: Namespace) -> None:
     if args.upload:
         if not all([os.path.exists(path) for path in preprocessed_paths]):
             raise RuntimeError("convert ast before uploading it")
-        upload_dataset(dataset_name, args.tar_suffix, data_path, vocabulary_name, holdout_folders, s3_bucket_name)
+        upload_dataset(dataset_name, args.store, args.tar_suffix, data_path, vocabulary_name, holdout_folders)
 
     if all([os.path.exists(path) for path in preprocessed_paths]):
         for holdout, path in zip(holdout_folders, preprocessed_paths):
@@ -103,6 +101,7 @@ if __name__ == '__main__':
     arg_parser.add_argument('--max_label_len', type=int, default=-1)
 
     arg_parser.add_argument('--upload', action='store_true')
+    arg_parser.add_argument('--store', choices=['s3', 'drive'], default='drive')
     arg_parser.add_argument('--tar_suffix', type=str, default='default')
 
     main(arg_parser.parse_args())

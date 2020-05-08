@@ -1,8 +1,12 @@
-import boto3
 from os.path import getsize, basename
+
+import boto3
 from tqdm.auto import tqdm
 
 # https://boto3.amazonaws.com/v1/documentation/api/latest/guide/s3-uploading-files.html
+
+
+BUCKET_NAME = 'voudy'
 
 
 class ProgressPercentage(object):
@@ -19,7 +23,7 @@ class ProgressPercentage(object):
         self._progress_bar.update(bytes_amount)
 
 
-def upload_file(file_name, bucket, object_name=None):
+def upload_file(file_name, object_name=None):
     """Upload a file to an S3 bucket
 
     :param file_name: File to upload
@@ -34,20 +38,20 @@ def upload_file(file_name, bucket, object_name=None):
     # Upload the file
     s3_client = boto3.client('s3')
     response = s3_client.upload_file(
-        file_name, bucket, object_name,
+        file_name, BUCKET_NAME, object_name,
         Callback=ProgressPercentage(file_name)
     )
 
 
-def download_file(file_name, bucket, object_name):
+def download_file(file_name, object_name):
 
     s3_client = boto3.client('s3')
     s3_resources = boto3.resource('s3')
-    for s3_object in s3_resources.Bucket(bucket).objects.all():
+    for s3_object in s3_resources.Bucket(BUCKET_NAME).objects.all():
         if s3_object.key == object_name:
             size = s3_object.size
             s3_client.download_file(
-                bucket, object_name, file_name,
+                BUCKET_NAME, object_name, file_name,
                 Callback=ProgressPercentage(file_name, size)
             )
             return True
