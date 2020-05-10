@@ -140,4 +140,5 @@ def train_on_dataset(
             eval_info = evaluate_on_dataset(val_dataset, model, criterion, device)
             logger.log(eval_info.get_state_dict(), batch_id, is_train=False)
 
-    logger.log(train_epoch_info.get_state_dict(), len(train_dataset), is_train=True)
+    if train_epoch_info.batch_processed > 0:
+        logger.log(train_epoch_info.get_state_dict(), len(train_dataset) - 1, is_train=True)
