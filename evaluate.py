@@ -38,7 +38,7 @@ def evaluate(params: Dict) -> None:
 
 if __name__ == '__main__':
     arg_parse = ArgumentParser()
-    arg_parse.add_argument('--config', type=str, required=True, help='path to config json')
+    arg_parse.add_argument('config', type=str, required=True, help='path to config json')
     args = arg_parse.parse_args()
 
     with open(args.config) as config_file:
