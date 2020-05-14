@@ -58,7 +58,7 @@
 
   "scheduler": {
     "name": "step",
-    "size": 350,
+    "step": 350,
     "gamma": 0.5
   },
 
