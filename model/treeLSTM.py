@@ -20,12 +20,16 @@ class TreeLSTM(_IEncoder):
         ConvolutionalTreeLSTMCell.__name__: ConvolutionalTreeLSTMCell
     }
 
-    def __init__(self, h_emb: int, h_enc: int, cell: Dict, dropout: float = 0., n_layers: int = 1):
+    def __init__(
+            self, h_emb: int, h_enc: int, cell: Dict,
+            dropout: float = 0., n_layers: int = 1, residual: bool = False
+    ):
         super().__init__(h_emb, h_enc)
         if cell['name'] not in self._tree_lstm_cells:
             raise ValueError(f"unknown TreeLSTM cell: {cell['name']}")
         self.dropout = nn.Dropout(dropout)
         self.n_layers = n_layers
+        self.residual = residual
 
         self.norm = nn.ModuleList([nn.LayerNorm(h_enc) for _ in range(self.n_layers)])
         self.cell = nn.ModuleList([
@@ -46,7 +50,10 @@ class TreeLSTM(_IEncoder):
                 apply_node_func=self.cell[layer].get_apply_node_func()
             )
 
-            x = self.norm[layer](graph.ndata.pop('h') + x)
+            if self.residual:
+                x = self.norm[layer](graph.ndata.pop('h') + x)
+            else:
+                x = graph.ndata.pop('h')
 
         c = graph.ndata.pop('c')
         return x, c
