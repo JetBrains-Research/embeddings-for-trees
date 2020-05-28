@@ -41,7 +41,7 @@ class LinearDecoder(_IDecoder):
 
     def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict) -> None:
         super().__init__(h_enc, h_dec, label_to_id)
-        self.linear = nn.Linear(h_enc, h_dec)
+        self.linear = nn.Linear(self.h_enc, self.out_size)
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
