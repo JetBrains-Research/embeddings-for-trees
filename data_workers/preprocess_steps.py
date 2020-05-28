@@ -96,7 +96,7 @@ def collect_vocabulary(
         label_to_id[EOS] = 3
     if wrap_tokens:
         token_to_id[SOS] = 2
-        label_to_id[EOS] = 3
+        token_to_id[EOS] = 3
 
     projects = os.listdir(train_path)
     print("collect vocabulary from training holdout")
