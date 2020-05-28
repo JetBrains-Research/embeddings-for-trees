@@ -29,7 +29,7 @@ do
             break
             ;;
         "Upload to cloud")
-            PYTHONPATH='.' python data_workers/preprocess.py "$1" --upload --store drive --tar_suffix "$2"
+            PYTHONPATH='.' python data_workers/preprocess.py "$1" --upload --store aws --tar_suffix "$2"
             break
             ;;
          *) echo "invalid option $REPLY";;
