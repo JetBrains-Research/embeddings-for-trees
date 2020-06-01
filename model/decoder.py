@@ -39,9 +39,10 @@ class _IDecoder(nn.Module):
 
 class LinearDecoder(_IDecoder):
 
-    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict) -> None:
+    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.) -> None:
         super().__init__(h_enc, h_dec, label_to_id)
         self.linear = nn.Linear(self.h_enc, self.out_size)
+        self.dropout = nn.Dropout(dropout)
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
@@ -55,6 +56,7 @@ class LinearDecoder(_IDecoder):
 
         # [batch size, hidden state]
         root_hidden_states = node_hidden_states[root_indexes]
+        root_hidden_states = self.dropout(root_hidden_states)
 
         # [1, batch size, vocab size]
         logits = self.linear(root_hidden_states).unsqueeze(0)
@@ -162,9 +164,10 @@ class LSTMDecoder(_IDecoder):
             else:
                 current_input = current_output.argmax(dim=-1)
 
-        del weighted_hidden_states
-        del attention
+        if self.use_attention:
+            del weighted_hidden_states
+            del attention
+            del attended_hidden_states
         del embedded
-        del attended_hidden_states
         del current_output
         return outputs
