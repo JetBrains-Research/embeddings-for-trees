@@ -28,7 +28,7 @@ google-auth-httplib2==0.0.3
 googleapis-common-protos==1.51.0
 gql==0.2.0
 graphql-core==1.1
-httplib2==0.15.0
+httplib2==0.18.1
 idna==2.9
 importlib-metadata==1.6.0
 ipykernel==5.1.4
@@ -88,11 +88,11 @@ pyzmq==18.1.1
 qtconsole==4.7.2
 QtPy==1.9.0
 requests==2.23.0
-rsa==3.4.2
+rsa==4.0
 s3transfer==0.3.3
 scipy==1.4.1
 Send2Trash==1.5.0
-sentry-sdk==0.14.3
+sentry-sdk==0.14.4
 shortuuid==1.0.1
 six==1.15.0
 smmap==3.0.4
