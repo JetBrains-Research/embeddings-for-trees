@@ -51,7 +51,7 @@ class Decoder(nn.Module):
 
         if self.decoder_name not in self._known_decoders:
             raise ValueError(f"Unknown decoder: {self.decoder_name}")
-        self.decoder = self._known_decoders[self.decoder_name](**params)
+        self.decoder = self._known_decoders[self.decoder_name](self.h_enc, self.h_dec, self.label_to_id, **params)
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
