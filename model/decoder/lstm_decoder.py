@@ -1,70 +1,16 @@
-from typing import Dict, Tuple, Union
+from typing import Union, Tuple, Dict
 
 import torch
-import torch.nn as nn
+from torch import nn
 
-from model.attention import get_attention
-from utils.common import PAD, UNK, segment_sizes_to_slices
-
-
-class _IDecoder(nn.Module):
-    """Decode sequence given hidden states of nodes"""
-
-    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict) -> None:
-        super().__init__()
-        self.h_enc = h_enc
-        self.h_dec = h_dec
-        self.label_to_id = label_to_id
-
-        if UNK not in self.label_to_id:
-            self.label_to_id[UNK] = len(self.label_to_id)
-
-        self.out_size = len(self.label_to_id)
-        self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
-
-    def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
-    ) -> torch.Tensor:
-        """Decode given encoded vectors of nodes
-
-        :param encoded_data: tensor or tuple of tensors with encoded data
-        :param labels: tensor of labels [sequence len, batch size]
-        :param root_indexes: indexes of roots in encoded data
-        :param device: torch device object
-        :return: logits [sequence len, batch size, labels vocab size]
-        """
-        raise NotImplementedError
+from model.decoder import ITreeDecoder
+from model.decoder.attention import get_attention
+from utils.common import segment_sizes_to_slices
 
 
-class LinearDecoder(_IDecoder):
+class LSTMDecoder(ITreeDecoder):
 
-    def __init__(self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.) -> None:
-        super().__init__(h_enc, h_dec, label_to_id)
-        self.linear = nn.Linear(self.h_enc, self.out_size)
-        self.dropout = nn.Dropout(dropout)
-
-    def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
-    ) -> torch.Tensor:
-        # [number of nodes, hidden state]
-        if isinstance(encoded_data, tuple):
-            node_hidden_states = encoded_data[0]
-        else:
-            node_hidden_states = encoded_data
-
-        # [batch size, hidden state]
-        root_hidden_states = node_hidden_states[root_indexes]
-        root_hidden_states = self.dropout(root_hidden_states)
-
-        # [1, batch size, vocab size]
-        logits = self.linear(root_hidden_states).unsqueeze(0)
-
-        return logits
-
-
-class LSTMDecoder(_IDecoder):
+    name = "LSTM"
 
     def __init__(
             self, h_enc: int, h_dec: int, label_to_id: Dict, dropout: float = 0.,

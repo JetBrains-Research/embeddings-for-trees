@@ -4,13 +4,13 @@ import torch
 import torch.nn as nn
 from dgl import DGLGraph
 
-from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
+from model.decoder import Decoder
 from model.embedding import Embedding
 from model.encoder import Encoder
 
 
 class Tree2Seq(nn.Module):
-    def __init__(self, embedding: Embedding, encoder: Encoder, decoder: _IDecoder) -> None:
+    def __init__(self, embedding: Embedding, encoder: Encoder, decoder: Decoder) -> None:
         super().__init__()
         self.embedding = embedding
         self.encoder = encoder
@@ -48,10 +48,6 @@ class Tree2Seq(nn.Module):
 
 
 class ModelBuilder:
-    _decoders = {
-        LinearDecoder.__name__: LinearDecoder,
-        LSTMDecoder.__name__: LSTMDecoder,
-    }
 
     def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict,
                  hidden_states: Dict, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
@@ -64,8 +60,6 @@ class ModelBuilder:
         self.token_to_id = token_to_id
         self.type_to_id = type_to_id
         self.label_to_id = label_to_id
-
-        self.decoder = self._get_module(self.decoder_info['name'], self._decoders)
 
     @staticmethod
     def _get_module(module_name: str, modules_dict: Dict) -> nn.Module:
@@ -83,9 +77,9 @@ class ModelBuilder:
                 h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
                 **self.encoder_info
             ),
-            self.decoder(
+            Decoder(
                 h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
-                label_to_id=self.label_to_id, **self.decoder_info['params']
+                label_to_id=self.label_to_id, **self.decoder_info
             )
         ).to(device)
 
