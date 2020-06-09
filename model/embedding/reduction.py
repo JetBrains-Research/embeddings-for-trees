@@ -5,6 +5,9 @@ import torch.nn as nn
 
 
 class IReduction(nn.Module):
+
+    name = "reduction interface"
+
     def __init__(self, n_embeds: int, h_emb: int):
         super().__init__()
         self.n_embeds = n_embeds
@@ -19,6 +22,9 @@ class IReduction(nn.Module):
 
 
 class SumReduction(IReduction):
+
+    name = "sum"
+
     def __init__(self, n_embeds: int, h_emb: int) -> int:
         super().__init__(n_embeds, h_emb)
 
@@ -27,6 +33,9 @@ class SumReduction(IReduction):
 
 
 class LinearReduction(IReduction):
+
+    name = "linear"
+
     _activations = {
         'tanh': nn.Tanh,
         'relu': nn.ReLU
@@ -45,6 +54,9 @@ class LinearReduction(IReduction):
 
 
 class ConcatenationReduction(IReduction):
+
+    name = "concat"
+
     def __init__(self, n_embeds: int, h_emb: int):
         super().__init__(n_embeds, h_emb)
         if h_emb % n_embeds != 0:

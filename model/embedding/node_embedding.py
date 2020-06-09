@@ -14,6 +14,8 @@ class INodeEmbedding(nn.Module):
     Forward method takes batched graph and applies embedding to its features.
     """
 
+    name = "Node embedding interface"
+
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
         super().__init__()
         self.token_to_id = token_to_id
@@ -35,6 +37,9 @@ class INodeEmbedding(nn.Module):
 
 
 class TokenNodeEmbedding(INodeEmbedding):
+
+    name = "token"
+
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
         self.token_embedding = nn.Embedding(self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index)
@@ -48,6 +53,9 @@ class TokenNodeEmbedding(INodeEmbedding):
 
 
 class TypeNodeEmbedding(INodeEmbedding):
+
+    name = "type"
+
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
         self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
@@ -61,6 +69,9 @@ class TypeNodeEmbedding(INodeEmbedding):
 
 
 class SubTokenNodeEmbedding(INodeEmbedding):
+
+    name = "subtoken"
+
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False,
                  delimiter: str = '|') -> None:
         self.delimiter = delimiter

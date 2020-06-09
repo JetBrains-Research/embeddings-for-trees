@@ -3,13 +3,15 @@ from typing import Dict
 import dgl
 import torch
 
-from embedding.node_embedding import INodeEmbedding
+from model.embedding.node_embedding import INodeEmbedding
 
 
 class PositionalEmbedding(INodeEmbedding):
     """Implement positional embedding from
     https://papers.nips.cc/paper/9376-novel-positional-encodings-to-enable-tree-based-transformers.pdf
     """
+
+    name = "positional"
 
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, n: int, k: int, p: float = 1.) -> None:
         """
