@@ -6,13 +6,11 @@ from dgl import DGLGraph
 
 from model.decoder import _IDecoder, LinearDecoder, LSTMDecoder
 from model.embedding import Embedding
-from model.encoder import _IEncoder
-from model.transformer import TransformerEncoder
-from model.treeLSTM import TreeLSTM, TwoOrderLSTM, DfsLSTM
+from model.encoder import Encoder
 
 
 class Tree2Seq(nn.Module):
-    def __init__(self, embedding: Embedding, encoder: _IEncoder, decoder: _IDecoder) -> None:
+    def __init__(self, embedding: Embedding, encoder: Encoder, decoder: _IDecoder) -> None:
         super().__init__()
         self.embedding = embedding
         self.encoder = encoder
@@ -50,12 +48,6 @@ class Tree2Seq(nn.Module):
 
 
 class ModelBuilder:
-    _encoders = {
-        TreeLSTM.__name__: TreeLSTM,
-        TransformerEncoder.__name__: TransformerEncoder,
-        DfsLSTM.__name__: DfsLSTM,
-        TwoOrderLSTM.__name__: TwoOrderLSTM
-    }
     _decoders = {
         LinearDecoder.__name__: LinearDecoder,
         LSTMDecoder.__name__: LSTMDecoder,
@@ -73,7 +65,6 @@ class ModelBuilder:
         self.type_to_id = type_to_id
         self.label_to_id = label_to_id
 
-        self.encoder = self._get_module(self.encoder_info['name'], self._encoders)
         self.decoder = self._get_module(self.decoder_info['name'], self._decoders)
 
     @staticmethod
@@ -88,9 +79,9 @@ class ModelBuilder:
                 h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
                 type_to_id=self.type_to_id, **self.embedding_info
             ),
-            self.encoder(
+            Encoder(
                 h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
-                **self.encoder_info['params']
+                **self.encoder_info
             ),
             self.decoder(
                 h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],

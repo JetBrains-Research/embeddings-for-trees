@@ -2,9 +2,9 @@ import unittest
 
 import torch
 
-from utils.common import fix_seed, get_device
+from encoder.transformer_encoder import TransformerEncoder
 from test_utils import gen_node_with_children
-from model.transformer import TransformerEncoder
+from utils.common import fix_seed, get_device
 
 
 class TransformerEncoderTest(unittest.TestCase):
