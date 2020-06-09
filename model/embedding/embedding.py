@@ -4,7 +4,7 @@ import dgl
 import torch
 import torch.nn as nn
 
-from common import UNK, PAD
+from utils.common import UNK, PAD
 
 
 class INodeEmbedding(nn.Module):

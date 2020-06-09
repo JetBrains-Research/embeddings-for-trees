@@ -5,9 +5,9 @@ import torch
 from numpy.ma import sqrt
 from torch import nn
 
-from common import UNK, PAD, METHOD_NAME, NAN, SELF
 from model.embedding import INodeEmbedding
-from token_processing import get_dict_of_subtokens
+from utils.common import UNK, PAD, METHOD_NAME, NAN, SELF
+from utils.token_processing import get_dict_of_subtokens
 
 
 class TokenNodeEmbedding(INodeEmbedding):
