@@ -4,10 +4,12 @@ import dgl
 import torch
 import torch.nn as nn
 
-from model.encoder.tree_encoder import ITreeEncoder
+from model.encoder import ITreeEncoder
 
 
 class TransformerEncoder(ITreeEncoder):
+
+    name = "Transformer"
 
     def __init__(
             self, h_emb: int, h_enc: int, n_heads: int, h_ffd: int = 2048, dropout: float = 0.1, n_layers: int = 1

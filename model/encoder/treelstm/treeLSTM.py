@@ -4,7 +4,7 @@ import dgl
 import torch
 import torch.nn as nn
 
-from model.encoder.tree_encoder import ITreeEncoder
+from model.encoder import ITreeEncoder
 from model.encoder.treelstm.treeLSTM_cell import ChildSumTreeLSTMCell, LuongAttentionTreeLSTMCell, \
     SelfAttentionTreeLSTMCell, \
     SequenceTreeLSTMCell, ConvolutionalTreeLSTMCell
@@ -12,6 +12,8 @@ from utils.common import get_root_indexes
 
 
 class TreeLSTM(ITreeEncoder):
+
+    name = "TreeLSTM"
 
     _tree_lstm_cells = {
         ChildSumTreeLSTMCell.__name__: ChildSumTreeLSTMCell,
@@ -62,6 +64,8 @@ class TreeLSTM(ITreeEncoder):
 
 class DfsLSTM(ITreeEncoder):
 
+    name = "DfsLSTM"
+
     def __init__(self, h_emb: int, h_enc: int, dropout: float):
         super().__init__(h_emb, h_enc)
         self.lstm = nn.LSTMCell(self.h_emb, self.h_enc)
@@ -106,6 +110,8 @@ class DfsLSTM(ITreeEncoder):
 
 
 class TwoOrderLSTM(ITreeEncoder):
+
+    name = "TwoOrderLSTM"
 
     def __init__(self, h_emb: int, h_enc: int, dropout: float):
         super().__init__(h_emb, h_enc)
