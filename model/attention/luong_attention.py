@@ -1,32 +1,16 @@
-from math import sqrt
 from typing import List
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as f
+from torch import nn
 
+from model.attention import ISubtreeAttention
 from utils.common import segment_sizes_to_slices
 
 
-class _IAttention(nn.Module):
-    def __init__(self, h_enc: int, h_dec: int) -> None:
-        super().__init__()
-        self.h_enc = h_enc
-        self.h_dec = h_dec
+class LuongAttention(ISubtreeAttention):
 
-    def forward(self, hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
-            -> torch.Tensor:
-        """ Compute attention weights based on previous decoder state and encoder output
+    name = "Luong"
 
-        :param hidden_states: [batch size, hidden size]
-        :param encoder_output: [number of nodes in batch, hidden size]
-        :param tree_sizes: [batch size]
-        :return: attention weights [number of nodes in batch, 1]
-        """
-        raise NotImplementedError
-
-
-class LuongAttention(_IAttention):
     def __init__(self, h_enc: int, h_dec: int, score: str = 'concat') -> None:
         super().__init__(h_enc, h_dec)
         self.score = score
@@ -38,8 +22,7 @@ class LuongAttention(_IAttention):
         else:
             raise ValueError(f"Unknown score function: {score}")
 
-    def forward(self, hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List)\
-            -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, encoder_output: torch.Tensor, tree_sizes: List) -> torch.Tensor:
         # [number of nodes in batch, h_dec]
         repeated_hidden_states = torch.cat(
             [prev_hidden_state.expand(tree_size, -1)
@@ -70,26 +53,3 @@ class LuongAttention(_IAttention):
         )
 
         return attentions
-
-
-def scaled_dot_product_attention(
-        query: torch.Tensor, key: torch.Tensor, value: torch.Tensor,
-        mask: torch.Tensor = None, dropout: nn.Dropout = None
-) -> torch.Tensor:
-    scores = query.matmul(key.transpose(-2, -1)) / sqrt(query.shape[-1])
-    if mask is not None:
-        scores = scores.masked_fill(mask == 0, -1e9)
-    scores = f.softmax(scores, dim=-1)
-    if dropout is not None:
-        scores = dropout(scores)
-    output = torch.matmul(scores, value)
-    return output
-
-
-def get_attention(attention: str) -> _IAttention:
-    attentions = {
-        LuongAttention.__name__: LuongAttention
-    }
-    if attention not in attentions:
-        raise ValueError(f"unknown attention mechanism: {attention}")
-    return attentions[attention]

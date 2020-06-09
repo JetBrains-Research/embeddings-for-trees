@@ -3,8 +3,8 @@ from typing import Union, Tuple, Dict
 import torch
 from torch import nn
 
+from model.attention import Attention
 from model.decoder import ITreeDecoder
-from model.decoder.attention import get_attention
 from utils.common import segment_sizes_to_slices
 
 
@@ -32,12 +32,9 @@ class LSTMDecoder(ITreeDecoder):
         self.linear = nn.Linear(self.h_enc, self.out_size)
         self.dropout = nn.Dropout(dropout)
 
-        if attention is not None:
-            self.use_attention = True
-            attention_class = get_attention(attention['name'])
-            self.attention = attention_class(h_enc=self.h_enc, h_dec=self.h_dec, **attention['params'])
-        else:
-            self.use_attention = False
+        self.use_attention = attention is not None
+        if self.use_attention:
+            self.attention = Attention(self.h_enc, self.h_dec, **attention)
 
         lstm_input_size = self.h_enc + self.h_dec if self.use_attention else self.h_dec
         self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=self.h_enc)
