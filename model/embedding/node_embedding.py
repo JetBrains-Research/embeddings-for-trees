@@ -2,15 +2,14 @@ from typing import Dict
 
 import dgl
 import torch
-import torch.nn as nn
-from numpy import sqrt
+from numpy.ma import sqrt
+from torch import nn
 
-from model.embedding_reduction import SumReduction, LinearReduction, ConcatenationReduction
-from utils.common import UNK, PAD, NAN, METHOD_NAME
-from utils.token_processing import get_dict_of_subtokens
+from common import UNK, PAD, METHOD_NAME, NAN, SELF
+from token_processing import get_dict_of_subtokens
 
 
-class _IEmbedding(nn.Module):
+class INodeEmbedding(nn.Module):
     """Interface of embedding module.
     Forward method takes batched graph and applies embedding to its features.
     """
@@ -35,7 +34,7 @@ class _IEmbedding(nn.Module):
         raise NotImplementedError
 
 
-class FullTokenEmbedding(_IEmbedding):
+class TokenNodeEmbedding(INodeEmbedding):
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
         self.token_embedding = nn.Embedding(self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index)
@@ -48,7 +47,7 @@ class FullTokenEmbedding(_IEmbedding):
         return token_embeds
 
 
-class FullTypeEmbedding(_IEmbedding):
+class TypeNodeEmbedding(INodeEmbedding):
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False) -> None:
         super().__init__(token_to_id, type_to_id, h_emb)
         self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
@@ -61,13 +60,13 @@ class FullTypeEmbedding(_IEmbedding):
         return type_embeds
 
 
-class SubTokenEmbedding(_IEmbedding):
+class SubTokenNodeEmbedding(INodeEmbedding):
     def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, normalize: bool = False,
                  delimiter: str = '|') -> None:
         self.delimiter = delimiter
         self.normalize = normalize
         self.subtoken_to_id, self.token_to_subtokens = \
-            get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN], delimiter=delimiter)
+            get_dict_of_subtokens(token_to_id, required_tokens=[UNK, PAD, METHOD_NAME, NAN, SELF], delimiter=delimiter)
         # subtoken_to_id saved to token_to_id via super class init
         super().__init__(self.subtoken_to_id, type_to_id, h_emb)
         self.subtoken_embedding = nn.Embedding(
@@ -106,82 +105,3 @@ class SubTokenEmbedding(_IEmbedding):
         if self.normalize:
             return token_embeds * sqrt(self.h_emb)
         return token_embeds
-
-
-class PositionalEmbedding(nn.Module):
-    """Implement positional embedding from
-    https://papers.nips.cc/paper/9376-novel-positional-encodings-to-enable-tree-based-transformers.pdf
-    """
-
-    def __init__(self, n: int, k: int, p: float = 1.) -> None:
-        """
-
-        :param n: the degree of tree
-        :param k: the depth of tree
-        :param p: regularization (Not Implemented)
-        """
-        super().__init__()
-        self.n, self.k, self.p = n, k, p
-        self.h_emb = self.n * self.k
-        self.p_emb = torch.tensor([self.p ** i for i in range(self.h_emb)])
-
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
-        """Forward pass for positional embedding
-
-        @param graph: a batched graph with oriented edges from leaves to roots
-        @param device: torch device
-        @return: positional embedding [n_nodes, n * k]
-        """
-        pos_embeds = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
-        for layer in dgl.topological_nodes_generator(graph, reverse=True):
-            for node in layer:
-                children = graph.in_edges(node, form='uv')[0]
-                pos_embeds[children, self.n:] = pos_embeds[node, :-self.n]
-                pos_embeds[children, :self.n] = torch.eye(children.shape[0], self.n, device=device)
-        # TODO: implement parametrized positional embedding with using p
-        return pos_embeds
-
-
-class Embedding(nn.Module):
-    _embeddings = {
-        'token': FullTokenEmbedding,
-        'type': FullTypeEmbedding,
-        'subtoken': SubTokenEmbedding,
-        'positional': PositionalEmbedding
-    }
-    _reductions = {
-        'sum': SumReduction,
-        'linear': LinearReduction,
-        'cat': ConcatenationReduction
-    }
-
-    def _init_embedding_layer(self, embedding_name: str, embedding_params: Dict) -> nn.Module:
-        if embedding_name not in self._embeddings:
-            raise ValueError(f"unknown embedding function: {embedding_name}")
-        embedding_module = self._embeddings[embedding_name]
-        if issubclass(embedding_module, _IEmbedding):
-            return embedding_module(
-                token_to_id=self.token_to_id, type_to_id=self.type_to_id, h_emb=self.h_emb, **embedding_params
-            )
-        return embedding_module(**embedding_params)
-
-    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, embeddings: Dict, reduction: Dict):
-        super().__init__()
-        self.token_to_id = token_to_id
-        self.type_to_id = type_to_id
-        self.h_emb = h_emb
-        if reduction['name'] == 'cat':
-            assert self.h_emb % len(embeddings) == 0
-            self.h_emb //= len(embeddings)
-        self.layers = nn.ModuleList([
-            self._init_embedding_layer(name, params) for name, params in embeddings.items()
-        ])
-
-        if reduction['name'] not in self._reductions:
-            raise ValueError(f"unknown embedding reduction: {reduction['name']}")
-        self.reduction = self._reductions[reduction['name']](**reduction['params'])
-
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
-        embeds = [embedding(graph, device) for embedding in self.layers]
-        graph.ndata['x'] = self.reduction(embeds)
-        return graph
