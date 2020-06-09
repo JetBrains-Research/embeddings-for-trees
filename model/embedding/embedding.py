@@ -13,6 +13,27 @@ class Embedding(nn.Module):
     _known_node_embeddings = {}
     _known_reductions = {}
 
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, embeddings_info: Dict, reduction_info: Dict):
+        super().__init__()
+        self.token_to_id = token_to_id
+        self.type_to_id = type_to_id
+
+        if reduction_info['name'] not in self._known_reductions:
+            raise ValueError(f"unknown embedding reduction: {reduction_info['name']}")
+        self.reduction = self._known_reductions[reduction_info['name']](
+            len(embeddings_info), h_emb, **reduction_info["params"]
+        )
+        self.embedding_size = self.reduction.embedding_size
+
+        self.node_embeddings = nn.ModuleList([
+            self._init_embedding_layer(name, params) for name, params in embeddings_info.items()
+        ])
+
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
+        embeds = [embedding(graph, device) for embedding in self.node_embeddings]
+        graph.ndata['x'] = self.reduction(embeds)
+        return graph
+
     def _init_embedding_layer(self, embedding_name: str, embedding_params: Dict) -> nn.Module:
         if embedding_name not in self._known_node_embeddings:
             raise ValueError(f"unknown embedding function: {embedding_name}")
@@ -20,25 +41,6 @@ class Embedding(nn.Module):
         return embedding_module(
             token_to_id=self.token_to_id, type_to_id=self.type_to_id, h_emb=self.embedding_size, **embedding_params
         )
-
-    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int, embeddings: Dict, reduction: Dict):
-        super().__init__()
-        self.token_to_id = token_to_id
-        self.type_to_id = type_to_id
-
-        if reduction['name'] not in self._known_reductions:
-            raise ValueError(f"unknown embedding reduction: {reduction['name']}")
-        self.reduction = self._known_reductions[reduction['name']](len(embeddings), h_emb, **reduction["params"])
-        self.embedding_size = self.reduction.embedding_size
-
-        self.node_embeddings = nn.ModuleList([
-            self._init_embedding_layer(name, params) for name, params in embeddings.items()
-        ])
-
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
-        embeds = [embedding(graph, device) for embedding in self.node_embeddings]
-        graph.ndata['x'] = self.reduction(embeds)
-        return graph
 
     @staticmethod
     def register_node_embedding(node_embedding: INodeEmbedding):
