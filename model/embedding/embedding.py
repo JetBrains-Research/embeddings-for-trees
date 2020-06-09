@@ -4,8 +4,51 @@ import dgl
 import torch
 import torch.nn as nn
 
-from model.embedding.node_embedding import INodeEmbedding
-from model.embedding.reduction import IReduction
+from common import UNK, PAD
+
+
+class INodeEmbedding(nn.Module):
+    """Interface of embedding module.
+    Forward method takes batched graph and applies embedding to its features.
+    """
+
+    name = "Node embedding interface"
+
+    def __init__(self, token_to_id: Dict, type_to_id: Dict, h_emb: int) -> None:
+        super().__init__()
+        self.token_to_id = token_to_id
+        self.type_to_id = type_to_id
+        self.h_emb = h_emb
+
+        if UNK not in self.token_to_id:
+            self.token_to_id[UNK] = len(token_to_id)
+        if UNK not in self.type_to_id:
+            self.type_to_id[UNK] = len(type_to_id)
+
+        self.token_vocab_size = len(self.token_to_id)
+        self.type_vocab_size = len(self.type_to_id)
+        self.token_pad_index = self.token_to_id[PAD] if PAD in self.token_to_id else -1
+        self.type_pad_index = self.type_to_id[PAD] if PAD in self.type_to_id else -1
+
+    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+        raise NotImplementedError
+
+
+class IReduction(nn.Module):
+
+    name = "reduction interface"
+
+    def __init__(self, n_embeds: int, h_emb: int):
+        super().__init__()
+        self.n_embeds = n_embeds
+        self.h_emb = h_emb
+
+    @property
+    def embedding_size(self) -> int:
+        return self.h_emb
+
+    def forward(self, embeds: List[torch.Tensor]) -> torch.Tensor:
+        raise NotImplementedError
 
 
 class Embedding(nn.Module):

@@ -2,9 +2,7 @@ from importlib import import_module
 from inspect import isclass
 from pkgutil import iter_modules
 
-from .embedding import Embedding
-from .node_embedding import INodeEmbedding
-from .reduction import IReduction
+from .embedding import Embedding, INodeEmbedding, IReduction
 
 for module_info in iter_modules(__path__, f'{__package__}.'):
     module = import_module(module_info.name)

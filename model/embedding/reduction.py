@@ -3,22 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-
-class IReduction(nn.Module):
-
-    name = "reduction interface"
-
-    def __init__(self, n_embeds: int, h_emb: int):
-        super().__init__()
-        self.n_embeds = n_embeds
-        self.h_emb = h_emb
-
-    @property
-    def embedding_size(self) -> int:
-        return self.h_emb
-
-    def forward(self, embeds: List[torch.Tensor]) -> torch.Tensor:
-        raise NotImplementedError
+from embedding import IReduction
 
 
 class SumReduction(IReduction):
