@@ -6,7 +6,7 @@ from numpy.ma import sqrt
 from torch import nn
 
 from common import UNK, PAD, METHOD_NAME, NAN, SELF
-from embedding import INodeEmbedding
+from model.embedding import INodeEmbedding
 from token_processing import get_dict_of_subtokens
 
 

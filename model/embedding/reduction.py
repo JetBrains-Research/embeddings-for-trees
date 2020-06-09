@@ -3,7 +3,7 @@ from typing import List
 import torch
 import torch.nn as nn
 
-from embedding import IReduction
+from model.embedding import IReduction
 
 
 class SumReduction(IReduction):

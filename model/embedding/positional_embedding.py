@@ -3,7 +3,7 @@ from typing import Dict
 import dgl
 import torch
 
-from model.embedding.base_node_embeddings import INodeEmbedding
+from model.embedding import INodeEmbedding
 
 
 class PositionalEmbedding(INodeEmbedding):
