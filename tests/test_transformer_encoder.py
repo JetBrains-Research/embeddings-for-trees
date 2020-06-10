@@ -24,27 +24,24 @@ class TransformerEncoderTest(unittest.TestCase):
                 g.ndata['x'] = x
 
                 my_model = TransformerEncoder(h_emb, h_emb, n_head)
-                transformer = torch.nn.TransformerEncoderLayer(h_emb, n_head)
+                transformer_layer = torch.nn.TransformerEncoderLayer(h_emb, n_head)
+                transformer = torch.nn.TransformerEncoder(transformer_layer, 1)
                 my_model.eval()
                 transformer.eval()
 
                 state_dict = {}
-                prefix = 'transformer.layers.0'
                 for layer_name in transformer.state_dict().keys():
-                    state_dict[layer_name] = my_model.state_dict()[f'{prefix}.{layer_name}']
+                    state_dict[layer_name] = my_model.state_dict()[f'transformer.{layer_name}']
                 transformer.load_state_dict(state_dict)
 
-                h_model = my_model(g)
+                my_result = my_model(g)
 
-                x_trans = my_model.transformer_layer(x.unsqueeze(1)).squeeze(1)
+                transformer_result = torch.empty_like(my_result)
+                transformer_result[1:] = my_model.norm(x[1:])
+                h_root = transformer(transformer_result[1:].unsqueeze(1)).transpose(0, 1).sum(1)
+                transformer_result[0] = my_model.norm(x[0] + h_root)
 
-                x_attn = torch.zeros_like(x)
-                x_attn[0] = x_trans[0]
-                x_attn[1:] = x[1:]
-
-                h = torch.tanh(my_model.linear_h(x_attn))
-
-                self.assertTrue(h.allclose(h_model))
+                self.assertTrue(transformer_result.allclose(my_result))
 
 
 if __name__ == '__main__':

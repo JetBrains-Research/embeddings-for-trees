@@ -23,8 +23,8 @@ class TransformerEncoder(ITreeEncoder):
         :param dropout: probability to be zeroed
         """
         super().__init__(h_emb, h_enc)
-        self.transformer_layer = nn.TransformerEncoderLayer(h_emb, n_heads, h_ffd, dropout)
-        self.transformer = nn.TransformerEncoder(self.transformer_layer, n_layers)
+        transformer_layer = nn.TransformerEncoderLayer(h_emb, n_heads, h_ffd, dropout)
+        self.transformer = nn.TransformerEncoder(transformer_layer, n_layers)
         self.norm = nn.LayerNorm(h_enc)
 
     def reduce_func(self, nodes: dgl.NodeBatch) -> Dict:
