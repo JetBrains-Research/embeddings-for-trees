@@ -37,13 +37,13 @@ class DfsLSTM(ITreeEncoder):
             'c': nodes.mailbox['c'].squeeze(1)
         }
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    def forward(self, graph: dgl.DGLGraph) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         graph.ndata['x'] = self.dropout(graph.ndata['x'])
-        root_indexes = torch.tensor(
-            get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False
+        root_indexes = graph.ndata['x'].new_tensor(
+            get_root_indexes(graph.batch_num_nodes), dtype=torch.long, requires_grad=False
         )
-        graph.ndata['h'] = torch.zeros((graph.number_of_nodes(), self.h_enc), device=device)
-        graph.ndata['c'] = torch.zeros((graph.number_of_nodes(), self.h_enc), device=device)
+        graph.ndata['h'] = graph.ndata['x'].new_zeros((graph.number_of_nodes(), self.h_enc))
+        graph.ndata['c'] = graph.ndata['x'].new_zeros((graph.number_of_nodes(), self.h_enc))
         graph.ndata['h'][root_indexes], graph.ndata['c'][root_indexes] = \
             self.lstm(graph.ndata['x'][root_indexes])
 
@@ -73,9 +73,9 @@ class TwoOrderLSTM(ITreeEncoder):
         self.linear_h = nn.Linear(self.h_enc, self.h_enc)
         self.linear_c = nn.Linear(self.h_enc, self.h_enc)
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
-        h_tree_lstm, c_tree_lstm = self.tree_lstm(graph, device)
-        h_dfs_lstm, c_dfs_lstm = self.dfs_lstm(graph, device)
+    def forward(self, graph: dgl.DGLGraph) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+        h_tree_lstm, c_tree_lstm = self.tree_lstm(graph)
+        h_dfs_lstm, c_dfs_lstm = self.dfs_lstm(graph)
 
         h = self.blend_alpha[0] * h_tree_lstm + (1 - self.blend_alpha[0]) * h_dfs_lstm
         c = self.blend_alpha[1] * c_tree_lstm + (1 - self.blend_alpha[1]) * c_dfs_lstm

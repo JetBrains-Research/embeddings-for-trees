@@ -46,14 +46,13 @@ class TransformerEncoder(ITreeEncoder):
         h = self.norm(nodes.data['x'] + nodes.data['h'])
         return {'h': h}
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         """Apply transformer encoder
 
         :param graph: batched dgl graph
-        :param device: torch device
         :return: encoded nodes [number of nodes, hidden size]
         """
-        graph.ndata['h'] = torch.zeros((graph.number_of_nodes(), self.h_enc), device=device)
+        graph.ndata['h'] = graph.ndata['x'].new_zeros((graph.number_of_nodes(), self.h_enc))
         dgl.prop_nodes_topo(
             graph, message_func=[dgl.function.copy_u('h', 'h')],
             reduce_func=self.reduce_func,

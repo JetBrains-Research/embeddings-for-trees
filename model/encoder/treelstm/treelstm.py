@@ -41,14 +41,14 @@ class ITreeLSTMCell(nn.Module):
             return {'h': h, 'c': c}
         return apply_node_func
 
-    def init_matrices(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
+    def init_matrices(self, graph: dgl.DGLGraph) -> dgl.DGLGraph:
         number_of_nodes = graph.number_of_nodes()
         graph.ndata['x_iou'] = self.W_iou(graph.ndata['x']) + self.b_iou
         graph.ndata['x_f'] = self.W_f(graph.ndata['x']) + self.b_f
-        graph.ndata['h'] = torch.zeros((number_of_nodes, self.h_size), device=device)
-        graph.ndata['c'] = torch.zeros((number_of_nodes, self.h_size), device=device)
-        graph.ndata['Uh_sum'] = torch.zeros((number_of_nodes, 3 * self.h_size), device=device)
-        graph.ndata['fc_sum'] = torch.zeros((number_of_nodes, self.h_size), device=device)
+        graph.ndata['h'] = graph.ndata['x'].new_zeros((number_of_nodes, self.h_size))
+        graph.ndata['c'] = graph.ndata['x'].new_zeros((number_of_nodes, self.h_size))
+        graph.ndata['Uh_sum'] = graph.ndata['x'].new_zeros((number_of_nodes, 3 * self.h_size))
+        graph.ndata['fc_sum'] = graph.ndata['x'].new_zeros((number_of_nodes, self.h_size))
         return graph
 
 
@@ -73,13 +73,13 @@ class TreeLSTM(ITreeEncoder):
             self._known_tree_lstm_cells[cell['name']](self.h_emb, self.h_enc, **cell['params']) for _ in range(self.n_layers)
         ])
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph) -> Tuple[torch.Tensor, torch.Tensor]:
         x = self.dropout(graph.ndata['x'])
 
         for layer in range(self.n_layers):
             graph.ndata['x'] = x
 
-            graph = self.cell[layer].init_matrices(graph, device)
+            graph = self.cell[layer].init_matrices(graph)
             dgl.prop_nodes_topo(
                 graph,
                 reduce_func=self.cell[layer].get_reduce_func(),
