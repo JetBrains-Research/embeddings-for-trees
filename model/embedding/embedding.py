@@ -30,7 +30,7 @@ class INodeEmbedding(nn.Module):
         self.token_pad_index = self.token_to_id[PAD] if PAD in self.token_to_id else -1
         self.type_pad_index = self.type_to_id[PAD] if PAD in self.type_to_id else -1
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         raise NotImplementedError
 
 
@@ -72,8 +72,8 @@ class Embedding(nn.Module):
             self._init_embedding_layer(name, params) for name, params in embeddings.items()
         ])
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> dgl.DGLGraph:
-        embeds = [embedding(graph, device) for embedding in self.node_embeddings]
+    def forward(self, graph: dgl.DGLGraph) -> dgl.DGLGraph:
+        embeds = [embedding(graph) for embedding in self.node_embeddings]
         graph.ndata['x'] = self.reduction(embeds)
         return graph
 

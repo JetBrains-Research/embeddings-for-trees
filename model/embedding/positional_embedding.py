@@ -4,6 +4,7 @@ import dgl
 import torch
 
 from model.embedding import INodeEmbedding
+from utils.common import get_device
 
 
 class PositionalEmbedding(INodeEmbedding):
@@ -25,13 +26,13 @@ class PositionalEmbedding(INodeEmbedding):
         self.n, self.k, self.p = n, k, p
         self.p_emb = torch.tensor([self.p ** i for i in range(self.h_emb)])
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         """Forward pass for positional embedding
 
         @param graph: a batched graph with oriented edges from leaves to roots
-        @param device: torch device
         @return: positional embedding [n_nodes, n * k]
         """
+        device = get_device()
         pos_embeds = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
         for layer in dgl.topological_nodes_generator(graph, reverse=True):
             for node in layer:

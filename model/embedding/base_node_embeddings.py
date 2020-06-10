@@ -6,7 +6,7 @@ from numpy.ma import sqrt
 from torch import nn
 
 from model.embedding import INodeEmbedding
-from utils.common import UNK, PAD, METHOD_NAME, NAN, SELF
+from utils.common import UNK, PAD, METHOD_NAME, NAN, SELF, get_device
 from utils.token_processing import get_dict_of_subtokens
 
 
@@ -19,7 +19,7 @@ class TokenNodeEmbedding(INodeEmbedding):
         self.token_embedding = nn.Embedding(self.token_vocab_size, self.h_emb, padding_idx=self.token_pad_index)
         self.normalize = normalize
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         token_embeds = self.token_embedding(graph.ndata['token']).squeeze(1)
         if self.normalize:
             return token_embeds * sqrt(self.h_emb)
@@ -35,7 +35,7 @@ class TypeNodeEmbedding(INodeEmbedding):
         self.type_embedding = nn.Embedding(self.type_vocab_size, self.h_emb, padding_idx=self.type_pad_index)
         self.normalize = normalize
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         type_embeds = self.type_embedding(graph.ndata['type'])
         if self.normalize:
             return type_embeds * sqrt(self.h_emb)
@@ -62,7 +62,7 @@ class SubTokenNodeEmbedding(INodeEmbedding):
             _id: self.token_to_subtokens[token] for token, _id in token_to_id.items()
         }
 
-    def forward(self, graph: dgl.DGLGraph, device: torch.device) -> torch.Tensor:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         start_index = 0
         subtoken_ids = []
         node_slices = []
@@ -82,6 +82,7 @@ class SubTokenNodeEmbedding(INodeEmbedding):
             node_slices.append(slice(start_index, start_index + len(cur_subtokens)))
             start_index += len(cur_subtokens)
 
+        device = get_device()
         full_subtokens_embeds = self.subtoken_embedding(torch.tensor(subtoken_ids, device=device))
 
         token_embeds = torch.zeros((graph.number_of_nodes(), self.h_emb), device=device)

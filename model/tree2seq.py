@@ -52,7 +52,7 @@ class Tree2Seq(nn.Module):
         """
         return self.decoder(
             self.encoder(
-                self.embedding(graph, device), device
+                self.embedding(graph), device
             ),
             labels, root_indexes, device
         )
