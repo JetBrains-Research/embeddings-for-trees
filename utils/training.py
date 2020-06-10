@@ -14,8 +14,7 @@ from utils.metrics import calculate_batch_statistics
 
 
 def _forward_pass(
-        model: Tree2Seq, graph: dgl.DGLGraph, labels: torch.Tensor,
-        criterion: nn.modules.loss, device: torch.device
+        model: Tree2Seq, graph: dgl.DGLGraph, labels: torch.Tensor, criterion: nn.modules.loss
 ) -> Tuple[torch.Tensor, torch.Tensor, Dict]:
     """Make model step
 
@@ -23,7 +22,6 @@ def _forward_pass(
     :param graph: batched dgl graph
     :param labels: [seq len; batch size] ground truth labels
     :param criterion: criterion to optimize
-    :param device: torch device
     :return: Tuple[
         loss [1] torch tensor with loss information
         prediction [the longest sequence, batch size]
@@ -62,13 +60,13 @@ def _forward_pass(
 
 def train_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim, scheduler: torch.optim.lr_scheduler,
-        graph: dgl.DGLGraph, labels: torch.Tensor, clip_norm: int, device: torch.device
+        graph: dgl.DGLGraph, labels: torch.Tensor, clip_norm: int
 ) -> Dict:
     model.train()
 
     # Model step
     model.zero_grad()
-    loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion, device)
+    loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion)
     batch_info['learning_rate'] = scheduler.get_last_lr()[0]
     loss.backward()
     nn.utils.clip_grad_value_(model.parameters(), clip_norm)
@@ -83,26 +81,26 @@ def train_on_batch(
 
 def eval_on_batch(
         model: Tree2Seq, criterion: nn.modules.loss, graph: dgl.DGLGraph,
-        labels: torch.Tensor, device: torch.device
+        labels: torch.Tensor
 ) -> Tuple[Dict, torch.Tensor]:
     model.eval()
     # Model step
     with torch.no_grad():
-        loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion, device)
+        loss, prediction, batch_info = _forward_pass(model, graph, labels, criterion)
         del loss
 
     return batch_info, prediction
 
 
 def evaluate_on_dataset(
-        dataset: Dataset, model: Tree2Seq, criterion: nn.modules.loss, device: torch.device
+        dataset: Dataset, model: Tree2Seq, criterion: nn.modules.loss
 ) -> LearningInfo:
     eval_epoch_info = LearningInfo()
 
     for batch_id in tqdm(range(len(dataset))):
         graph, labels = dataset[batch_id]
         batch_info, prediction = eval_on_batch(
-            model, criterion, graph, labels, device
+            model, criterion, graph, labels
         )
         eval_epoch_info.accumulate_info(batch_info)
         del prediction
@@ -112,8 +110,8 @@ def evaluate_on_dataset(
 
 def train_on_dataset(
         train_dataset: Dataset, val_dataset, model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim,
-        scheduler: torch.optim.lr_scheduler, clip_norm: int, logger: Logger, device: torch.device,
-        start_batch_id: int = 0, log_step: int = -1, eval_step: int = -1, save_step: int = -1
+        scheduler: torch.optim.lr_scheduler, clip_norm: int, logger: Logger, start_batch_id: int = 0,
+        log_step: int = -1, eval_step: int = -1, save_step: int = -1
 ):
     train_epoch_info = LearningInfo()
 
@@ -123,7 +121,7 @@ def train_on_dataset(
 
     for batch_id in batch_iterator_pb:
         graph, labels = train_dataset[batch_id]
-        batch_info = train_on_batch(model, criterion, optimizer, scheduler, graph, labels, clip_norm, device)
+        batch_info = train_on_batch(model, criterion, optimizer, scheduler, graph, labels, clip_norm)
         train_epoch_info.accumulate_info(batch_info)
 
         if is_step_match(batch_id, log_step):
@@ -140,7 +138,7 @@ def train_on_dataset(
             logger.save_model(f'batch_{batch_id}.pt', train_dump)
 
         if is_step_match(batch_id, eval_step):
-            eval_info = evaluate_on_dataset(val_dataset, model, criterion, device)
+            eval_info = evaluate_on_dataset(val_dataset, model, criterion)
             logger.log(eval_info.get_state_dict(), batch_id, is_train=False)
 
     if train_epoch_info.batch_processed > 0:

@@ -30,7 +30,7 @@ def evaluate(params: Dict) -> None:
 
     # evaluation loop
     print("ok, let's evaluate it")
-    eval_epoch_info = evaluate_on_dataset(evaluation_set, model, criterion, device)
+    eval_epoch_info = evaluate_on_dataset(evaluation_set, model, criterion)
 
     print(eval_epoch_info.get_state_dict())
 

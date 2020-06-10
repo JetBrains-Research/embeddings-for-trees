@@ -78,11 +78,11 @@ def train(params: Dict, logger_name: str) -> None:
 
         # train 1 epoch
         train_on_dataset(
-            training_set, validation_set, model, criterion, optimizer, scheduler, params['clip_norm'], logger, device,
+            training_set, validation_set, model, criterion, optimizer, scheduler, params['clip_norm'], logger,
             start_batch_id, params['logging_step'], params['evaluation_step'], params['checkpoint_step']
         )
 
-        eval_epoch_info = evaluate_on_dataset(validation_set, model, criterion, device)
+        eval_epoch_info = evaluate_on_dataset(validation_set, model, criterion)
         logger.log(eval_epoch_info.get_state_dict(), len(training_set), is_train=False)
 
         model_dump = {
