@@ -86,7 +86,7 @@ class SubTokenNodeEmbedding(INodeEmbedding):
             graph.ndata['token_id'].new_tensor(subtoken_ids)
         )
 
-        token_embeds = graph.ndata['token_id'].new_empty((graph.number_of_nodes(), self.h_emb))
+        token_embeds = graph.ndata['token_id'].new_empty((graph.number_of_nodes(), self.h_emb), dtype=torch.float)
         for node in range(graph.number_of_nodes()):
             token_embeds[node] = full_subtokens_embeds[node_slices[node]].sum(0)
         if self.normalize:
