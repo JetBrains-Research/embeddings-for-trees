@@ -17,7 +17,7 @@ class LinearDecoder(ITreeDecoder):
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
+            root_indexes: torch.LongTensor
     ) -> torch.Tensor:
         # [number of nodes, hidden state]
         if isinstance(encoded_data, tuple):

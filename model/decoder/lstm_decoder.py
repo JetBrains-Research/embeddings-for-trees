@@ -41,13 +41,13 @@ class LSTMDecoder(ITreeDecoder):
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
+            root_indexes: torch.LongTensor
     ) -> torch.Tensor:
         if isinstance(encoded_data, torch.Tensor):
             encoded_data = (encoded_data,)
         if len(encoded_data) == 1:
             node_hidden_states = encoded_data[0]
-            node_memory_states = torch.zeros_like(encoded_data[0], requires_grad=False)
+            node_memory_states = encoded_data[0].new_zeros(encoded_data[0].shape, requires_grad=False)
         elif len(encoded_data) == 2:
             # [number of nodes, encoder hidden state]
             node_hidden_states, node_memory_states = encoded_data
@@ -60,7 +60,7 @@ class LSTMDecoder(ITreeDecoder):
 
         max_length, batch_size = labels.shape
         # [the longest sequence, batch size, vocab size]
-        outputs = torch.zeros(max_length, batch_size, self.out_size, device=device)
+        outputs = node_hidden_states.new_zeros((max_length, batch_size, self.out_size))
 
         tree_sizes = [(root_indexes[i] - root_indexes[i - 1]).item() for i in range(1, batch_size)]
         tree_sizes.append(node_hidden_states.shape[0] - root_indexes[-1].item())

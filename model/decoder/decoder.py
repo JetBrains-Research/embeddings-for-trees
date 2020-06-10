@@ -24,14 +24,13 @@ class ITreeDecoder(nn.Module):
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
+            root_indexes: torch.LongTensor
     ) -> torch.Tensor:
         """Decode given encoded vectors of nodes
 
         :param encoded_data: tensor or tuple of tensors with encoded data
         :param labels: tensor of labels [sequence len, batch size]
         :param root_indexes: indexes of roots in encoded data
-        :param device: torch device object
         :return: logits [sequence len, batch size, labels vocab size]
         """
         raise NotImplementedError
@@ -55,9 +54,9 @@ class Decoder(nn.Module):
 
     def forward(
             self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor, device: torch.device
+            root_indexes: torch.LongTensor
     ) -> torch.Tensor:
-        return self.decoder(encoded_data, labels, root_indexes, device)
+        return self.decoder(encoded_data, labels, root_indexes)
 
     @staticmethod
     def register_decoder(tree_decoder: ITreeDecoder):
