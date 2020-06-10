@@ -5,7 +5,7 @@ import torch
 
 from model.embedding.base_node_embeddings import SubTokenNodeEmbedding
 from model.embedding.positional_embedding import PositionalEmbedding
-from tests.test_utils import gen_tree
+from tests.generator import generate_tree
 from utils.common import fix_seed
 
 
@@ -33,7 +33,7 @@ class EmbeddingTest(unittest.TestCase):
 
         subtoken_embedding.subtoken_embedding.weight = torch.nn.Parameter(embed_weight, requires_grad=True)
 
-        token_embeds = subtoken_embedding(g, device)
+        token_embeds = subtoken_embedding(g)
         true_embeds = torch.tensor([
             [1, 1, 1, 0, 0],
             [1, 0, 0, 1, 0],
@@ -46,7 +46,7 @@ class EmbeddingTest(unittest.TestCase):
         fix_seed()
         device = torch.device('cpu')
 
-        g = gen_tree(3, 3)
+        g = generate_tree(3, 3)
         g.ndata['x'] = torch.randn((13, 6), device=device)
         positional_embedding = PositionalEmbedding({}, {}, 6, 3, 2)
         pos_embeds = positional_embedding(g)

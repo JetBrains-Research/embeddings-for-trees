@@ -23,7 +23,7 @@ def _get_simple_token_to_id(add_sos_eos: bool = False) -> Tuple[Dict, List, Dict
     return token_to_id, list_of_subtokens, correct_splits
 
 
-class TokenProcessing(unittest.TestCase):
+class TokenProcessingTest(unittest.TestCase):
 
     def _test_dividing_to_subtokens(
             self, list_of_subtokens: List[str], correct_splits: Dict,
