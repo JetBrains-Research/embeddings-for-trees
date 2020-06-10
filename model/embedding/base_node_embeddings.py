@@ -6,7 +6,7 @@ from numpy.ma import sqrt
 from torch import nn
 
 from model.embedding import INodeEmbedding
-from utils.common import UNK, PAD, METHOD_NAME, NAN, SELF, get_device
+from utils.common import UNK, PAD, METHOD_NAME, NAN, SELF
 from utils.token_processing import get_dict_of_subtokens
 
 
@@ -82,10 +82,11 @@ class SubTokenNodeEmbedding(INodeEmbedding):
             node_slices.append(slice(start_index, start_index + len(cur_subtokens)))
             start_index += len(cur_subtokens)
 
-        device = get_device()
-        full_subtokens_embeds = self.subtoken_embedding(torch.tensor(subtoken_ids, device=device))
+        full_subtokens_embeds = self.subtoken_embedding(
+            graph.ndata['token_id'].new_tensor(subtoken_ids)
+        )
 
-        token_embeds = torch.zeros((graph.number_of_nodes(), self.h_emb), device=device)
+        token_embeds = graph.ndata['token_id'].new_empty((graph.number_of_nodes(), self.h_emb))
         for node in range(graph.number_of_nodes()):
             token_embeds[node] = full_subtokens_embeds[node_slices[node]].sum(0)
         if self.normalize:

@@ -3,7 +3,8 @@ import unittest
 import dgl
 import torch
 
-from model.embedding import SubTokenEmbedding, PositionalEmbedding
+from model.embedding.base_node_embeddings import SubTokenNodeEmbedding
+from model.embedding.positional_embedding import PositionalEmbedding
 from test.test_utils import gen_tree
 from utils.common import fix_seed, get_device
 
@@ -21,7 +22,7 @@ class EmbeddingTest(unittest.TestCase):
         }
         g = dgl.DGLGraph()
         g.add_nodes(3, {'token_id': torch.tensor([0, 1, 2])})
-        subtoken_embedding = SubTokenEmbedding(token_to_id, {}, h_emb)
+        subtoken_embedding = SubTokenNodeEmbedding(token_to_id, {}, h_emb)
 
         embed_weight = torch.zeros(len(subtoken_embedding.token_to_id), h_emb)
         embed_weight[subtoken_embedding.token_to_id['token'], 0] = 1
@@ -46,8 +47,9 @@ class EmbeddingTest(unittest.TestCase):
         device = get_device()
 
         g = gen_tree(3, 3)
-        positional_embedding = PositionalEmbedding(3, 2)
-        pos_embeds = positional_embedding(g, device)
+        g.ndata['x'] = torch.randn((13, 6), device=device)
+        positional_embedding = PositionalEmbedding({}, {}, 6, 3, 2)
+        pos_embeds = positional_embedding(g)
 
         correct_pos_embedding = torch.tensor([[0., 0., 0., 0., 0., 0.],
                                               [1., 0., 0., 0., 0., 0.],

@@ -4,7 +4,6 @@ import dgl
 import torch
 
 from model.embedding import INodeEmbedding
-from utils.common import get_device
 
 
 class PositionalEmbedding(INodeEmbedding):
@@ -32,12 +31,14 @@ class PositionalEmbedding(INodeEmbedding):
         @param graph: a batched graph with oriented edges from leaves to roots
         @return: positional embedding [n_nodes, n * k]
         """
-        device = get_device()
-        pos_embeds = torch.zeros(graph.number_of_nodes(), self.h_emb, device=device)
+        pos_embeds = graph.ndata['x'].new_zeros((graph.number_of_nodes(), self.h_emb))
         for layer in dgl.topological_nodes_generator(graph, reverse=True):
             for node in layer:
                 children = graph.in_edges(node, form='uv')[0]
                 pos_embeds[children, self.n:] = pos_embeds[node, :-self.n]
-                pos_embeds[children, :self.n] = torch.eye(children.shape[0], self.n, device=device)
+                eye_tensor = graph.ndata["x"].new_zeros((children.shape[0], self.n))
+                diag_range = torch.arange(0, min(children.shape[0], self.n), dtype=torch.long)
+                eye_tensor[diag_range, diag_range] = 1
+                pos_embeds[children, :self.n] = eye_tensor
         # TODO: implement parametrized positional embedding with using p
         return pos_embeds
