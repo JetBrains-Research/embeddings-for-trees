@@ -7,7 +7,7 @@ from dgl.data.utils import load_graphs
 
 from data_workers.convert import convert_project
 from data_workers.preprocess_steps import build_project_asts
-from model.tree2seq import ModelBuilder
+from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, create_folder, EOS
 
 tmp_folder = '.tmp'
@@ -23,13 +23,12 @@ def interactive(path_to_function: str, path_to_model: str):
     print("loading model...")
     checkpoint = torch.load(path_to_model, map_location=device)
 
-    model_factory = ModelBuilder(**checkpoint['configuration'])
-    model = model_factory.construct_model(device)
+    model = Tree2Seq(**checkpoint['configuration']).to(device)
     model.load_state_dict(checkpoint['state_dict'])
 
-    token_to_id = checkpoint['configuration']['token_to_id']
-    type_to_id = checkpoint['configuration']['type_to_id']
-    label_to_id = checkpoint['configuration']['label_to_id']
+    token_to_id = model.token_to_id
+    type_to_id = model.type_to_id
+    label_to_id = model.label_to_id
     id_to_label = {v: k for k, v in label_to_id.items()}
 
     # convert function to dgl format

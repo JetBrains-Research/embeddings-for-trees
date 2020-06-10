@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 
 from data_workers.dataset import JavaDataset
-from model.tree2seq import ModelBuilder
+from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, PAD
 from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
 from utils.scheduler import get_scheduler
@@ -41,11 +41,10 @@ def train(params: Dict, logger_name: str) -> None:
 
     print('model initializing...')
     # create model
-    model_factory = ModelBuilder(
+    model = Tree2Seq(
         params['embedding'], params['encoder'], params['decoder'],
         params['hidden_states'], token_to_id, type_to_id, label_to_id
-    )
-    model = model_factory.construct_model(device)
+    ).to(device)
     if 'state_dict' in checkpoint:
         model.load_state_dict(checkpoint['state_dict'])
 
@@ -69,7 +68,7 @@ def train(params: Dict, logger_name: str) -> None:
         logger = WandBLogger(params['checkpoints_folder'], params, params.get('resume_wandb_id', False))
     else:
         logger = Logger(params['checkpoints_folder'], params)
-    logger.additional_save_info['configuration'] = model_factory.save_configuration()
+    logger.additional_save_info['configuration'] = model.get_configuration()
 
     start_batch_id = checkpoint.get('batch_id', -1) + 1
     # train loop

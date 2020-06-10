@@ -10,11 +10,31 @@ from model.encoder import Encoder
 
 
 class Tree2Seq(nn.Module):
-    def __init__(self, embedding: Embedding, encoder: Encoder, decoder: Decoder) -> None:
+    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict,
+                 hidden_states: Dict, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
         super().__init__()
-        self.embedding = embedding
-        self.encoder = encoder
-        self.decoder = decoder
+
+        self.embedding_info = embedding_info
+        self.encoder_info = encoder_info
+        self.decoder_info = decoder_info
+
+        self.hidden_states = hidden_states
+
+        self.token_to_id = token_to_id
+        self.type_to_id = type_to_id
+        self.label_to_id = label_to_id
+
+        self.embedding = Embedding(
+            h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
+            type_to_id=self.type_to_id, **self.embedding_info)
+        self.encoder = Encoder(
+            h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
+            **self.encoder_info
+        )
+        self.decoder = Decoder(
+            h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
+            label_to_id=self.label_to_id, **self.decoder_info
+        )
 
     def forward(
             self, graph: DGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor, device: torch.device
@@ -46,44 +66,7 @@ class Tree2Seq(nn.Module):
         """
         return logits.argmax(dim=-1)
 
-
-class ModelBuilder:
-
-    def __init__(self, embedding_info: Dict, encoder_info: Dict, decoder_info: Dict,
-                 hidden_states: Dict, token_to_id: Dict, type_to_id: Dict, label_to_id: Dict):
-        self.embedding_info = embedding_info
-        self.encoder_info = encoder_info
-        self.decoder_info = decoder_info
-
-        self.hidden_states = hidden_states
-
-        self.token_to_id = token_to_id
-        self.type_to_id = type_to_id
-        self.label_to_id = label_to_id
-
-    @staticmethod
-    def _get_module(module_name: str, modules_dict: Dict) -> nn.Module:
-        if module_name not in modules_dict:
-            raise ModuleNotFoundError(f"Unknown module {module_name}, try one of {', '.join(modules_dict.keys())}")
-        return modules_dict[module_name]
-
-    def construct_model(self, device: torch.device) -> Tree2Seq:
-        return Tree2Seq(
-            Embedding(
-                h_emb=self.hidden_states['embedding'], token_to_id=self.token_to_id,
-                type_to_id=self.type_to_id, **self.embedding_info
-            ),
-            Encoder(
-                h_emb=self.hidden_states['embedding'], h_enc=self.hidden_states['encoder'],
-                **self.encoder_info
-            ),
-            Decoder(
-                h_enc=self.hidden_states['encoder'], h_dec=self.hidden_states['decoder'],
-                label_to_id=self.label_to_id, **self.decoder_info
-            )
-        ).to(device)
-
-    def save_configuration(self) -> Dict:
+    def get_configuration(self) -> Dict:
         return {
             'embedding_info': self.embedding_info,
             'encoder_info': self.encoder_info,
