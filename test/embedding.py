@@ -6,14 +6,14 @@ import torch
 from model.embedding.base_node_embeddings import SubTokenNodeEmbedding
 from model.embedding.positional_embedding import PositionalEmbedding
 from test.test_utils import gen_tree
-from utils.common import fix_seed, get_device
+from utils.common import fix_seed
 
 
 class EmbeddingTest(unittest.TestCase):
 
     def test_subtoken_embedding(self):
         fix_seed()
-        device = get_device()
+        device = torch.device('cpu')
         h_emb = 5
         token_to_id = {
             'token|name|first': 0,
@@ -44,7 +44,7 @@ class EmbeddingTest(unittest.TestCase):
 
     def test_positional_embedding(self):
         fix_seed()
-        device = get_device()
+        device = torch.device('cpu')
 
         g = gen_tree(3, 3)
         g.ndata['x'] = torch.randn((13, 6), device=device)

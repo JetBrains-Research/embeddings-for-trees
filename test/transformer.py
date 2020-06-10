@@ -4,14 +4,14 @@ import torch
 
 from encoder.transformer_encoder import TransformerEncoder
 from test_utils import gen_node_with_children
-from utils.common import fix_seed, get_device
+from utils.common import fix_seed
 
 
 class TransformerEncoderTest(unittest.TestCase):
 
     def test_simple_forward_pass(self):
         fix_seed()
-        device = get_device()
+        device = torch.device('cpu')
 
         number_of_children = [3, 5, 128, 256]
         hidden_state = [5, 10, 128, 256]
