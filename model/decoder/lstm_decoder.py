@@ -40,8 +40,8 @@ class LSTMDecoder(ITreeDecoder):
         self.lstm = nn.LSTM(input_size=lstm_input_size, hidden_size=self.h_enc)
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+            root_indexes: torch.LongTensor, labels: torch.Tensor
     ) -> torch.Tensor:
         if isinstance(encoded_data, torch.Tensor):
             encoded_data = (encoded_data,)

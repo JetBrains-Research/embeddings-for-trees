@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
 from model.tree2seq import Tree2Seq
-from utils.common import EOS, UNK, PAD, get_root_indexes, is_step_match
+from utils.common import EOS, UNK, PAD, is_step_match
 from utils.learning_info import LearningInfo
 from utils.logger import Logger
 from utils.metrics import calculate_batch_statistics
@@ -31,11 +31,7 @@ def _forward_pass(
     ]
     """
     # [seq len; batch size; vocab size]
-    root_logits = model(
-        graph,
-        torch.tensor(get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False),
-        labels
-    )
+    root_logits = model(graph, labels)
 
     # if seq len in labels equal to 1, then model solve classification task
     # for longer sequences we should remove <SOS> token, since it's always on the first place

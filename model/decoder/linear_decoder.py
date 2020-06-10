@@ -16,8 +16,8 @@ class LinearDecoder(ITreeDecoder):
         self.dropout = nn.Dropout(dropout)
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+            root_indexes: torch.LongTensor, labels: torch.Tensor
     ) -> torch.Tensor:
         # [number of nodes, hidden state]
         if isinstance(encoded_data, tuple):

@@ -23,8 +23,8 @@ class ITreeDecoder(nn.Module):
         self.pad_index = self.label_to_id[PAD] if PAD in self.label_to_id else -1
 
     def forward(
-            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]], labels: torch.Tensor,
-            root_indexes: torch.LongTensor
+            self, encoded_data: Union[torch.Tensor, Tuple[torch.Tensor, ...]],
+            root_indexes: torch.LongTensor, labels: torch.Tensor
     ) -> torch.Tensor:
         """Decode given encoded vectors of nodes
 

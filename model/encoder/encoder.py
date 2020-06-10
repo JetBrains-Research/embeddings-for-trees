@@ -4,6 +4,8 @@ import dgl
 import torch
 from torch import nn
 
+from utils.common import get_root_indexes
+
 
 class ITreeEncoder(nn.Module):
 
@@ -33,9 +35,11 @@ class Encoder(nn.Module):
             raise ValueError(f"unknown encoder: {self.encoder_name}")
         self.encoder = self._known_tree_encoders[self.encoder_name](self.h_emb, self.h_enc, **params)
 
-    def forward(self, graph: dgl.DGLGraph) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
+    def forward(self, graph: dgl.DGLGraph) -> Tuple[Union[torch.Tensor, Tuple[torch.Tensor, ...]], torch.LongTensor]:
         """Produce new states for each node in given graph"""
-        return self.encoder(graph)
+        root_indexes = get_root_indexes(graph.batch_num_nodes)
+        root_indexes = graph.ndata['x'].new_tensor(root_indexes, dtype=torch.long, requires_grad=False)
+        return self.encoder(graph), root_indexes
 
     @staticmethod
     def register_tree_encoder(tree_encoder: ITreeEncoder):
