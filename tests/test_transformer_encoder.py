@@ -9,7 +9,7 @@ from utils.common import fix_seed
 
 class TransformerEncoderTest(unittest.TestCase):
 
-    def test_simple_forward_pass(self):
+    def test_transformer_encoder_forward_pass(self):
         fix_seed()
         device = torch.device('cpu')
 

@@ -38,12 +38,12 @@ class TokenProcessingTest(unittest.TestCase):
             list_of_ids = [test_subtoken_to_ids[st] for st in split]
             self.assertListEqual(list_of_ids, test_token_to_subtokens[token])
 
-    def test_get_dict_of_subtokens(self):
+    def test_divide_tokens_to_subtokens(self):
         token_to_id, list_of_subtokens, correct_splits = _get_simple_token_to_id()
         subtoken_to_ids, token_to_subtokens = get_dict_of_subtokens(token_to_id)
         self._test_dividing_to_subtokens(list_of_subtokens, correct_splits, subtoken_to_ids, token_to_subtokens)
 
-    def test_get_dict_of_subtokens_with_sos_eos(self):
+    def test_divide_tokens_to_subtokens_with_sos_eos(self):
         token_to_id, list_of_subtokens, correct_splits = _get_simple_token_to_id(True)
         subtoken_to_ids, token_to_subtokens = get_dict_of_subtokens(token_to_id, add_sos_eos=True)
         self._test_dividing_to_subtokens(list_of_subtokens, correct_splits, subtoken_to_ids, token_to_subtokens)
