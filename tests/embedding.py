@@ -5,7 +5,7 @@ import torch
 
 from model.embedding.base_node_embeddings import SubTokenNodeEmbedding
 from model.embedding.positional_embedding import PositionalEmbedding
-from test.test_utils import gen_tree
+from tests.test_utils import gen_tree
 from utils.common import fix_seed
 
 

@@ -8,7 +8,7 @@ from utils.common import create_folder, fix_seed
 
 data_folder = 'data'
 vocabulary_name = 'vocabulary.pkl'
-holdout_folders = ['training', 'validation', 'test']
+holdout_folders = ['training', 'validation', 'tests']
 
 dataset_url = 'https://s3.amazonaws.com/code2seq/datasets/{}.tar.gz'
 astminer_cli_path = 'utils/astminer-cli.jar'
@@ -17,7 +17,7 @@ dataset_mapping = {
     'small': 'java-small',
     'medium': 'java-med',
     'large': 'java-large',
-    'test': 'java-test'
+    'tests': 'java-tests'
 }
 
 
