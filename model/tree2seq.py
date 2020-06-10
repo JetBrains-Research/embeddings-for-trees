@@ -36,15 +36,12 @@ class Tree2Seq(nn.Module):
             label_to_id=self.label_to_id, **self.decoder_info
         )
 
-    def forward(
-            self, graph: DGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor, device: torch.device
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: DGLGraph, root_indexes: torch.LongTensor, labels: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Predict sequence of tokens for given batched graph
 
         :param graph: the batched graph
         :param root_indexes: [batch size] indexes of roots in the batched graph
         :param labels: [batch size] string labels of each example
-        :param device: torch device
         :return: Tuple[
             logits [the longest sequence, batch size, vocab size]
             ground truth [the longest sequence, batch size]

@@ -34,7 +34,7 @@ def _forward_pass(
     root_logits = model(
         graph,
         torch.tensor(get_root_indexes(graph.batch_num_nodes), dtype=torch.long, device=device, requires_grad=False),
-        labels, device
+        labels
     )
 
     # if seq len in labels equal to 1, then model solve classification task
