@@ -8,8 +8,8 @@ import pandas as pd
 from requests import get
 from tqdm.auto import tqdm
 
-from data_workers.drive_workers import upload_file as drive_upload_file
-from data_workers.s3_worker import upload_file as s3_upload_file
+from data_preprocessing.drive_workers import upload_file as drive_upload_file
+from data_preprocessing.s3_worker import upload_file as s3_upload_file
 from utils.common import extract_tar_gz, create_folder, UNK, PAD, SOS, EOS
 
 

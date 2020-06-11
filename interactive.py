@@ -5,8 +5,8 @@ from itertools import takewhile
 import torch
 from dgl.data.utils import load_graphs
 
-from data_workers.convert import convert_project
-from data_workers.preprocess_steps import build_project_asts
+from data_preprocessing.convert import convert_project
+from data_preprocessing.preprocess_steps import build_project_asts
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, create_folder, EOS
 
