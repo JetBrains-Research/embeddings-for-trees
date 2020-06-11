@@ -10,8 +10,10 @@ from data_preprocessing.preprocess_steps import build_asts
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, create_folder, EOS
 
-tmp_folder = '.tmp'
-astminer_cli_path = 'utils/astminer-cli.jar'
+TMP_FOLDER = '.tmp'
+ASTMINER_PATH = 'utils/astminer-cli.jar'
+ASTMINER_PARAMS = ['--storage', 'dot', '--granularity', 'method', '--lang', 'java', '--hide-method-name',
+                   '--split-tokens', '--java-parser', 'gumtree', '--remove-nodes', 'Javadoc']
 
 
 def interactive(path_to_function: str, path_to_model: str):
@@ -33,9 +35,9 @@ def interactive(path_to_function: str, path_to_model: str):
 
     # convert function to dgl format
     print("convert function to dgl format...")
-    create_folder(tmp_folder)
-    build_asts(path_to_function, tmp_folder, astminer_cli_path)
-    project_folder = os.path.join(tmp_folder, 'java')
+    create_folder(TMP_FOLDER)
+    build_asts(path_to_function, TMP_FOLDER, ASTMINER_PATH, *ASTMINER_PARAMS)
+    project_folder = os.path.join(TMP_FOLDER, 'java')
     convert_project(project_folder, token_to_id, type_to_id, label_to_id, True, True, 5, 6, False, True, '|')
 
     # load function
