@@ -1,19 +1,19 @@
 version: 2.1
 
-orbs:
-  python: circleci/python@0.3.0
-
 jobs:
   build-and-test:
-    executor: python/default
+    docker:
+      - image: continuumio/miniconda3
     steps:
       - checkout
-      - python/load-cache
-      - python/install-deps
-      - python/save-cache
       - run:
-          command: python -m unittest discover -v
-          name: Unit tests
+          name: Install conda environment
+          command: conda env create -f environment.yml
+      - run:
+          name: Run unit tests
+          command: |
+            source activate tree_embedding
+            python -m unittest discover tests -v
 
 workflows:
   main:
