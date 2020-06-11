@@ -18,7 +18,7 @@ def _get_batches(path: str, ext: str) -> List[str]:
     return [os.path.join(path, gf) for gf in files]
 
 
-class JavaDataset(Dataset):
+class TreeDGLDataset(Dataset):
 
     def __init__(
             self, dataset_path: str, batch_size: int, device: torch.device,

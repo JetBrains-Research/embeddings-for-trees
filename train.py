@@ -6,7 +6,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from dataset import JavaDataset
+from dataset import TreeDGLDataset
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, PAD
 from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
@@ -27,11 +27,11 @@ def train(params: Dict, logger_name: str) -> None:
         params = checkpoint['config']
         params['resume_wandb_id'] = resume_wandb_id
 
-    training_set = JavaDataset(
+    training_set = TreeDGLDataset(
         params['paths']['train'], params['batch_size'], device, True,
         params.get('max_n_nodes', -1), params.get('max_depth', -1)
     )
-    validation_set = JavaDataset(params['paths']['validate'], params['batch_size'], device, True)
+    validation_set = TreeDGLDataset(params['paths']['validate'], params['batch_size'], device, True)
 
     with open(params['paths']['vocabulary'], 'rb') as pkl_file:
         vocabulary = pkl_load(pkl_file)
