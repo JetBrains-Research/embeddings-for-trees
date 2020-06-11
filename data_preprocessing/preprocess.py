@@ -2,7 +2,7 @@ import os
 from argparse import ArgumentParser, Namespace
 from pickle import load as pickle_load
 
-from data_preprocessing.convert import convert_holdout
+from data_preprocessing.dot2dgl import convert_holdout
 from data_preprocessing.preprocess_steps import download_dataset, build_holdout_asts, collect_vocabulary, upload_dataset
 from utils.common import create_folder, fix_seed
 
