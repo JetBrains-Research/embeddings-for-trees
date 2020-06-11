@@ -6,7 +6,7 @@ import torch
 from dgl.data.utils import load_graphs
 
 from data_preprocessing.dot2dgl import convert_project
-from data_preprocessing.preprocess_steps import build_project_asts
+from data_preprocessing.preprocess_steps import build_asts
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, create_folder, EOS
 
@@ -34,7 +34,7 @@ def interactive(path_to_function: str, path_to_model: str):
     # convert function to dgl format
     print("convert function to dgl format...")
     create_folder(tmp_folder)
-    build_project_asts(path_to_function, tmp_folder, astminer_cli_path)
+    build_asts(path_to_function, tmp_folder, astminer_cli_path)
     project_folder = os.path.join(tmp_folder, 'java')
     convert_project(project_folder, token_to_id, type_to_id, label_to_id, True, True, 5, 6, False, True, '|')
 
