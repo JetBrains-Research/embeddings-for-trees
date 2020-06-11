@@ -7,6 +7,10 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Install GCC and Python-dev
+          command: apt-get install gcc python3-dev
+      - run:
+          name: Install and upgrade pip, setuptools, and virtualenv
           command: pip install -U pip setuptools virtualenv
       - run:
           name: Install conda environment
