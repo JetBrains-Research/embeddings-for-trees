@@ -6,7 +6,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from data_workers.dataset import JavaDataset
+from dataset import JavaDataset
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, PAD
 from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
