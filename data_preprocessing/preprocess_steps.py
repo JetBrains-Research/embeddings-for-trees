@@ -8,17 +8,18 @@ import pandas as pd
 from requests import get
 from tqdm.auto import tqdm
 
-from data_workers.drive_workers import upload_file as drive_upload_file
-from data_workers.s3_worker import upload_file as s3_upload_file
+from data_information import IDatasetInfo
+from data_preprocessing.drive_workers import upload_file as drive_upload_file
+from data_preprocessing.s3_worker import upload_file as s3_upload_file
 from utils.common import extract_tar_gz, create_folder, UNK, PAD, SOS, EOS
 
 
-def _download_dataset(name: str, download_path: str, dataset_url: str, block_size: int = 1024) -> str:
-    r = get(dataset_url.format(name), stream=True)
+def _download_dataset_archive(dataset_info: IDatasetInfo, dataset_path: str, block_size: int = 1024) -> str:
+    r = get(dataset_info.url, stream=True)
     assert r.status_code == 200
     total_size = int(r.headers.get('content-length', 0))
     download_progress_bar = tqdm(total=total_size, unit='iB', unit_scale=True)
-    file_path = os.path.join(download_path, f'{name}.tar.gz')
+    file_path = os.path.join(dataset_path, f'{dataset_info.name}.tar.gz')
     with open(file_path, 'wb') as f:
         for data in r.iter_content(chunk_size=block_size):
             download_progress_bar.update(len(data))
@@ -27,49 +28,44 @@ def _download_dataset(name: str, download_path: str, dataset_url: str, block_siz
     return file_path
 
 
-def _extract_dataset(file_path: str, extract_path: str, dataset_name: str, holdout_folders: List[str]) -> List[str]:
-    extract_tar_gz(file_path, extract_path)
-    return [os.path.join(extract_path, dataset_name, folder) for folder in holdout_folders]
-
-
-def download_dataset(dataset_name: str, data_folder: str, dataset_url: str, holdout_folders: List[str]) -> List[str]:
-    print(f"download {dataset_name} dataset...")
-    tar_file_path = _download_dataset(dataset_name, data_folder, dataset_url)
+def download_dataset(dataset_info: IDatasetInfo, dataset_path: str) -> None:
+    print(f"download {dataset_info.name} dataset...")
+    tar_file_path = _download_dataset_archive(dataset_info, dataset_path)
     print(f"extract files from tar archive {tar_file_path}...")
-    paths = _extract_dataset(tar_file_path, data_folder, dataset_name, holdout_folders)
+    extract_tar_gz(tar_file_path, dataset_path)
     print("remove tar file...")
     os.remove(tar_file_path)
-    return paths
 
 
-def build_project_asts(project_path: str, output_path: str, astminer_cli_path: str) -> bool:
-    completed_process = subprocess_run([
-        'java', '-Xmx30g', '-jar', astminer_cli_path, 'parse', '--project', project_path, '--output', output_path,
-        '--storage', 'dot', '--granularity', 'method', '--lang', 'java', '--hide-method-name', '--split-tokens',
-        '--java-parser', 'gumtree', '--filter-modifiers', 'abstract', '--remove-constructors',
-        '--remove-nodes', 'Javadoc',
-    ])
+def build_asts(input_path: str, output_path: str, astminer_path: str, astminer_params: List[str]) -> bool:
+    completed_process = subprocess_run(['java', '-Xmx30g', '-jar', astminer_path, 'parse', '--project',
+                                        input_path, '--output', output_path, *astminer_params])
     if completed_process.returncode != 0:
-        print(f"can't build ASTs for project {project_path}, failed with:\n{completed_process.stdout}")
+        print(f"can't build ASTs for project {input_path}, failed with:\n{completed_process.stdout}")
         return False
     return True
 
 
-def build_holdout_asts(data_path: str, holdout_name: str, astminer_cli_path: str) -> str:
-    print(f"build asts for {holdout_name} data...")
-    projects = os.listdir(os.path.join(data_path, holdout_name))
-    output_folder_path = os.path.join(data_path, f'{holdout_name}_asts')
-    create_folder(output_folder_path)
+def build_projects_asts(projects_folder: str, output_folder: str, astminer_path: str, astminer_params: List[str]) -> int:
+    print(f"build asts for projects in {projects_folder} folder")
+    projects = os.listdir(projects_folder)
     successful_builds = 0
     for project in tqdm(projects):
-        print(f"working with {project} project")
-        project_path = os.path.join(data_path, holdout_name, project)
-        output_project_path = os.path.join(output_folder_path, project)
-        create_folder(output_project_path)
-        if build_project_asts(project_path, output_project_path, astminer_cli_path):
+        print(f"build asts for {project} project")
+        project_path = os.path.join(projects_folder, project)
+        output_path = os.path.join(output_folder, project)
+        create_folder(output_path)
+        if build_asts(project_path, output_path, astminer_path, astminer_params):
             successful_builds += 1
-    print(f"create asts for {successful_builds}/{len(projects)} {holdout_name} projects")
-    return output_folder_path
+    print(f"create asts for {successful_builds} out of {len(projects)} projects")
+    return successful_builds
+
+
+def build_dataset_asts(dataset_info: IDatasetInfo, dataset_path: str, astminer_path: str) -> None:
+    for holdout in dataset_info.holdout_folders:
+        holdout_folder = os.path.join(dataset_path, holdout)
+        output_folder = os.path.join(dataset_path, f'{holdout}_asts')
+        build_projects_asts(holdout_folder, output_folder, astminer_path, dataset_info.astminer_params)
 
 
 def _update_vocab_counter(counter: Counter, values: List, is_split: bool = False, delimiter: str = '|') -> Counter:
@@ -116,7 +112,7 @@ def collect_vocabulary(
             [(token, num + st_index) for num, (token, _) in enumerate(counter.most_common(n_max))]
         )
 
-    assert all([t in token_to_id for t in ['METHOD_NAME', '<SELF>', UNK, PAD] + ([SOS, EOS] if wrap_tokens else [])])
+    assert all([t in token_to_id for t in [UNK, PAD] + ([SOS, EOS] if wrap_tokens else [])])
     assert all([t in type_to_id for t in [UNK, PAD]])
     assert all([t in label_to_id for t in [UNK, PAD] + ([SOS, EOS] if wrap_labels else [])])
 
@@ -126,19 +122,19 @@ def collect_vocabulary(
         }, vocab_file)
 
 
-def upload_dataset(
-        dataset_name: str, store: str, tar_suffix: str, data_path: str, vocabulary_name: str, holdout_folders: List[str]
-):
-    tar_file_name = f'{dataset_name}_{tar_suffix}.tar.gz'
+def upload_dataset(dataset_info: IDatasetInfo, dataset_path: str, vocabulary_name: str, store: str, tar_suffix: str) -> None:
+    tar_file_name = f'{dataset_info.name}_{tar_suffix}.tar.gz'
     completed_process = subprocess_run(
         ['tar', '-czf', tar_file_name, vocabulary_name] +
-        [f'{holdout}_preprocessed' for holdout in holdout_folders],
-        cwd=data_path
+        [f'{holdout}_preprocessed' for holdout in dataset_info.holdout_folders],
+        cwd=dataset_path
     )
     if completed_process.returncode != 0:
         print(f"can't create tar for preprocessed data, failed with\n{completed_process.stdout}")
+        return
+    if store == 's3':
+        s3_upload_file(os.path.join(dataset_path, tar_file_name), tar_file_name)
+    elif store == 'drive':
+        drive_upload_file(os.path.join(dataset_path, tar_file_name))
     else:
-        if store == 's3':
-            s3_upload_file(os.path.join(data_path, tar_file_name), tar_file_name)
-        elif store == 'drive':
-            drive_upload_file(os.path.join(data_path, tar_file_name))
+        raise ValueError("Unsupported store, try one of: s3, drive")

@@ -11,7 +11,7 @@ from dgl import DGLGraph, batch, unbatch
 from dgl.data.utils import save_graphs, load_graphs
 from tqdm.auto import tqdm
 
-from utils.common import create_folder, UNK, PAD, SOS, EOS
+from utils.common import UNK, PAD, SOS, EOS
 
 
 def convert_dot_to_dgl(dot_path: str) -> DGLGraph:
@@ -144,17 +144,12 @@ def _convert_project_safe(project_path: str, log_file: str,  **kwargs):
             log_file.write(f"can't convert {project_path} project, failed with\n{err}")
 
 
-def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
+def convert_holdout(holdout_path: str, output_path: str, batch_size: int,
                     token_to_id: Dict, type_to_id: Dict, label_to_id: Dict,
                     tokens_to_leaves: bool = False, is_split: bool = False,
                     max_token_len: int = -1, max_label_len: int = -1, wrap_tokens: bool = False,
                     wrap_labels: bool = False, delimiter: str = '|', shuffle: bool = True, n_jobs: int = -1) -> str:
     log_file = os.path.join('logs', f"convert_{datetime.now().strftime('%Y_%m_%d_%H:%M:%S')}.txt")
-
-    print(f"Convert asts for {holdout_name} data...")
-    holdout_path = os.path.join(data_path, f'{holdout_name}_asts')
-    output_holdout_path = os.path.join(data_path, f'{holdout_name}_preprocessed')
-    create_folder(output_holdout_path)
 
     projects_paths = [os.path.join(holdout_path, project, 'java') for project in os.listdir(holdout_path)]
 
@@ -204,12 +199,10 @@ def convert_holdout(data_path: str, holdout_name: str, batch_size: int,
     n_batches = len(graphs) // batch_size + (1 if len(graphs) % batch_size > 0 else 0)
     for batch_num in tqdm(range(n_batches)):
         current_slice = slice(batch_num * batch_size, min((batch_num + 1) * batch_size, len(graphs)))
-        output_graph_path = os.path.join(output_holdout_path, f'batch_{batch_num}.dgl')
-        output_labels_path = os.path.join(output_holdout_path, f'batch_{batch_num}.pkl')
+        output_graph_path = os.path.join(output_path, f'batch_{batch_num}.dgl')
+        output_labels_path = os.path.join(output_path, f'batch_{batch_num}.pkl')
         save_graphs(output_graph_path, graphs[current_slice])
         with open(output_labels_path, 'wb') as pkl_file:
             dump({
                 'labels': labels[current_slice], 'source_paths': source_paths[current_slice]
             }, pkl_file)
-
-    return output_holdout_path
