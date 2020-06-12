@@ -6,7 +6,7 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from dataset import TreeDGLDataset
+from data_loaders import TreeDGLDataset
 from logger import known_loggers, create_logger
 from model.tree2seq import Tree2Seq
 from trainer import evaluate_on_dataset, train_on_dataset
