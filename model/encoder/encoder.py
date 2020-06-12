@@ -4,7 +4,7 @@ import dgl
 import torch
 from torch import nn
 
-from utils.common import get_root_indexes
+from utils.tree_operations import get_root_indexes
 
 
 class ITreeEncoder(nn.Module):

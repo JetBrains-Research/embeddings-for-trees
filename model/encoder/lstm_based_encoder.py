@@ -6,7 +6,7 @@ from torch import nn
 
 from model.encoder import ITreeEncoder
 from model.encoder.treelstm.treelstm import ChildSumTreeLSTMCell, TreeLSTM
-from utils.common import get_root_indexes
+from utils.tree_operations import get_root_indexes
 
 
 class DfsLSTM(ITreeEncoder):
