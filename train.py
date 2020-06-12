@@ -6,12 +6,12 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from dataset import TreeDGLDataset
+from data_loaders import TreeDGLDataset
 from logger import known_loggers, create_logger
 from model.tree2seq import Tree2Seq
+from trainer import evaluate_on_dataset, train_on_dataset
 from utils.common import fix_seed, get_device, PAD
 from utils.scheduler import get_scheduler
-from utils.training import evaluate_on_dataset, train_on_dataset
 
 
 def train(params: Dict, logger_name: str) -> None:

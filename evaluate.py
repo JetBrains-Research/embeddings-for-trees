@@ -5,10 +5,10 @@ from typing import Dict
 import torch
 import torch.nn as nn
 
-from dataset import TreeDGLDataset
+from data_loaders import TreeDGLDataset
 from model.tree2seq import Tree2Seq
+from trainer import evaluate_on_dataset
 from utils.common import fix_seed, get_device, PAD
-from utils.training import evaluate_on_dataset
 
 
 def evaluate(params: Dict) -> None:

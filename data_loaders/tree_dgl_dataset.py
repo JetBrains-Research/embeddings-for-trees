@@ -8,7 +8,7 @@ from dgl.data.utils import load_graphs
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
-from utils.common import get_tree_depth
+from utils.tree_operations import get_tree_depth
 
 
 def _get_batches(path: str, ext: str) -> List[str]:
