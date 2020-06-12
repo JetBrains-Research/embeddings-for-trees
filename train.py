@@ -8,10 +8,10 @@ import torch.nn as nn
 
 from dataset import TreeDGLDataset
 from model.tree2seq import Tree2Seq
+from trainer import evaluate_on_dataset, train_on_dataset
 from utils.common import fix_seed, get_device, PAD
 from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
 from utils.scheduler import get_scheduler
-from utils.training import evaluate_on_dataset, train_on_dataset
 
 
 def train(params: Dict, logger_name: str) -> None:
