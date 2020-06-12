@@ -7,9 +7,9 @@ import torch
 import torch.nn as nn
 
 from dataset import TreeDGLDataset
+from logger import known_loggers, create_logger
 from model.tree2seq import Tree2Seq
 from utils.common import fix_seed, get_device, PAD
-from utils.logger import get_possible_loggers, FileLogger, WandBLogger, Logger
 from utils.scheduler import get_scheduler
 from utils.training import evaluate_on_dataset, train_on_dataset
 
@@ -61,14 +61,9 @@ def train(params: Dict, logger_name: str) -> None:
     # define loss function
     criterion = nn.CrossEntropyLoss(ignore_index=label_to_id[PAD]).to(device)
 
-    # init logger class
-    if logger_name == FileLogger.name:
-        logger = FileLogger(params['checkpoints_folder'], params, params['logging_folder'])
-    elif logger_name == WandBLogger.name:
-        logger = WandBLogger(params['checkpoints_folder'], params, params.get('resume_wandb_id', False))
-    else:
-        logger = Logger(params['checkpoints_folder'], params)
-    logger.additional_save_info['configuration'] = model.get_configuration()
+    # init logger
+    logger = create_logger(logger_name, params['logging_folder'], params['checkpoints_folder'], params)
+    logger.add_to_saving('configuration', model.get_configuration())
 
     start_batch_id = checkpoint.get('batch_id', -1) + 1
     # train loop
@@ -96,8 +91,8 @@ def train(params: Dict, logger_name: str) -> None:
 if __name__ == '__main__':
     arg_parse = ArgumentParser()
     arg_parse.add_argument('config', type=str, help='path to config json')
-    arg_parse.add_argument('logging', choices=get_possible_loggers())
+    arg_parse.add_argument('logger', choices=known_loggers.keys())
     args = arg_parse.parse_args()
 
     with open(args.config) as config_file:
-        train(json_load(config_file), args.logging)
+        train(json_load(config_file), args.logger)

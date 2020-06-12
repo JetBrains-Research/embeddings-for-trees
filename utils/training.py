@@ -6,10 +6,10 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from tqdm.auto import tqdm
 
+from logger import AbstractLogger
 from model.tree2seq import Tree2Seq
 from utils.common import EOS, UNK, PAD, is_step_match
 from utils.learning_info import LearningInfo
-from utils.logger import Logger
 from utils.metrics import calculate_batch_statistics
 
 
@@ -110,7 +110,7 @@ def evaluate_on_dataset(
 
 def train_on_dataset(
         train_dataset: Dataset, val_dataset, model: Tree2Seq, criterion: nn.modules.loss, optimizer: torch.optim,
-        scheduler: torch.optim.lr_scheduler, clip_norm: int, logger: Logger, start_batch_id: int = 0,
+        scheduler: torch.optim.lr_scheduler, clip_norm: int, logger: AbstractLogger, start_batch_id: int = 0,
         log_step: int = -1, eval_step: int = -1, save_step: int = -1
 ):
     train_epoch_info = LearningInfo()
