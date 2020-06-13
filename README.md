@@ -1,3 +1,4 @@
+[![JetBrains Research](https://jb.gg/badges/research.svg)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
 [![embeddings-for-trees](https://circleci.com/gh/JetBrains-Research/embeddings-for-trees.svg?style=svg)](https://app.circleci.com/pipelines/github/JetBrains-Research/embeddings-for-trees)
 
 # Embeddings for trees
