@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import List
 
 
-@dataclass
+@dataclass(init=False)
 class IDatasetInfo:
     name: str = None
     url: str = None
@@ -11,7 +11,7 @@ class IDatasetInfo:
     astminer_params: List[str] = None
 
 
-@dataclass
+@dataclass(init=False)
 class _JavaDataset(IDatasetInfo):
     dataset_url = 'https://s3.amazonaws.com/code2seq/datasets/{}.tar.gz'
     holdout_folders = ['training', 'validation', 'test']
@@ -28,22 +28,22 @@ class _JavaDataset(IDatasetInfo):
                 '--remove-nodes', 'Javadoc']
 
 
-@dataclass
+@dataclass(init=False)
 class JavaSmallDataset(_JavaDataset):
     name = "java-small"
 
 
-@dataclass
+@dataclass(init=False)
 class JavaMediumDataset(_JavaDataset):
     name = "java-med"
 
 
-@dataclass
+@dataclass(init=False)
 class JavaLargeDataset(_JavaDataset):
     name = "java-large"
 
 
-@dataclass
+@dataclass(init=False)
 class JavaTestDataset(_JavaDataset):
     name = "java-test"
 

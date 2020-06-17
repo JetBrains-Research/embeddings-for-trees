@@ -23,7 +23,7 @@ def main(args: Namespace) -> None:
     fix_seed()
     if args.dataset not in known_datasets:
         raise ValueError(f"Unknown dataset: {args.dataset}")
-    dataset_info = known_datasets[args.dataset]
+    dataset_info = known_datasets[args.dataset]()
     dataset_path = os.path.join(DATA_FOLDER, dataset_info.name)
     vocabulary_path = os.path.join(dataset_path, VOCABULARY_NAME)
     create_folder(dataset_path, is_clean=False)

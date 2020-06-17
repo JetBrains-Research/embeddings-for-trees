@@ -32,7 +32,7 @@ def download_dataset(dataset_info: IDatasetInfo, dataset_path: str) -> None:
     print(f"download {dataset_info.name} dataset...")
     tar_file_path = _download_dataset_archive(dataset_info, dataset_path)
     print(f"extract files from tar archive {tar_file_path}...")
-    extract_tar_gz(tar_file_path, dataset_path)
+    extract_tar_gz(tar_file_path, os.path.dirname(dataset_path))
     print("remove tar file...")
     os.remove(tar_file_path)
 
@@ -65,6 +65,7 @@ def build_dataset_asts(dataset_info: IDatasetInfo, dataset_path: str, astminer_p
     for holdout in dataset_info.holdout_folders:
         holdout_folder = os.path.join(dataset_path, holdout)
         output_folder = os.path.join(dataset_path, f'{holdout}_asts')
+        create_folder(output_folder)
         build_projects_asts(holdout_folder, output_folder, astminer_path, dataset_info.astminer_params)
 
 
