@@ -1,7 +1,7 @@
 from typing import Dict
 
-from .file_logger import FileLogger
 from .logger import AbstractLogger, PrintLogger
+from .file_logger import FileLogger
 from .wandb_logger import WandBLogger
 
 known_loggers: Dict[str, AbstractLogger.__class__] = {
