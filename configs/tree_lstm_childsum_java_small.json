@@ -1,8 +1,8 @@
 {
   "paths": {
-    "train": "./data/java-large/training_preprocessed",
-    "validate": "./data/java-large/validation_preprocessed",
-    "vocabulary": "./data/java-large/vocabulary.pkl"
+    "train": "./data/java-small/training_preprocessed",
+    "validate": "./data/java-small/validation_preprocessed",
+    "vocabulary": "./data/java-small/vocabulary.pkl"
   },
 
   "hidden_states": {
@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "ChildSumTreeLSTMCell",
+        "name": "ChildSum",
         "params": {
         }
       },
@@ -37,12 +37,12 @@
   },
 
   "decoder": {
-    "name": "LSTMDecoder",
+    "name": "LSTM",
     "params": {
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongAttention",
+        "name": "Luong",
         "params": {
             "score": "general"
         }
@@ -58,17 +58,17 @@
 
   "scheduler": {
     "name": "step",
-    "step": 5000,
+    "step": 350,
     "gamma": 0.5
   },
 
   "max_n_nodes": 250,
   "max_depth": 20,
 
-  "evaluation_step": 5000,
+  "evaluation_step": 100,
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": 5000,
+  "checkpoint_step": 500,
   "checkpoints_folder": "checkpoints",
-  "wandb_project": "TreeLSTM-large"
+  "wandb_project": "TreeLSTM-small"
 }
