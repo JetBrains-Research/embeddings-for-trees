@@ -1,23 +1,27 @@
 [![embeddings-for-trees](https://circleci.com/gh/JetBrains-Research/embeddings-for-trees.svg?style=svg)](https://app.circleci.com/pipelines/github/JetBrains-Research/embeddings-for-trees)
 
 # Embeddings for trees
-PyTorch Tree2Seq framework for developing and evaluating different algorithms for tree embedding.
+PyTorch Tree2Seq framework for developing and evaluating different algorithms for embedding trees.
 
 ## Requirements
-You can use conda manager for creating virtual environment:
+You can use conda manager to create a virtual environment:
 ```bash
 conda env create -f environment.yml
 ```
-Also, there is `requirements.txt` file that describe all used python packages.
+Alternatively, you can install the dependencies manually,
+but there may be problems during installation, because in Pypi and Conda some packages have different versions.
+```bash
+pip install -r requirements.txt
+```
 
 ## Data preprocessing
 
-`data_preprocessing` package contain steps for converting source code into abstract syntax trees.
-Main tool for building such trees is [astminer](https://github.com/JetBrains-Research/astminer).
+The `data_preprocessing` package contains all the necessary steps to convert the source code into abstract syntax trees.
+The main tool for building such trees is [astminer](https://github.com/JetBrains-Research/astminer).
 You should build this tool from sources and define the path to `.jar` in `data_preprocessing/main.py`.
 
-Also, there are already converted data: 3 datasets with Java function ASTs for predicting their names.
-Below you can find statistic for each dataset and link to download it:
+Also, you can use the data that is already converted: three datasets with Java function ASTs for predicting their names.
+Below you can find their parameters and the download links.
 
 <table>
 <thead>
@@ -72,42 +76,42 @@ Below you can find statistic for each dataset and link to download it:
 
 ## Tree2Seq framework
 
-Implementation based on [PyTorch](https://pytorch.org/docs/stable/torch.html) framework.
-For supporting learning on graphs [DGL](https://www.dgl.ai/) library is used.
+The implementation is based on the [PyTorch](https://pytorch.org/docs/stable/torch.html) framework,
+and we also use [DGL](https://www.dgl.ai/) to support learning on graphs.
 
-Framework consist of 3 main parts:
-- Node embedding (`INodeEmbedding`) that embed tokens in nodes to vectors.
-- Tree encoder (`ITreeEncoder`) that encode tree into a vector representation.
-- Tree decoder (`ITreeDecoder`) that decode vector representation into target sequence.
+The framework consists of three main parts:
+- Node embedding (`INodeEmbedding`) embeds tokens on nodes to vectors.
+- Tree encoder (`ITreeEncoder`) encodes trees into a vector representation.
+- Tree decoder (`ITreeDecoder`) decodes the vector representation into a target sequence.
 
-Converting source tree into target sequence occurs in `Tree2Seq` class and represent sequence applying of interface realization.
-If you want to add a new algorithm, you should realize class with inheritance from the needed interface, and then use it in the configuration.
+Converting the source tree into a target sequence is carried out in `Tree2Seq` class and consists in a consecutive applying of the interface realization.
+If you want to add a new algorithm, you need to create a class with inheritance from the necessary interface, and then use it in a configuration.
 
 ### Configuration
 
-Components configuration and required hyper parameters can be passed to the model throw `.json` files.
-The examples of such files can be found in `config` directory, there are already prepared configs for training and evaluating
-Tree-LSTM model on Java dataset.
+The configuration of the components and required hyperparameters can be passed to the model via `.json` files.
+The examples of such files can be found in `config` directory, prepared configs for training and evaluating the Tree-LSTM model on Java datasets are already present there.
 
-Use can use prepared scripts to interact with model:
-- Start training ChildSum Tree-LSTM with logging to [wandb](https://www.wandb.com/) service
+You can use these scripts to interact with models:
+- Start training [ChildSum Tree-LSTM](https://arxiv.org/abs/1503.00075) with logging to [wandb](https://www.wandb.com/) service:
 ```bash
 python train.py configs/tree_lstm_childsum_java_small.json wandb
 ```
-- Evaluate model:
+- Evaluate the model:
 ```bash
 python evaluate.py configs/evaluate.json
 ```
-- Predict target sequence for given file with concrete model (predict function name by its body),
-this step includes data preprocessing and model applying:
+- Predict a target sequence for a given file with concrete model (predict the function name by its body),
+this step includes the preprocessing of data and the applying of the model:
 ```bash
 python interactive.py test.java model.pt
 ```
 
 ## Evaluation
 
-Currently, there are implemented Tree-LSTM model with various modifications. For all of them, LSTM with Attention to subtrees
-is used to decoder to target sequence (method name). For node embedding used type (internal nodes) and token (leafs) matrix embeddings.
+Currently, several Tree-LSTM models with various modifications are implemented.
+For all of them, LSTM with Attention to subtrees is used to decode the representation into a target sequence (a method name).
+As for the node embedding, the matrix embeddings for types (internal nodes) and tokens (leafs) are employed.
 
 <table>
 <thead>
@@ -165,7 +169,9 @@ is used to decoder to target sequence (method name). For node embedding used typ
 </tbody>
 </table>
 
+Information about modifications can be found in this [work](https://drive.google.com/file/d/1Mu-b0PqNgOCN_VC2s11LGEsBCaVg2rCt/view?usp=sharing) (russian language)
+
 ## Contribution
 
-Supporting different algorithms to encode and decode trees are the main key areas of improvement this framework.
-So, if you have any suggestions or questions feel free to open issues or even create pull requests. 
+Supporting different algorithms of encoding and decoding trees is the key area of improvement for this framework.
+If you have any suggestions or questions, feel free to open issues and create pull requests.
