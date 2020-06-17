@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "ChildSumTreeLSTMCell",
+        "name": "ChildSum",
         "params": {
         }
       },
@@ -37,12 +37,12 @@
   },
 
   "decoder": {
-    "name": "LSTMDecoder",
+    "name": "LSTM",
     "params": {
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongAttention",
+        "name": "Luong",
         "params": {
             "score": "general"
         }

@@ -1,14 +1,14 @@
 {
   "paths": {
-    "train": "./data/java-test/training_preprocessed",
-    "validate": "./data/java-test/validation_preprocessed",
-    "vocabulary": "./data/java-test/vocabulary.pkl"
+    "train": "./data/java-med/training_preprocessed",
+    "validate": "./data/java-med/validation_preprocessed",
+    "vocabulary": "./data/java-med/vocabulary.pkl"
   },
 
   "hidden_states": {
-    "embedding": 64,
-    "encoder": 64,
-    "decoder": 64
+    "embedding": 256,
+    "encoder": 256,
+    "decoder": 256
   },
 
   "embedding": {
@@ -27,7 +27,7 @@
     "name": "TreeLSTM",
     "params": {
       "cell": {
-        "name": "ChildSumTreeLSTMCell",
+        "name": "ChildSum",
         "params": {
         }
       },
@@ -37,12 +37,12 @@
   },
 
   "decoder": {
-    "name": "LSTMDecoder",
+    "name": "LSTM",
     "params": {
       "dropout": 0.5,
       "teacher_force": 0.0,
       "attention": {
-        "name": "LuongAttention",
+        "name": "Luong",
         "params": {
             "score": "general"
         }
@@ -50,25 +50,25 @@
     }
   },
 
-  "batch_size": 64,
+  "batch_size": 500,
   "n_epochs": 1,
-  "lr": 0.1,
+  "lr": 0.01,
   "weight_decay": 1e-4,
-  "clip_norm": 5,
+  "clip_norm": 20,
 
   "scheduler": {
-    "name": "cosine_warm_up",
-    "warm_up_cf": 0.1,
-    "max_lr": 0.1,
-    "min_lr": 0.0
+    "name": "step",
+    "step": 1000,
+    "gamma": 0.5
   },
 
   "max_n_nodes": 250,
   "max_depth": 20,
 
-  "evaluation_step": 50,
+  "evaluation_step": 1500,
   "logging_step": 10,
   "logging_folder": "logs",
-  "checkpoint_step": -1,
-  "checkpoints_folder": "checkpoints"
+  "checkpoint_step": 1500,
+  "checkpoints_folder": "checkpoints",
+  "wandb_project": "TreeLSTM-medium"
 }
