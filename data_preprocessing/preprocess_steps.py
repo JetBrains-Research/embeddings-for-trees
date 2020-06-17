@@ -65,6 +65,7 @@ def build_dataset_asts(dataset_info: IDatasetInfo, dataset_path: str, astminer_p
     for holdout in dataset_info.holdout_folders:
         holdout_folder = os.path.join(dataset_path, holdout)
         output_folder = os.path.join(dataset_path, f'{holdout}_asts')
+        create_folder(output_folder)
         build_projects_asts(holdout_folder, output_folder, astminer_path, dataset_info.astminer_params)
 
 
