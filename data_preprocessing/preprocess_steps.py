@@ -103,8 +103,12 @@ def collect_vocabulary(
         print(f"collecting {column} vocabulary...")
         counter = Counter()
         for project in tqdm(projects):
-            project_description = pd.read_csv(os.path.join(train_path, project, 'java', 'description.csv'))
-            counter = _update_vocab_counter(counter, project_description[column], is_split, delimiter)
+            try:
+                project_description = pd.read_csv(os.path.join(train_path, project, 'java', 'description.csv'))
+                counter = _update_vocab_counter(counter, project_description[column], is_split, delimiter)
+            except Exception as err:
+                print(f"failed to read description for {project} project\n"
+                      f"error: {err}")
         if n_max == -1:
             n_max = len(counter)
         print(f"found {len(counter)} {column}, use {n_max} most common")
