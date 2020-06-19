@@ -164,8 +164,8 @@ def convert_holdout(holdout_path: str, output_path: str, batch_size: int,
         )
 
     graphs = []
-    labels = None
-    source_paths = None
+    labels = []
+    source_paths = []
     print("load graphs to memory...")
     for project_path in tqdm(projects_paths):
         graph_path = os.path.join(project_path, 'converted.dgl')
@@ -179,8 +179,8 @@ def convert_holdout(holdout_path: str, output_path: str, batch_size: int,
             pkl_data = load(pkl_file)
             cur_labels, cur_source_paths = pkl_data['labels'], pkl_data['source_paths']
         graphs += cur_graphs
-        labels = cur_labels if labels is None else np.append(labels, cur_labels, axis=0)
-        source_paths = cur_source_paths if source_paths is None else np.append(source_paths, cur_source_paths, axis=0)
+        labels += cur_labels.tolist()
+        source_paths += cur_source_paths.tolist()
     assert len(graphs) == len(labels), "unequal lengths of graphs and labels"
     assert len(graphs) == len(source_paths), "unequal lengths of graphs and source paths"
     print(f"total number of graphs: {len(graphs)}")
@@ -188,8 +188,8 @@ def convert_holdout(holdout_path: str, output_path: str, batch_size: int,
     if shuffle:
         order = np.random.permutation(len(graphs))
         graphs = [graphs[i] for i in order]
-        labels = labels[order]
-        source_paths = source_paths[order]
+        labels = [labels[i] for i in order]
+        source_paths = [source_paths[i] for i in order]
 
     print(f"save batches...")
     n_batches = len(graphs) // batch_size + (1 if len(graphs) % batch_size > 0 else 0)
@@ -200,5 +200,5 @@ def convert_holdout(holdout_path: str, output_path: str, batch_size: int,
         save_graphs(output_graph_path, graphs[current_slice])
         with open(output_labels_path, 'wb') as pkl_file:
             dump({
-                'labels': labels[current_slice], 'source_paths': source_paths[current_slice]
+                'labels': np.array(labels[current_slice]), 'source_paths': source_paths[current_slice]
             }, pkl_file)
