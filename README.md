@@ -69,7 +69,7 @@ Below you can find their parameters and the download links.
     <td>250</td>
     <td>307</td>
     <td>16 794 775</td>
-    <td>~350 000</td>
+    <td>352 898</td>
     <td>459 104</td>
   </tr>
 </tbody>
