@@ -1,5 +1,5 @@
 [![JetBrains Research](https://jb.gg/badges/research.svg)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
-[![embeddings-for-trees](https://circleci.com/gh/JetBrains-Research/embeddings-for-trees.svg?style=shield)](https://app.circleci.com/pipelines/github/JetBrains-Research/embeddings-for-trees)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 
 # Embeddings for trees
 PyTorch Tree2Seq framework for developing and evaluating different algorithms for embedding trees.
