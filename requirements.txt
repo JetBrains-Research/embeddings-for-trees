@@ -6,3 +6,4 @@ wandb==0.10.15
 mypy==0.800
 hydra-core==1.0.5
 omegaconf==2.0.6
+dgl==0.5.3

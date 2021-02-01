@@ -1,0 +1,12 @@
+hydra:
+  run:
+    dir: .
+
+# ===== Data =====
+data_folder: ../data
+dataset: java-test-asts
+
+max_labels: null
+max_label_parts: 5
+max_tokens: null
+max_token_parts: 5

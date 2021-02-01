@@ -7,7 +7,7 @@ from os import path
 
 from tqdm import tqdm
 
-from utils.common import get_lines_in_file, LABEL, AST, NODE, TOKEN
+from utils.common import get_lines_in_file, LABEL, AST, NODE, TOKEN, SEPARATOR
 
 
 def build_vocabulary(train_data: str):
@@ -23,10 +23,10 @@ def build_vocabulary(train_data: str):
                 print(f"Can't parse sample #{sample_id}, failed with {e.msg}")
                 continue
 
-            label_counter.update(sample[LABEL].split("|"))
+            label_counter.update(sample[LABEL].split(SEPARATOR))
             for node in sample[AST]:
                 node_counter.update([node[NODE]])
-                token_counter.update(node[TOKEN].split("|"))
+                token_counter.update(node[TOKEN].split(SEPARATOR))
 
     print(f"Count {len(label_counter)} labels, top-5: {label_counter.most_common(5)}")
     print(f"Count {len(node_counter)} nodes, top-5: {node_counter.most_common(5)}")
@@ -35,11 +35,14 @@ def build_vocabulary(train_data: str):
     dataset_dir = path.dirname(train_data)
     vocabulary_file = path.join(dataset_dir, "vocabulary.pkl")
     with open(vocabulary_file, "wb") as f_out:
-        pickle.dump({
-            LABEL: label_counter,
-            NODE: node_counter,
-            TOKEN: token_counter,
-        }, f_out)
+        pickle.dump(
+            {
+                LABEL: label_counter,
+                NODE: node_counter,
+                TOKEN: token_counter,
+            },
+            f_out,
+        )
 
 
 if __name__ == "__main__":

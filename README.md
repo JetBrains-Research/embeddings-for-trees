@@ -98,11 +98,11 @@ The examples of such files can be found in `config` directory, prepared configs 
 You can use these scripts to interact with models:
 - Start training [ChildSum Tree-LSTM](https://arxiv.org/abs/1503.00075) with logging to [wandb](https://www.wandb.com/) service:
 ```bash
-python train.py configs/tree_lstm_childsum_java_small.json wandb
+python train.py config/tree_lstm_childsum_java_small.json wandb
 ```
 - Evaluate the model:
 ```bash
-python evaluate.py configs/evaluate.json
+python evaluate.py config/evaluate.json
 ```
 - Predict a target sequence for a given file with concrete model (predict the function name by its body),
 this step includes the preprocessing of data and the applying of the model:
