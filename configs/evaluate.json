@@ -1,5 +1,0 @@
-{
-  "dataset": "./data/java-small/test_preprocessed",
-  "model": "epoch_0.pt",
-  "batch_size": 500
-}
