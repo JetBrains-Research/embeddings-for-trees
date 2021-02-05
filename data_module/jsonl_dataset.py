@@ -26,10 +26,10 @@ class JsonlDataset(Dataset):
 
         self._line_offsets = []
         cumulative_offset = 0
-        with open(self._data_file, "r") as data_file:
-            for line in data_file:
+        with open(self._data_file, "r") as file:
+            for line in file:
                 self._line_offsets.append(cumulative_offset)
-                cumulative_offset += len(line.encode(data_file.encoding))
+                cumulative_offset += len(line.encode(file.encoding))
         self._n_samples = len(self._line_offsets)
 
     def __len__(self):
