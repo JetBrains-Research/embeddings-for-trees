@@ -50,20 +50,16 @@ class JsonlDataset(Dataset):
             return None
 
         # convert label
-        label = torch.full(
-            (self._config.max_label_parts,), self._vocab.label_to_id[PAD]
-        )
+        label = torch.full((self._config.max_label_parts, 1), self._vocab.label_to_id[PAD])
         sublabels = sample[LABEL].split(SEPARATOR)[: self._config.max_label_parts]
-        label[: len(sublabels)] = torch.tensor(
+        label[: len(sublabels), 0] = torch.tensor(
             [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
         )
 
         # prepare ast feature tensors
         ast = sample[AST]
         us, vs = [], []
-        token_ids = torch.full(
-            (len(ast), self._config.max_token_parts), self._vocab.token_to_id[PAD]
-        )
+        token_ids = torch.full((len(ast), self._config.max_token_parts), self._vocab.token_to_id[PAD])
         node_ids = torch.full((len(ast),), self._vocab.node_to_id[PAD])
 
         # iterate through nodes
