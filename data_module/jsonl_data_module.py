@@ -84,3 +84,9 @@ class JsonlDataModule(LightningDataModule):
         self, batch: Tuple[torch.Tensor, dgl.DGLGraph], device: Optional[torch.device] = None
     ) -> Tuple[torch.Tensor, dgl.DGLGraph]:
         return batch[0].to(device), batch[1].to(device)
+
+    @property
+    def vocabulary(self) -> Vocabulary:
+        if self._vocabulary is None:
+            raise RuntimeError(f"Setup data module for initializing vocabulary")
+        return self._vocabulary

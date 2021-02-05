@@ -16,3 +16,9 @@ max_token_parts: 5
 
 # ===== Hyperparameters =====
 batch_size: 10
+
+# ===== Model parameters =====
+tree_lstm:
+  embedding_size: 10
+  encoder_dropout: 0.5
+  encoder_size: 10
