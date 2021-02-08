@@ -9,15 +9,19 @@ from torch import nn
 class TreeLSTM(nn.Module):
     def __init__(self, config: DictConfig):
         super().__init__()
-        self._encoder_size = config.tree_lstm.encoder_size
+        self._encoder_size = config.encoder_size
 
-        self._dropout = nn.Dropout(config.tree_lstm.encoder_dropout)
+        self._dropout = nn.Dropout(config.encoder_dropout)
 
-        self._W_iou = nn.Linear(config.tree_lstm.embedding_size, 3 * config.tree_lstm.encoder_size)
-        self._U_iou = nn.Linear(config.tree_lstm.encoder_size, 3 * config.tree_lstm.encoder_size, bias=False)
+        self._W_iou = nn.Linear(config.embedding_size, 3 * config.encoder_size)
+        self._U_iou = nn.Linear(config.encoder_size, 3 * config.encoder_size, bias=False)
 
-        self._W_f = nn.Linear(config.tree_lstm.embedding_size, config.tree_lstm.encoder_size)
-        self._U_f = nn.Linear(config.tree_lstm.encoder_size, config.tree_lstm.encoder_size, bias=False)
+        self._W_f = nn.Linear(config.embedding_size, config.encoder_size)
+        self._U_f = nn.Linear(config.encoder_size, config.encoder_size, bias=False)
+
+        self._out_linear = nn.Linear(config.encoder_size, config.decoder_size)
+        self._norm = nn.LayerNorm(config.decoder_size)
+        self._tanh = nn.Tanh()
 
     def message_func(self, edges: dgl.udf.EdgeBatch) -> Dict:
         h_f = self._U_f(edges.src["h"])
@@ -40,7 +44,7 @@ class TreeLSTM(nn.Module):
 
         return {"h": h, "c": c}
 
-    def forward(self, graph: dgl.DGLGraph) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         x = self._dropout(graph.ndata["x"])
 
         # init matrices for message propagation
@@ -60,4 +64,8 @@ class TreeLSTM(nn.Module):
             apply_node_func=self.apply_node_func,
         )
 
-        return graph.ndata.pop("h"), graph.ndata.pop("c")
+        # [n nodes; encoder size]
+        h = graph.ndata.pop("h")
+        # [n nodes; decoder size]
+        out = self._tanh(self._norm(self._out_linear(h)))
+        return out

@@ -12,12 +12,12 @@ class NodeFeaturesEmbedding(nn.Module):
         super().__init__()
 
         self._token_embedding = nn.Embedding(
-            len(vocabulary.token_to_id), config.tree_lstm.embedding_size, padding_idx=vocabulary.token_to_id[PAD]
+            len(vocabulary.token_to_id), config.embedding_size, padding_idx=vocabulary.token_to_id[PAD]
         )
         self._node_embedding = nn.Embedding(
-            len(vocabulary.node_to_id), config.tree_lstm.embedding_size, padding_idx=vocabulary.node_to_id[PAD]
+            len(vocabulary.node_to_id), config.embedding_size, padding_idx=vocabulary.node_to_id[PAD]
         )
-        self._concat_linear = nn.Linear(2 * config.tree_lstm.embedding_size, config.tree_lstm.embedding_size)
+        self._concat_linear = nn.Linear(2 * config.embedding_size, config.embedding_size)
 
     def forward(self, graph: dgl.DGLGraph) -> dgl.DGLGraph:
         # [n nodes; embedding size]

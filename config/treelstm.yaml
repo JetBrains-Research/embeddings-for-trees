@@ -1,6 +1,9 @@
 hydra:
   run:
     dir: .
+  output_subdir: null
+  job_logging: null
+  hydra_logging: null
 
 num_workers: 10
 
@@ -14,11 +17,13 @@ max_tokens: null
 max_token_parts: 5
 
 
-# ===== Hyperparameters =====
+# ===== Hyperparameters =====в
 batch_size: 10
 
 # ===== Model parameters =====
-tree_lstm:
-  embedding_size: 10
-  encoder_dropout: 0.5
-  encoder_size: 10
+embedding_size: 10
+encoder_dropout: 0.5
+encoder_size: 10
+decoder_size: 10
+decoder_num_layers: 1
+rnn_dropout: 0.25
