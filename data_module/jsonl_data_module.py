@@ -55,14 +55,14 @@ class JsonlDataModule(LightningDataModule):
 
     @staticmethod
     def _collate_batch(sample_list: List[Tuple[torch.Tensor, dgl.DGLGraph]]) -> Tuple[torch.Tensor, dgl.DGLGraph]:
-        labels, graphs = zip(*sample_list)
+        labels, graphs = zip(*filter(lambda sample: sample is not None, sample_list))
         return torch.cat(labels, dim=1), dgl.batch(graphs)
 
-    def _common_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
+    def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
-        train_holdout = path.join(self._dataset_dir, f"{self._config.dataset}.{holdout}.jsonl")
-        dataset = JsonlDataset(train_holdout, self._vocabulary, self._config)
+        holdout_file = path.join(self._dataset_dir, f"{self._config.dataset}.{holdout}.jsonl")
+        dataset = JsonlDataset(holdout_file, self._vocabulary, self._config)
         return DataLoader(
             dataset,
             self._config.batch_size,
@@ -72,13 +72,13 @@ class JsonlDataModule(LightningDataModule):
         )
 
     def train_dataloader(self, *args, **kwargs) -> DataLoader:
-        return self._common_dataloader(self._train, True)
+        return self._shared_dataloader(self._train, True)
 
     def val_dataloader(self, *args, **kwargs) -> DataLoader:
-        return self._common_dataloader(self._val, False)
+        return self._shared_dataloader(self._val, False)
 
     def test_dataloader(self, *args, **kwargs) -> DataLoader:
-        return self._common_dataloader(self._test, False)
+        return self._shared_dataloader(self._test, False)
 
     def transfer_batch_to_device(
         self, batch: Tuple[torch.Tensor, dgl.DGLGraph], device: Optional[torch.device] = None

@@ -46,7 +46,7 @@ class JsonlDataset(Dataset):
         try:
             sample = json.loads(raw_sample)
         except JSONDecodeError as e:
-            print(f"Can't decode json for sample #{index}, failed with {e.msg}")
+            # print(f"Can't decode json for sample #{index}, failed with {e.msg}")
             return None
 
         # convert label

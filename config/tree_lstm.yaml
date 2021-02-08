@@ -5,7 +5,12 @@ hydra:
   job_logging: null
   hydra_logging: null
 
-num_workers: 10
+num_workers: 1
+seed: 7
+log_offline: true
+
+# ===== Resuming =====
+resume_checkpoint: null
 
 # ===== Data =====
 data_folder: ../data
@@ -17,8 +22,24 @@ max_tokens: null
 max_token_parts: 5
 
 
-# ===== Hyperparameters =====в
+# ===== Hyperparameters =====
+learning_rate: 0.01
+weight_decay: 0
+lr_decay_gamma: 0.95
+
 batch_size: 10
+n_epochs: 3000
+
+patience: 10
+clip_norm: 5
+teacher_forcing: 0.5
+
+# ===== Training parameters =====
+val_every_epoch: 1
+save_every_epoch: 1
+log_every_step: 10
+progress_bar_refresh_rate: 10
+
 
 # ===== Model parameters =====
 embedding_size: 10

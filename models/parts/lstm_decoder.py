@@ -19,6 +19,7 @@ class LSTMDecoder(nn.Module):
         self._out_size = len(vocabulary.label_to_id)
         self._sos_token = vocabulary.label_to_id[SOS]
         self._decoder_num_layers = config.decoder_num_layers
+        self._teacher_forcing = config.teacher_forcing
 
         self._target_embedding = nn.Embedding(
             len(vocabulary.label_to_id), config.embedding_size, padding_idx=vocabulary.label_to_id[PAD]
@@ -67,7 +68,7 @@ class LSTMDecoder(nn.Module):
                 current_input, h_prev, c_prev, batched_encoded_trees, attention_mask
             )
             output[step] = current_output
-            if target_sequence is not None and torch.rand(1) < self.teacher_forcing:
+            if target_sequence is not None and torch.rand(1) < self._teacher_forcing:
                 current_input = target_sequence[step]
             else:
                 current_input = output[step].argmax(dim=-1)
