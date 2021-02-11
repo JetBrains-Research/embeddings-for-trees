@@ -13,6 +13,7 @@ notebooks/
 *.pt
 *.jar
 *.java
+*.log
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
