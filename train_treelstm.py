@@ -12,7 +12,7 @@ from utils.callbacks import UploadCheckpointCallback, PrintEpochResultCallback
 from utils.common import filter_warnings, print_config
 
 
-@hydra.main(config_path="config", config_name="tree_lstm")
+@hydra.main(config_path="config", config_name="tree_lstm_small")
 def train_treelstm(config: DictConfig):
     filter_warnings()
     seed_everything(config.seed)

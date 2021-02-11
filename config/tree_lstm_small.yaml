@@ -5,9 +5,9 @@ hydra:
   job_logging: null
   hydra_logging: null
 
-num_workers: 1
+num_workers: 4
 seed: 7
-log_offline: true
+log_offline: false
 
 # ===== Resuming =====
 resume_checkpoint: null
