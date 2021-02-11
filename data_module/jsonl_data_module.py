@@ -19,7 +19,8 @@ class JsonlDataModule(LightningDataModule):
     _test = "test"
 
     _known_datasets = {
-        "java-test-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-test-asts.tar.gz"
+        "java-test-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-test-asts.tar.gz",
+        "java-small-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-asts.tar.gz",
     }
 
     def __init__(self, config: DictConfig):
