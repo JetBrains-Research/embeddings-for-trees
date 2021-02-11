@@ -100,7 +100,7 @@ class JsonlDataset(Dataset):
 
         return label, graph
 
-    def _print_tree(self, tree: dgl.DGLGraph, indent: int = 4, symbol: str = "..", indent_ste: int = 4):
+    def _print_tree(self, tree: dgl.DGLGraph, symbol: str = ".."):
         id_to_subtoken = {v: k for k, v in self._vocab.token_to_id.items()}
         id_to_node = {v: k for k, v in self._vocab.node_to_id.items()}
         node_depth = {0: 0}

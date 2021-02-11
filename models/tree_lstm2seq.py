@@ -7,8 +7,9 @@ from pytorch_lightning import LightningModule
 from torch.optim import Optimizer, Adam
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 
-from models.parts import NodeFeaturesEmbedding, LSTMDecoder
-from models.parts.tree_lstm_dgl_encoder import TreeLSTM
+from models.parts import NodeFeaturesEmbedding, LSTMDecoder, TreeLSTM
+
+# from models.parts.tree_lstm_dgl_encoder import TreeLSTM
 from utils.common import PAD, UNK, EOS, SOS
 from utils.metrics import PredictionStatistic
 from utils.vocabulary import Vocabulary

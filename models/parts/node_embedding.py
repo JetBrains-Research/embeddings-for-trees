@@ -17,7 +17,6 @@ class NodeFeaturesEmbedding(nn.Module):
         self._node_embedding = nn.Embedding(
             len(vocabulary.node_to_id), config.embedding_size, padding_idx=vocabulary.node_to_id[PAD]
         )
-        self._concat_linear = nn.Linear(2 * config.embedding_size, config.embedding_size)
 
     def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         # [n nodes; embedding size]
@@ -25,6 +24,4 @@ class NodeFeaturesEmbedding(nn.Module):
         # [n nodes; embedding size]
         node_embedding = self._node_embedding(graph.ndata[NODE])
         # [n nodes; 2 * embedding size]
-        concat = torch.cat([token_embedding, node_embedding], dim=1)
-        # [n nodes; embedding size]
-        return self._concat_linear(concat)
+        return token_embedding + node_embedding
