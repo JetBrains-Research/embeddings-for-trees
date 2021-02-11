@@ -1,9 +1,11 @@
 import subprocess
+from math import ceil
 from os.path import join, dirname
 from typing import Dict, List
 from warnings import filterwarnings
 
 from dgl.base import DGLWarning
+from omegaconf import DictConfig
 
 SEPARATOR = "|"
 
@@ -64,3 +66,14 @@ def filter_warnings():
     # "Please also save or load the state of the optimizer when saving or loading the scheduler."
     filterwarnings("ignore", category=UserWarning, module="torch.optim.lr_scheduler", lineno=216)  # save
     filterwarnings("ignore", category=UserWarning, module="torch.optim.lr_scheduler", lineno=234)  # load
+
+
+def print_config(config: DictConfig, ignore_keys: List[str] = None, n_cols: int = 4):
+    if ignore_keys is None:
+        ignore_keys = []
+    parameters = [f"{k}: {v}" for k, v in config.items() if k not in ignore_keys]
+    table_data = {}
+    items_per_col = int(ceil(len(parameters) / n_cols))
+    for col in range(n_cols):
+        table_data[f"Parameters #{col + 1}"] = parameters[items_per_col * col : items_per_col * (col + 1)]
+    print_table(table_data)

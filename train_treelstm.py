@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 from data_module.jsonl_data_module import JsonlDataModule
 from models import TreeLSTM2Seq
 from utils.callbacks import UploadCheckpointCallback, PrintEpochResultCallback
-from utils.common import filter_warnings
+from utils.common import filter_warnings, print_config
 
 
 @hydra.main(config_path="config", config_name="tree_lstm")
@@ -17,6 +17,8 @@ def train_treelstm(config: DictConfig):
     filter_warnings()
     seed_everything(config.seed)
     dgl.seed(config.seed)
+
+    print_config(config, ["hydra", "log_offline"])
 
     data_module = JsonlDataModule(config)
     data_module.prepare_data()
