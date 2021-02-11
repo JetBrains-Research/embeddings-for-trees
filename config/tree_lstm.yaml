@@ -21,6 +21,9 @@ max_label_parts: 5
 max_tokens: 45000
 max_token_parts: 5
 
+max_tree_nodes: 250
+max_tree_depth: 20
+
 
 # ===== Hyperparameters =====
 learning_rate: 0.01

@@ -13,7 +13,6 @@ from utils.vocabulary import Vocabulary
 
 
 class JsonlDataset(Dataset):
-
     _log_file = "bad_samples.log"
 
     def __init__(self, data_file: str, vocabulary: Vocabulary, config: DictConfig):
@@ -43,6 +42,16 @@ class JsonlDataset(Dataset):
             data_file.seek(self._line_offsets[index])
             line = data_file.readline().strip()
         return line
+
+    def _is_suitable_tree(self, tree: dgl.DGLGraph) -> bool:
+        if self._config.max_tree_nodes is not None and tree.number_of_nodes() > self._config.max_tree_nodes:
+            return False
+        if (
+            self._config.max_tree_depth is not None
+            and len(dgl.topological_nodes_generator(tree)) > self._config.max_tree_depth
+        ):
+            return False
+        return True
 
     def __getitem__(self, index) -> Optional[Tuple[torch.Tensor, dgl.DGLGraph]]:
         raw_sample = self._read_line(index)
@@ -79,6 +88,8 @@ class JsonlDataset(Dataset):
 
         # convert to dgl graph
         graph = dgl.graph((us, vs))
+        if not self._is_suitable_tree(graph):
+            return None
         graph.ndata[TOKEN] = token_ids
         graph.ndata[NODE] = node_ids
 
