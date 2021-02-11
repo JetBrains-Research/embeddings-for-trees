@@ -1,8 +1,8 @@
 black==20.8b1
 torch==1.7.1
-tqdm==4.56.0
-pytorch-lightning==1.1.8
-wandb==0.10.17
+tqdm==4.56.2
+pytorch-lightning==1.1.7
+wandb==0.10.18
 mypy==0.800
 hydra-core==1.0.6
 omegaconf==2.0.6

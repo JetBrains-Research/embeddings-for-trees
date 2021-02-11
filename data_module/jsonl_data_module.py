@@ -13,7 +13,6 @@ from utils.vocabulary import Vocabulary
 
 
 class JsonlDataModule(LightningDataModule):
-
     _vocabulary_file = "vocabulary.pkl"
     _train = "train"
     _val = "val"
@@ -39,14 +38,12 @@ class JsonlDataModule(LightningDataModule):
                 f"Unknown dataset name ({self._config.dataset}).\n"
                 f"Try one of the following: {', '.join(self._known_datasets.keys())}"
             )
-            try:
-                download_dataset(
-                    self._known_datasets[self._config.dataset],
-                    self._dataset_dir,
-                    self._config.dataset,
-                )
-            except RuntimeError as error:
-                print(f"Error during preparing dataset: {error}")
+            return
+        download_dataset(
+            self._known_datasets[self._config.dataset],
+            self._dataset_dir,
+            self._config.dataset,
+        )
 
     def setup(self, stage: Optional[str] = None):
         if not path.exists(path.join(self._dataset_dir, Vocabulary.vocab_file)):

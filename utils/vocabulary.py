@@ -14,6 +14,7 @@ from utils.common import PAD, UNK, NODE, SOS, EOS, TOKEN, LABEL, SEPARATOR, AST,
 
 class Vocabulary:
     vocab_file = "vocabulary.pkl"
+    _log_file = "bad_samples.log"
 
     def __init__(self, config: DictConfig):
         vocabulary_file = path.join(config.data_folder, config.dataset, self.vocab_file)
@@ -56,8 +57,9 @@ class Vocabulary:
             for sample_id, sample_json in tqdm(enumerate(f_in), total=total_samples):
                 try:
                     sample = loads(sample_json)
-                except JSONDecodeError as e:
-                    print(f"Can't parse sample #{sample_id}, failed with {e.msg}")
+                except JSONDecodeError:
+                    with open(Vocabulary._log_file, "a") as log_file:
+                        log_file.write(sample_json + "\n")
                     continue
 
                 label_counter.update(sample[LABEL].split(SEPARATOR))

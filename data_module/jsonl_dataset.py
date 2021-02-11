@@ -13,6 +13,9 @@ from utils.vocabulary import Vocabulary
 
 
 class JsonlDataset(Dataset):
+
+    _log_file = "bad_samples.log"
+
     def __init__(self, data_file: str, vocabulary: Vocabulary, config: DictConfig):
         if not exists(data_file):
             raise ValueError(f"Can't find file with data: {data_file}")
@@ -46,7 +49,8 @@ class JsonlDataset(Dataset):
         try:
             sample = json.loads(raw_sample)
         except JSONDecodeError as e:
-            # print(f"Can't decode json for sample #{index}, failed with {e.msg}")
+            with open(self._log_file, "a") as log_file:
+                log_file.write(raw_sample + "\n")
             return None
 
         # convert label

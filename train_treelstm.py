@@ -1,7 +1,7 @@
 import dgl
 import hydra
 import torch
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
@@ -22,8 +22,6 @@ def train_treelstm(config: DictConfig):
     data_module.prepare_data()
     data_module.setup()
     model = TreeLSTM2Seq(config, data_module.vocabulary)
-
-    print(OmegaConf.to_yaml(config))
 
     # define logger
     wandb_logger = WandbLogger(project=f"tree-lstm-{config.dataset}", log_model=False, offline=config.log_offline)
@@ -58,7 +56,7 @@ def train_treelstm(config: DictConfig):
             early_stopping_callback,
             checkpoint_callback,
             upload_checkpoint_callback,
-            # print_epoch_result_callback,
+            print_epoch_result_callback,
         ],
         resume_from_checkpoint=config.resume_checkpoint,
     )
