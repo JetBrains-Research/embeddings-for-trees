@@ -14,11 +14,11 @@ resume_checkpoint: null
 
 # ===== Data =====
 data_folder: ../data
-dataset: java-test-asts
+dataset: java-small-asts
 
-max_labels: null
+max_labels: 9000
 max_label_parts: 5
-max_tokens: null
+max_tokens: 45000
 max_token_parts: 5
 
 

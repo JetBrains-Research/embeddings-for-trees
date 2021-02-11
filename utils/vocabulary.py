@@ -1,4 +1,5 @@
 import pickle
+from argparse import ArgumentParser
 from collections import Counter
 from json import JSONDecodeError, loads
 from os import path
@@ -82,3 +83,10 @@ class Vocabulary:
                 },
                 f_out,
             )
+
+
+if __name__ == "__main__":
+    arg_parse = ArgumentParser()
+    arg_parse.add_argument("data", type=str, help="Path to file with data")
+    args = arg_parse.parse_args()
+    Vocabulary.build_from_scratch(args.data)
