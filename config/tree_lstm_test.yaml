@@ -5,7 +5,7 @@ hydra:
   job_logging: null
   hydra_logging: null
 
-num_workers: 1
+num_workers: 0
 seed: 7
 log_offline: true
 
@@ -17,7 +17,7 @@ data_folder: ../data
 dataset: java-test-asts
 
 max_labels: null
-max_label_parts: 5
+max_label_parts: 7
 max_tokens: null
 max_token_parts: 5
 

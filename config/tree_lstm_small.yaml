@@ -17,7 +17,7 @@ data_folder: ../data
 dataset: java-small-asts
 
 max_labels: 9000
-max_label_parts: 5
+max_label_parts: 7
 max_tokens: 45000
 max_token_parts: 5
 

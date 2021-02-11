@@ -21,7 +21,7 @@ class NodeFeaturesEmbedding(nn.Module):
 
     def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
         # [n nodes; embedding size]
-        token_embedding = self._token_embedding(graph.ndata[TOKEN]).sum(1)
+        token_embedding = self._token_embedding(graph.ndata[TOKEN])
         # [n nodes; embedding size]
         node_embedding = self._node_embedding(graph.ndata[NODE])
         # [n nodes; 2 * embedding size]

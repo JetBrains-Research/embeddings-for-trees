@@ -1,7 +1,7 @@
 import json
 from json import JSONDecodeError
 from os.path import exists
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import dgl
 import torch
@@ -69,28 +69,50 @@ class JsonlDataset(Dataset):
             [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
         )
 
-        # prepare ast feature tensors
-        ast = sample[AST]
-        us, vs = [], []
-        token_ids = torch.full((len(ast), self._config.max_token_parts), self._vocab.token_to_id[PAD])
-        node_ids = torch.full((len(ast),), self._vocab.node_to_id[PAD])
-
         # iterate through nodes
+        ast = sample[AST]
+        node_to_parent = {}
+        nodes: List[Tuple[str, str, Optional[int]]] = []  # list of (subtoken, node, parent)
         for n_id, node in enumerate(ast):
             if CHILDREN in node:
-                us += node[CHILDREN]
-                vs += [n_id] * len(node[CHILDREN])
-            subtokens = node[TOKEN].split(SEPARATOR)[: self._config.max_token_parts]
-            token_ids[n_id, : len(subtokens)] = torch.tensor(
-                [self._vocab.token_to_id.get(st, self._token_unk) for st in subtokens]
-            )
-            node_ids[n_id] = self._vocab.node_to_id.get(node[NODE], self._node_unk)
+                assert node[TOKEN] == "<EMPTY>", "internal node has non empty token"
+
+                for c in node[CHILDREN]:
+                    node_to_parent[c] = len(nodes)
+
+                parent_id = node_to_parent.get(n_id, None)
+                nodes.append((node[TOKEN], node[NODE], parent_id))
+            else:
+                subtokens = node[TOKEN].split(SEPARATOR)[: self._config.max_token_parts]
+                parent_id = node_to_parent[n_id]
+                nodes += [(st, node[NODE], parent_id) for st in subtokens]
 
         # convert to dgl graph
+        us, vs = zip(*[(child, parent) for child, (_, _, parent) in enumerate(nodes) if parent is not None])
         graph = dgl.graph((us, vs))
         if not self._is_suitable_tree(graph):
             return None
-        graph.ndata[TOKEN] = token_ids
-        graph.ndata[NODE] = node_ids
+        graph.ndata[TOKEN] = torch.empty((len(nodes),), dtype=torch.long)
+        graph.ndata[NODE] = torch.empty((len(nodes),), dtype=torch.long)
+        for n_id, (token, node, _) in enumerate(nodes):
+            graph.ndata[TOKEN][n_id] = self._vocab.token_to_id.get(token, self._token_unk)
+            graph.ndata[NODE][n_id] = self._vocab.node_to_id.get(node, self._node_unk)
 
         return label, graph
+
+    def _print_tree(self, tree: dgl.DGLGraph, indent: int = 4, symbol: str = "..", indent_ste: int = 4):
+        id_to_subtoken = {v: k for k, v in self._vocab.token_to_id.items()}
+        id_to_node = {v: k for k, v in self._vocab.node_to_id.items()}
+        node_depth = {0: 0}
+        print(f"{id_to_subtoken[tree.ndata[TOKEN][0].item()]}/{id_to_node[tree.ndata[NODE][0].item()]}")
+
+        edges = tree.edges()
+        for edge_id in dgl.dfs_edges_generator(tree, 0, True):
+            edge_id = edge_id.item()
+            v, u = edges[0][edge_id].item(), edges[1][edge_id].item()
+            cur_depth = node_depth[u] + 1
+            node_depth[v] = cur_depth
+            print(
+                f"{symbol * cur_depth}"
+                f"{id_to_subtoken[tree.ndata[TOKEN][v].item()]}/{id_to_node[tree.ndata[NODE][v].item()]}"
+            )
