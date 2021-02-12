@@ -77,7 +77,7 @@ class JsonlDataset(Dataset):
         node_to_parent = {}
         nodes: List[Tuple[str, str, Optional[int]]] = []  # list of (subtoken, node, parent)
         for n_id, node in enumerate(ast):
-            if CHILDREN in node:
+            if CHILDREN in node and len(CHILDREN) > 0:
                 assert node[TOKEN] == "<EMPTY>", "internal node has non empty token"
 
                 for c in node[CHILDREN]:
