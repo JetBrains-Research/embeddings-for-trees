@@ -8,7 +8,7 @@ import torch
 from omegaconf import DictConfig
 from torch.utils.data import Dataset
 
-from utils.common import LABEL, AST, CHILDREN, TOKEN, PAD, NODE, SEPARATOR, UNK
+from utils.common import LABEL, AST, CHILDREN, TOKEN, PAD, NODE, SEPARATOR, UNK, SOS, EOS
 from utils.vocabulary import Vocabulary
 
 
@@ -63,11 +63,14 @@ class JsonlDataset(Dataset):
             return None
 
         # convert label
-        label = torch.full((self._config.max_label_parts, 1), self._vocab.label_to_id[PAD])
+        label = torch.full((self._config.max_label_parts + 1, 1), self._vocab.label_to_id[PAD])
+        label[0, 0] = self._vocab.label_to_id[SOS]
         sublabels = sample[LABEL].split(SEPARATOR)[: self._config.max_label_parts]
-        label[: len(sublabels), 0] = torch.tensor(
+        label[1 : len(sublabels) + 1, 0] = torch.tensor(
             [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
         )
+        if len(sublabels) < self._config.max_label_parts:
+            label[len(sublabels) + 1, 0] = self._vocab.label_to_id[EOS]
 
         # iterate through nodes
         ast = sample[AST]
