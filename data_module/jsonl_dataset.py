@@ -82,14 +82,12 @@ class JsonlDataset(Dataset):
         nodes: List[Tuple[str, str, Optional[int]]] = []  # list of (subtoken, node, parent)
         for n_id, node in enumerate(ast):
             if CHILDREN in node and len(CHILDREN) > 0:
-                assert node[TOKEN] == "<EMPTY>", "internal node has non empty token"
-
                 for c in node[CHILDREN]:
                     node_to_parent[c] = len(nodes)
 
                 parent_id = node_to_parent.get(n_id, None)
                 nodes.append((node[TOKEN], node[NODE], parent_id))
-            else:
+            else:  # if token is leaf than split it into several
                 subtokens = node[TOKEN].split(SEPARATOR)[: self._config.max_token_parts]
                 parent_id = node_to_parent[n_id]
                 nodes += [(st, node[NODE], parent_id) for st in subtokens]
@@ -99,10 +97,14 @@ class JsonlDataset(Dataset):
         graph = dgl.graph((us, vs))
         if not self._is_suitable_tree(graph):
             return None
-        graph.ndata[TOKEN] = torch.empty((len(nodes),), dtype=torch.long)
+        graph.ndata[TOKEN] = torch.full((len(nodes), self._config.max_token_parts), self._vocab.token_to_id[PAD])
         graph.ndata[NODE] = torch.empty((len(nodes),), dtype=torch.long)
         for n_id, (token, node, _) in enumerate(nodes):
-            graph.ndata[TOKEN][n_id] = self._vocab.token_to_id.get(token, self._token_unk)
+            subtokens_ids = [
+                self._vocab.token_to_id.get(t, self._token_unk)
+                for t in token.split(SEPARATOR)[: self._config.max_token_parts]
+            ]
+            graph.ndata[TOKEN][n_id, : len(subtokens_ids)] = torch.tensor(subtokens_ids)
             graph.ndata[NODE][n_id] = self._vocab.node_to_id.get(node, self._node_unk)
 
         return label, graph
