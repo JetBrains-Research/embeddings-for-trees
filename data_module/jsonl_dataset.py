@@ -63,6 +63,10 @@ class JsonlDataset(Dataset):
             return None
 
         # convert label
+        if sample[LABEL] == "":
+            with open(self._log_file, "a") as log_file:
+                log_file.write(raw_sample + "\n")
+            return None
         label = torch.full((self._config.max_label_parts + 1, 1), self._vocab.label_to_id[PAD])
         label[0, 0] = self._vocab.label_to_id[SOS]
         sublabels = sample[LABEL].split(SEPARATOR)[: self._config.max_label_parts]
