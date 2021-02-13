@@ -7,7 +7,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, Learning
 from pytorch_lightning.loggers import WandbLogger
 
 from data_module.jsonl_data_module import JsonlDataModule
-from models import TreeLSTM2Seq
+from models import TreeLSTM2Seq, TypedTreeLSTM2Seq
 from utils.callbacks import UploadCheckpointCallback, PrintEpochResultCallback
 from utils.common import filter_warnings, print_config
 
@@ -23,7 +23,10 @@ def train_treelstm(config: DictConfig):
     data_module = JsonlDataModule(config)
     data_module.prepare_data()
     data_module.setup()
-    model = TreeLSTM2Seq(config, data_module.vocabulary)
+    if "max_types" in config and "max_type_parts" in config:
+        model = TypedTreeLSTM2Seq(config, data_module.vocabulary)
+    else:
+        model = TreeLSTM2Seq(config, data_module.vocabulary)
 
     # define logger
     wandb_logger = WandbLogger(project=f"tree-lstm-{config.dataset}", log_model=False, offline=config.log_offline)
