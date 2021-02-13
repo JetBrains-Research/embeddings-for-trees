@@ -7,9 +7,7 @@ from pytorch_lightning import LightningModule
 from torch.optim import Optimizer, Adam
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 
-from models.parts import NodeFeaturesEmbedding, LSTMDecoder, TreeLSTM
-
-# from models.parts.tree_lstm_dgl_encoder import TreeLSTM
+from models.parts import NodeEmbedding, LSTMDecoder, TreeLSTM
 from utils.common import PAD, UNK, EOS, SOS
 from utils.metrics import PredictionStatistic
 from utils.vocabulary import Vocabulary
@@ -29,7 +27,7 @@ class TreeLSTM2Seq(LightningModule):
             vocabulary.label_to_id[i] for i in [PAD, UNK, EOS, SOS] if i in vocabulary.label_to_id
         ]
 
-        self._embedding = NodeFeaturesEmbedding(config, vocabulary)
+        self._embedding = NodeEmbedding(config, vocabulary)
         self._encoder = TreeLSTM(config)
         self._decoder = LSTMDecoder(config, vocabulary)
 
