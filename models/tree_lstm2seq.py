@@ -27,7 +27,7 @@ class TreeLSTM2Seq(LightningModule):
             vocabulary.label_to_id[i] for i in [PAD, UNK, EOS, SOS] if i in vocabulary.label_to_id
         ]
 
-        self._embedding = NodeEmbedding(config, vocabulary)
+        self._embedding = self._get_embedding()
         self._encoder = TreeLSTM(config)
         self._decoder = LSTMDecoder(config, vocabulary)
 
@@ -38,6 +38,9 @@ class TreeLSTM2Seq(LightningModule):
     @property
     def vocabulary(self) -> Vocabulary:
         return self._vocabulary
+
+    def _get_embedding(self) -> torch.nn.Module:
+        return NodeEmbedding(self._config, self._vocabulary)
 
     # ========== Main PyTorch-Lightning hooks ==========
 

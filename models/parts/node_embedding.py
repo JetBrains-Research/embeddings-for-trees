@@ -3,11 +3,11 @@ import torch
 from omegaconf import DictConfig
 from torch import nn
 
-from utils.common import PAD, TOKEN, NODE
+from utils.common import PAD, TOKEN, NODE, TYPE
 from utils.vocabulary import Vocabulary
 
 
-class NodeFeaturesEmbedding(nn.Module):
+class NodeEmbedding(nn.Module):
     def __init__(self, config: DictConfig, vocabulary: Vocabulary):
         super().__init__()
 
@@ -25,3 +25,17 @@ class NodeFeaturesEmbedding(nn.Module):
         node_embedding = self._node_embedding(graph.ndata[NODE])
         # [n nodes; 2 * embedding size]
         return token_embedding + node_embedding
+
+
+class TypedNodeEmbedding(NodeEmbedding):
+    def __init__(self, config: DictConfig, vocabulary: Vocabulary):
+        super().__init__(config, vocabulary)
+        self._type_embedding = nn.Embedding(
+            len(vocabulary.type_to_id), config.embedding_size, padding_idx=vocabulary.type_to_id[PAD]
+        )
+
+    def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
+        token_emb = self._token_embedding(graph.ndata[TOKEN]).sum(1)
+        type_emb = self._type_embedding(graph.ndata[TYPE]).sum(1)
+        node_emb = self._node_embedding(graph.ndata[NODE])
+        return token_emb + type_emb + node_emb

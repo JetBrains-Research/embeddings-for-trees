@@ -89,7 +89,7 @@ class Vocabulary:
                     for feature, value in node.items():
                         if feature == CHILDREN:
                             continue
-                        if feature in Vocabulary._split_features:
+                        if feature in SPLIT_FIELDS:
                             value = value.split(SEPARATOR)
                         else:
                             value = [value]
