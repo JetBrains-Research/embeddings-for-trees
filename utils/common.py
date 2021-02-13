@@ -17,6 +17,8 @@ TOKEN = "token"
 TYPE = "type"
 CHILDREN = "children"
 
+SPLIT_FIELDS = [LABEL, TOKEN, TYPE]
+
 # vocabulary keys
 PAD = "<PAD>"
 SOS = "<SOS>"

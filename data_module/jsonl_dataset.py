@@ -1,18 +1,18 @@
 import json
 from json import JSONDecodeError
 from os.path import exists
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict
 
 import dgl
 import torch
 from omegaconf import DictConfig
 from torch.utils.data import Dataset
 
-from utils.common import LABEL, AST, CHILDREN, TOKEN, PAD, NODE, SEPARATOR, UNK, SOS, EOS
+from utils.common import LABEL, AST, CHILDREN, TOKEN, PAD, NODE, SEPARATOR, UNK, SOS, EOS, TYPE, SPLIT_FIELDS
 from utils.vocabulary import Vocabulary
 
 
-class JsonlDataset(Dataset):
+class JsonlASTDataset(Dataset):
     _log_file = "bad_samples.log"
 
     def __init__(self, data_file: str, vocabulary: Vocabulary, config: DictConfig):
@@ -53,7 +53,40 @@ class JsonlDataset(Dataset):
             return False
         return True
 
-    def __getitem__(self, index) -> Optional[Tuple[torch.Tensor, dgl.DGLGraph]]:
+    def _build_graph(self, ast: Dict) -> Tuple[dgl.DGLGraph, List[Dict]]:
+        # iterate through nodes
+        node_to_parent: Dict[int, int] = {}
+        nodes: List[Tuple[Optional[int], Dict]] = []  # list of (subtoken, node, parent)
+        for n_id, node in enumerate(ast):
+            parent_id = node_to_parent.get(n_id, None)
+            if CHILDREN in node and len(CHILDREN) > 0:
+                for c in node[CHILDREN]:
+                    node_to_parent[c] = len(nodes)
+                del node[CHILDREN]
+                nodes.append((parent_id, node))
+            else:  # if token is leaf than split it into several
+                for subtoken in node[TOKEN].split(SEPARATOR)[: self._config.max_token_parts]:
+                    new_node = node.copy()
+                    new_node[TOKEN] = subtoken
+                    nodes.append((parent_id, new_node))
+
+        # convert to dgl graph
+        us, vs = zip(*[(child, parent) for child, (parent, _) in enumerate(nodes) if parent is not None])
+        graph = dgl.graph((us, vs))
+        return graph, [node for parent, node in nodes]
+
+    def _get_label(self, str_label: str) -> torch.Tensor:
+        label = torch.full((self._config.max_label_parts + 1, 1), self._vocab.label_to_id[PAD])
+        label[0, 0] = self._vocab.label_to_id[SOS]
+        sublabels = str_label.split(SEPARATOR)[: self._config.max_label_parts]
+        label[1 : len(sublabels) + 1, 0] = torch.tensor(
+            [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
+        )
+        if len(sublabels) < self._config.max_label_parts:
+            label[len(sublabels) + 1, 0] = self._vocab.label_to_id[EOS]
+        return label
+
+    def _read_sample(self, index: int) -> Optional[Dict]:
         raw_sample = self._read_line(index)
         try:
             sample = json.loads(raw_sample)
@@ -61,52 +94,42 @@ class JsonlDataset(Dataset):
             with open(self._log_file, "a") as log_file:
                 log_file.write(raw_sample + "\n")
             return None
-
-        # convert label
         if sample[LABEL] == "":
             with open(self._log_file, "a") as log_file:
                 log_file.write(raw_sample + "\n")
             return None
-        label = torch.full((self._config.max_label_parts + 1, 1), self._vocab.label_to_id[PAD])
-        label[0, 0] = self._vocab.label_to_id[SOS]
-        sublabels = sample[LABEL].split(SEPARATOR)[: self._config.max_label_parts]
-        label[1 : len(sublabels) + 1, 0] = torch.tensor(
-            [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
-        )
-        if len(sublabels) < self._config.max_label_parts:
-            label[len(sublabels) + 1, 0] = self._vocab.label_to_id[EOS]
+        return sample
 
-        # iterate through nodes
-        ast = sample[AST]
-        node_to_parent = {}
-        nodes: List[Tuple[str, str, Optional[int]]] = []  # list of (subtoken, node, parent)
-        for n_id, node in enumerate(ast):
-            if CHILDREN in node and len(CHILDREN) > 0:
-                for c in node[CHILDREN]:
-                    node_to_parent[c] = len(nodes)
+    def _set_graph_features(self, graph: dgl.DGLGraph, nodes: List[Dict]) -> dgl.DGLGraph:
+        max_parts = {TOKEN: self._config.max_token_parts, TYPE: self._config.get("max_type_parts", None)}
+        n_nodes = len(nodes)
+        for feature in nodes[0].keys():
+            n_parts = max_parts.get(feature, None)
+            if n_parts is not None:
+                graph.ndata[feature] = torch.full((n_nodes, n_parts), self._vocab.vocabs[feature][PAD])
+            else:
+                graph.ndata[feature] = torch.empty((n_nodes,), dtype=torch.long)
+        for n_id, node in enumerate(nodes):
+            for feature, value in node.items():
+                unk = self._vocab.vocabs[feature][UNK]
+                if feature not in SPLIT_FIELDS:
+                    graph.ndata[feature][n_id] = self._vocab.vocabs[feature].get(value, unk)
+                    continue
+                sub_values = value.split(SEPARATOR)[: max_parts[feature]]
+                sub_values_ids = [self._vocab.vocabs[feature].get(sv, unk) for sv in sub_values]
+                graph.ndata[feature][n_id, : len(sub_values_ids)] = torch.tensor(sub_values_ids)
+        return graph
 
-                parent_id = node_to_parent.get(n_id, None)
-                nodes.append((node[TOKEN], node[NODE], parent_id))
-            else:  # if token is leaf than split it into several
-                subtokens = node[TOKEN].split(SEPARATOR)[: self._config.max_token_parts]
-                parent_id = node_to_parent[n_id]
-                nodes += [(st, node[NODE], parent_id) for st in subtokens]
+    def __getitem__(self, index: int) -> Optional[Tuple[torch.Tensor, dgl.DGLGraph]]:
+        sample = self._read_sample(index)
+        if sample is None:
+            return None
 
-        # convert to dgl graph
-        us, vs = zip(*[(child, parent) for child, (_, _, parent) in enumerate(nodes) if parent is not None])
-        graph = dgl.graph((us, vs))
+        label = self._get_label(sample[LABEL])
+        graph, nodes = self._build_graph(sample[AST])
         if not self._is_suitable_tree(graph):
             return None
-        graph.ndata[TOKEN] = torch.full((len(nodes), self._config.max_token_parts), self._vocab.token_to_id[PAD])
-        graph.ndata[NODE] = torch.empty((len(nodes),), dtype=torch.long)
-        for n_id, (token, node, _) in enumerate(nodes):
-            subtokens_ids = [
-                self._vocab.token_to_id.get(t, self._token_unk)
-                for t in token.split(SEPARATOR)[: self._config.max_token_parts]
-            ]
-            graph.ndata[TOKEN][n_id, : len(subtokens_ids)] = torch.tensor(subtokens_ids)
-            graph.ndata[NODE][n_id] = self._vocab.node_to_id.get(node, self._node_unk)
-
+        graph = self._set_graph_features(graph, nodes)
         return label, graph
 
     def _print_tree(self, tree: dgl.DGLGraph, symbol: str = ".."):

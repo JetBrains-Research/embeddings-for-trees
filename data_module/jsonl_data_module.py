@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from data_module.jsonl_dataset import JsonlDataset
+from data_module.jsonl_dataset import JsonlASTDataset
 from utils.common import download_dataset
 from utils.vocabulary import Vocabulary
 
@@ -61,7 +61,7 @@ class JsonlDataModule(LightningDataModule):
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
         holdout_file = path.join(self._dataset_dir, f"{self._config.dataset}.{holdout}.jsonl")
-        dataset = JsonlDataset(holdout_file, self._vocabulary, self._config)
+        dataset = JsonlASTDataset(holdout_file, self._vocabulary, self._config)
         return DataLoader(
             dataset,
             self._config.batch_size,
