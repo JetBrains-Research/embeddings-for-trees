@@ -14,6 +14,7 @@ LABEL = "label"
 AST = "AST"
 NODE = "node"
 TOKEN = "token"
+TYPE = "type"
 CHILDREN = "children"
 
 # vocabulary keys

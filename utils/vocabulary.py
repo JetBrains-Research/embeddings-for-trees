@@ -10,12 +10,14 @@ from typing import Counter as CounterType
 from omegaconf import DictConfig
 from tqdm import tqdm
 
-from utils.common import PAD, UNK, NODE, SOS, EOS, TOKEN, LABEL, SEPARATOR, AST, get_lines_in_file
+from utils.common import PAD, UNK, NODE, SOS, EOS, TOKEN, LABEL, SEPARATOR, AST, get_lines_in_file, CHILDREN, TYPE
 
 
 class Vocabulary:
     vocab_file = "vocabulary.pkl"
     _log_file = "bad_samples.log"
+
+    _split_features = [LABEL, TOKEN, TYPE]
 
     def __init__(self, config: DictConfig):
         vocabulary_file = path.join(config.data_folder, config.dataset, self.vocab_file)
@@ -23,37 +25,40 @@ class Vocabulary:
             raise ValueError(f"Can't find vocabulary file ({vocabulary_file})")
         with open(vocabulary_file, "rb") as f_in:
             counters = pickle.load(f_in)
-        self._node_to_id = {PAD: 0, UNK: 1}
-        self._node_to_id.update((node, i + 2) for i, node in enumerate(counters[NODE]))
-
-        self._token_to_id = {PAD: 0, UNK: 1, SOS: 2, EOS: 3}
-        self._token_to_id.update(
-            (token[0], i + 4) for i, token in enumerate(counters[TOKEN].most_common(config.max_tokens))
-        )
-
-        self._label_to_id = {PAD: 0, UNK: 1, SOS: 2, EOS: 3}
-        self._label_to_id.update(
-            (label[0], i + 4) for i, label in enumerate(counters[LABEL].most_common(config.max_labels))
-        )
+        max_parts = {LABEL: config.max_labels, TOKEN: config.max_tokens, TYPE: config.get("max_types", None)}
+        self._dicts = {}
+        for key, counter in counters.items():
+            if key in self._split_features:
+                service_tokens = {PAD: 0, UNK: 1, SOS: 2, EOS: 3}
+            else:
+                service_tokens = {PAD: 0, UNK: 1}
+            skip_id = len(service_tokens)
+            self._dicts[key] = service_tokens
+            self._dicts[key].update(
+                (token[0], i + skip_id) for i, token in enumerate(counter.most_common(max_parts.get(key, None)))
+            )
 
     @property
     def node_to_id(self) -> Dict[str, int]:
-        return self._node_to_id
+        return self._dicts[NODE]
 
     @property
     def token_to_id(self) -> Dict[str, int]:
-        return self._token_to_id
+        return self._dicts[TOKEN]
 
     @property
     def label_to_id(self) -> Dict[str, int]:
-        return self._label_to_id
+        return self._dicts[LABEL]
+
+    @property
+    def type_to_id(self) -> Dict[str, int]:
+        return self._dicts[TYPE]
 
     @staticmethod
     def build_from_scratch(train_data: str):
         total_samples = get_lines_in_file(train_data)
         label_counter: CounterType[str] = Counter()
-        node_counter: CounterType[str] = Counter()
-        token_counter: CounterType = Counter()
+        feature_counters: Dict[str, CounterType[str]] = {}
         with open(train_data, "r") as f_in:
             for sample_id, sample_json in tqdm(enumerate(f_in), total=total_samples):
                 try:
@@ -65,24 +70,25 @@ class Vocabulary:
 
                 label_counter.update(sample[LABEL].split(SEPARATOR))
                 for node in sample[AST]:
-                    node_counter.update([node[NODE]])
-                    token_counter.update(node[TOKEN].split(SEPARATOR))
+                    for feature, value in node.items():
+                        if feature == CHILDREN:
+                            continue
+                        if feature in Vocabulary._split_features:
+                            value = value.split(SEPARATOR)
+                        else:
+                            value = [value]
+                        if feature not in feature_counters:
+                            feature_counters[feature] = Counter()
+                        feature_counters[feature].update(value)
 
-        print(f"Count {len(label_counter)} labels, top-5: {label_counter.most_common(5)}")
-        print(f"Count {len(node_counter)} nodes, top-5: {node_counter.most_common(5)}")
-        print(f"Count {len(token_counter)} tokens, top-5: {token_counter.most_common(5)}")
+        feature_counters[LABEL] = label_counter
+        for feature, counter in feature_counters.items():
+            print(f"Count {len(counter)} {feature}, top-5: {counter.most_common(5)}")
 
         dataset_dir = path.dirname(train_data)
         vocabulary_file = path.join(dataset_dir, Vocabulary.vocab_file)
         with open(vocabulary_file, "wb") as f_out:
-            pickle.dump(
-                {
-                    LABEL: label_counter,
-                    NODE: node_counter,
-                    TOKEN: token_counter,
-                },
-                f_out,
-            )
+            pickle.dump(feature_counters, f_out)
 
 
 if __name__ == "__main__":
