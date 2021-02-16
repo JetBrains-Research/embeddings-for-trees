@@ -2,7 +2,7 @@ import dgl
 import hydra
 import torch
 from omegaconf import DictConfig
-from pytorch_lightning import seed_everything, Trainer
+from pytorch_lightning import seed_everything, Trainer, LightningModule
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 
@@ -23,6 +23,7 @@ def train_treelstm(config: DictConfig):
     data_module = JsonlDataModule(config)
     data_module.prepare_data()
     data_module.setup()
+    model: LightningModule
     if "max_types" in config and "max_type_parts" in config:
         model = TypedTreeLSTM2Seq(config, data_module.vocabulary)
     else:
