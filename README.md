@@ -24,9 +24,9 @@ List of some useful tools for preprocessing source code into a dataset with ASTs
   tool for processing PSI trees from IntelliJ IDEA and creating labeled dataset from them.
 
 ## Model zoo
-List of supported algorithms of tree embeddings:
+List of supported algorithms of tree embeddings with links to wiki guides:
 
-- [TreeLSTM]()
+- [TreeLSTM](https://github.com/JetBrains-Research/embeddings-for-trees/wiki/TreeLSTM-guide)
 
 ## Contribution
 
