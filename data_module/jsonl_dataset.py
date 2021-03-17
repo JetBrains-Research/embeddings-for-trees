@@ -5,6 +5,7 @@ from typing import Optional, Tuple, List, Dict
 
 import dgl
 import torch
+from commode_utils.filesystem import get_lines_offsets, get_line_by_offset
 from omegaconf import DictConfig
 from torch.utils.data import Dataset
 
@@ -26,22 +27,11 @@ class JsonlASTDataset(Dataset):
         self._node_unk = self._vocab.node_to_id[UNK]
         self._label_unk = self._vocab.label_to_id[UNK]
 
-        self._line_offsets = []
-        cumulative_offset = 0
-        with open(self._data_file, "r") as file:
-            for line in file:
-                self._line_offsets.append(cumulative_offset)
-                cumulative_offset += len(line.encode(file.encoding))
+        self._line_offsets = get_lines_offsets(data_file)
         self._n_samples = len(self._line_offsets)
 
     def __len__(self):
         return self._n_samples
-
-    def _read_line(self, index: int) -> str:
-        with open(self._data_file, "r") as data_file:
-            data_file.seek(self._line_offsets[index])
-            line = data_file.readline().strip()
-        return line
 
     def _is_suitable_tree(self, tree: dgl.DGLGraph) -> bool:
         if self._config.max_tree_nodes is not None and tree.number_of_nodes() > self._config.max_tree_nodes:
@@ -87,7 +77,7 @@ class JsonlASTDataset(Dataset):
         return label
 
     def _read_sample(self, index: int) -> Optional[Dict]:
-        raw_sample = self._read_line(index)
+        raw_sample = get_line_by_offset(self._data_file, self._line_offsets[index])
         try:
             sample = json.loads(raw_sample)
         except JSONDecodeError as e:

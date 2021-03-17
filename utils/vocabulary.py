@@ -7,6 +7,7 @@ from os.path import exists
 from typing import Dict
 from typing import Counter as CounterType
 
+from commode_utils.filesystem import count_lines_in_file
 from omegaconf import DictConfig
 from tqdm import tqdm
 
@@ -20,7 +21,6 @@ from utils.common import (
     LABEL,
     SEPARATOR,
     AST,
-    get_lines_in_file,
     CHILDREN,
     TYPE,
     SPLIT_FIELDS,
@@ -72,7 +72,7 @@ class Vocabulary:
 
     @staticmethod
     def build_from_scratch(train_data: str):
-        total_samples = get_lines_in_file(train_data)
+        total_samples = count_lines_in_file(train_data)
         label_counter: CounterType[str] = Counter()
         feature_counters: Dict[str, CounterType[str]] = {}
         with open(train_data, "r") as f_in:
