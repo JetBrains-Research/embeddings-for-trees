@@ -31,7 +31,7 @@ def train_treelstm(config: DictConfig):
 
     # define logger
     wandb_logger = WandbLogger(project=f"tree-lstm-{config.dataset}", log_model=False, offline=config.log_offline)
-    wandb_logger.watch(model)
+
     # define model checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=wandb_logger.experiment.dir,
