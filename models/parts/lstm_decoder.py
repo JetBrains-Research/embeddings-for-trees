@@ -1,12 +1,11 @@
 from typing import Union, Tuple
 
 import torch
+from commode_utils.training import cut_into_segments
 from omegaconf import DictConfig
 from torch import nn
 
 from models.parts.attention import LuongAttention
-from utils.training import cut_encoded_data
-from utils.common import PAD, SOS
 from utils.vocabulary import Vocabulary
 
 
@@ -17,12 +16,12 @@ class LSTMDecoder(nn.Module):
     def __init__(self, config: DictConfig, vocabulary: Vocabulary):
         super().__init__()
         self._out_size = len(vocabulary.label_to_id)
-        self._sos_token = vocabulary.label_to_id[SOS]
+        self._sos_token = vocabulary.label_to_id[vocabulary.SOS]
         self._decoder_num_layers = config.decoder_num_layers
         self._teacher_forcing = config.teacher_forcing
 
         self._target_embedding = nn.Embedding(
-            len(vocabulary.label_to_id), config.embedding_size, padding_idx=vocabulary.label_to_id[PAD]
+            len(vocabulary.label_to_id), config.embedding_size, padding_idx=vocabulary.label_to_id[vocabulary.PAD]
         )
 
         self._attention = LuongAttention(config.decoder_size)
@@ -49,7 +48,7 @@ class LSTMDecoder(nn.Module):
     ) -> torch.Tensor:
         batch_size = tree_sizes.shape[0]
         # [batch size; max tree size; decoder size], [batch size; max tree size]
-        batched_encoded_trees, attention_mask = cut_encoded_data(encoded_trees, tree_sizes, self._negative_value)
+        batched_encoded_trees, attention_mask = cut_into_segments(encoded_trees, tree_sizes, self._negative_value)
 
         # [n layers; batch size; decoder size]
         initial_state = (

@@ -1,114 +1,71 @@
-import pickle
 from argparse import ArgumentParser
 from collections import Counter
 from json import JSONDecodeError, loads
-from os import path
-from os.path import exists
-from typing import Dict
 from typing import Counter as CounterType
+from typing import Dict
 
-from commode_utils.filesystem import count_lines_in_file
+from commode_utils.vocabulary import BaseVocabulary, build_from_scratch
 from omegaconf import DictConfig
-from tqdm import tqdm
 
-from utils.common import (
-    PAD,
-    UNK,
-    NODE,
-    SOS,
-    EOS,
-    TOKEN,
-    LABEL,
-    SEPARATOR,
-    AST,
-    CHILDREN,
-    TYPE,
-    SPLIT_FIELDS,
-)
+from utils.common import AST
 
 
-class Vocabulary:
-    vocab_file = "vocabulary.pkl"
-    _log_file = "bad_samples.log"
+class Vocabulary(BaseVocabulary):
+    @staticmethod
+    def process_raw_sample(raw_sample: str, counters: Dict[str, CounterType[str]]):
+        try:
+            sample = loads(raw_sample)
+        except JSONDecodeError:
+            with open(Vocabulary._log_filename, "a") as log_file:
+                log_file.write(raw_sample + "\n")
+            return
+
+        counters[Vocabulary.LABEL].update(sample[Vocabulary.LABEL].split(Vocabulary._separator))
+        for node in sample[AST]:
+            counters[Vocabulary.TOKEN].update(node[Vocabulary.TOKEN].split(Vocabulary._separator))
+            counters[Vocabulary.NODE].update([node[Vocabulary.NODE]])
+
+
+class TypedVocabulary(Vocabulary):
+
+    TYPE = "type"
 
     def __init__(self, config: DictConfig, data_folder: str):
-        vocabulary_file = path.join(data_folder, config.name, self.vocab_file)
-        if not exists(vocabulary_file):
-            raise ValueError(f"Can't find vocabulary file ({vocabulary_file})")
-        with open(vocabulary_file, "rb") as f_in:
-            counters = pickle.load(f_in)
-        max_size = {LABEL: config.max_labels, TOKEN: config.max_tokens, TYPE: config.get("max_types", None)}
-        self._vocabs = {}
-        for key, counter in counters.items():
-            if key in SPLIT_FIELDS:
-                service_tokens = {PAD: 0, UNK: 1, SOS: 2, EOS: 3}
-            else:
-                service_tokens = {PAD: 0, UNK: 1}
-            skip_id = len(service_tokens)
-            self._vocabs[key] = service_tokens
-            self._vocabs[key].update(
-                (token[0], i + skip_id) for i, token in enumerate(counter.most_common(max_size.get(key, None)))
-            )
+        super().__init__(config, data_folder)
 
-    @property
-    def vocabs(self) -> Dict[str, Dict]:
-        return self._vocabs
-
-    @property
-    def node_to_id(self) -> Dict[str, int]:
-        return self._vocabs[NODE]
-
-    @property
-    def token_to_id(self) -> Dict[str, int]:
-        return self._vocabs[TOKEN]
-
-    @property
-    def label_to_id(self) -> Dict[str, int]:
-        return self._vocabs[LABEL]
+        self._type_to_id = {self.PAD: 0, self.UNK: 1, self.SOS: 2, self.EOS: 3}
+        self._type_to_id.update(
+            (token[0], i + 4) for i, token in enumerate(self._counters[self.TYPE].most_common(config.max_types))
+        )
 
     @property
     def type_to_id(self) -> Dict[str, int]:
-        return self._vocabs[TYPE]
+        return self._type_to_id
 
     @staticmethod
-    def build_from_scratch(train_data: str):
-        total_samples = count_lines_in_file(train_data)
-        label_counter: CounterType[str] = Counter()
-        feature_counters: Dict[str, CounterType[str]] = {}
-        with open(train_data, "r") as f_in:
-            for sample_id, sample_json in tqdm(enumerate(f_in), total=total_samples):
-                try:
-                    sample = loads(sample_json)
-                except JSONDecodeError:
-                    with open(Vocabulary._log_file, "a") as log_file:
-                        log_file.write(sample_json + "\n")
-                    continue
+    def process_raw_sample(raw_sample: str, counters: Dict[str, CounterType[str]]):
+        try:
+            sample = loads(raw_sample)
+        except JSONDecodeError:
+            with open(TypedVocabulary._log_filename, "a") as log_file:
+                log_file.write(raw_sample + "\n")
+            return
 
-                label_counter.update(sample[LABEL].split(SEPARATOR))
-                for node in sample[AST]:
-                    for feature, value in node.items():
-                        if feature == CHILDREN:
-                            continue
-                        if feature in SPLIT_FIELDS:
-                            value = value.split(SEPARATOR)
-                        else:
-                            value = [value]
-                        if feature not in feature_counters:
-                            feature_counters[feature] = Counter()
-                        feature_counters[feature].update(value)
+        if TypedVocabulary.TYPE not in counters:
+            counters[TypedVocabulary.TYPE] = Counter()
 
-        feature_counters[LABEL] = label_counter
-        for feature, counter in feature_counters.items():
-            print(f"Count {len(counter)} {feature}, top-5: {counter.most_common(5)}")
-
-        dataset_dir = path.dirname(train_data)
-        vocabulary_file = path.join(dataset_dir, Vocabulary.vocab_file)
-        with open(vocabulary_file, "wb") as f_out:
-            pickle.dump(feature_counters, f_out)
+        counters[TypedVocabulary.LABEL].update(sample[TypedVocabulary.LABEL].split(TypedVocabulary._separator))
+        for node in sample[AST]:
+            counters[TypedVocabulary.TOKEN].update(node[TypedVocabulary.TOKEN].split(TypedVocabulary._separator))
+            counters[TypedVocabulary.NODE].update([node[TypedVocabulary.NODE]])
+            counters[TypedVocabulary.TYPE].update(node[TypedVocabulary.TYPE].split(TypedVocabulary._separator))
 
 
 if __name__ == "__main__":
     arg_parse = ArgumentParser()
     arg_parse.add_argument("data", type=str, help="Path to file with data")
+    arg_parse.add_argument("--typed", action="store_true", help="Use typed vocabulary")
     args = arg_parse.parse_args()
-    Vocabulary.build_from_scratch(args.data)
+
+    _vocab_cls = TypedVocabulary if args.typed else Vocabulary
+    build_from_scratch(args.data, _vocab_cls)

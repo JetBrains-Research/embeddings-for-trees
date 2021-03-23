@@ -2,6 +2,7 @@
 
 name: java-small-typed-asts
 url: https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz
+use_types: true
 
 num_workers: 4
 

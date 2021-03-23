@@ -1,3 +1,5 @@
+from typing import Dict, Type
+
 import dgl
 import hydra
 import torch
@@ -8,11 +10,11 @@ from pytorch_lightning import seed_everything, Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger
 
-from data_module.jsonl_data_module import JsonlDataModule
+from data_module.jsonl_data_module import JsonlASTDatamodule, JsonlTypedASTDatamodule
 from models import TreeLSTM2Seq, TypedTreeLSTM2Seq
 from utils.common import filter_warnings
 
-MODELS = {"Tree-LSTM": TreeLSTM2Seq, "Typed Tree-LSTM": TypedTreeLSTM2Seq}
+MODELS: Dict[str, Type[TreeLSTM2Seq]] = {"Tree-LSTM": TreeLSTM2Seq, "Typed Tree-LSTM": TypedTreeLSTM2Seq}
 
 
 @hydra.main(config_path="config", config_name="main")
@@ -23,7 +25,10 @@ def train(config: DictConfig):
 
     print_config(config, fields=["model", "datamodule", "trainer"])
 
-    data_module = JsonlDataModule(config.datamodule, config.data_folder)
+    if config.datamodule.get("use_types", False):
+        data_module: JsonlASTDatamodule = JsonlTypedASTDatamodule(config.datamodule, config.data_folder)
+    else:
+        data_module = JsonlASTDatamodule(config.datamodule, config.data_folder)
     data_module.prepare_data()
     data_module.setup()
 

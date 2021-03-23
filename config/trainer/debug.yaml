@@ -10,7 +10,7 @@ n_epochs: 5
 patience: 10
 
 val_every_epoch: 1
-save_every_epoch: 10
+save_every_epoch: 1
 log_every_step: 10
 
 progress_bar_refresh_rate: 1

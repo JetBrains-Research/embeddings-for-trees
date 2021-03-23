@@ -9,7 +9,6 @@ from torch.optim import Optimizer, Adam
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 
 from models.parts import NodeEmbedding, LSTMDecoder, TreeLSTM
-from utils.common import PAD, UNK, EOS, SOS
 from utils.vocabulary import Vocabulary
 
 
@@ -20,11 +19,15 @@ class TreeLSTM2Seq(LightningModule):
         self._config = config
         self._vocabulary = vocabulary
 
-        if SOS not in vocabulary.label_to_id:
+        if vocabulary.SOS not in vocabulary.label_to_id:
             raise ValueError(f"Can't find SOS token in label to id vocabulary")
 
-        pad_idx = vocabulary.label_to_id[PAD]
-        ignore_idx = [vocabulary.label_to_id[i] for i in [UNK, EOS, SOS] if i in vocabulary.label_to_id]
+        pad_idx = vocabulary.label_to_id[vocabulary.PAD]
+        ignore_idx = [
+            vocabulary.label_to_id[i]
+            for i in [vocabulary.UNK, vocabulary.EOS, vocabulary.SOS]
+            if i in vocabulary.label_to_id
+        ]
         self._train_metrics = SequentialF1Score(mask_after_pad=True, pad_idx=pad_idx, ignore_idx=ignore_idx)
         self._val_metrics = SequentialF1Score(
             mask_after_pad=True, pad_idx=pad_idx, ignore_idx=ignore_idx, compute_on_step=False
@@ -88,7 +91,7 @@ class TreeLSTM2Seq(LightningModule):
         # [batch size; seq length]
         loss = torch.nn.functional.cross_entropy(_logits, _labels, reduction="none")
         # [batch size; seq length]
-        mask = _labels != self._vocabulary.label_to_id[PAD]
+        mask = _labels != self._vocabulary.label_to_id[self._vocabulary.PAD]
         # [batch size; seq length]
         loss = loss * mask
         # [1]

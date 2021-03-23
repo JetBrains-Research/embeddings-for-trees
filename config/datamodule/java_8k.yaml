@@ -1,6 +1,6 @@
 # @package _group_
 
-dataset: java-8k-asts
+name: java-8k-asts
 url: https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/code-summarization/java-full-asts.tar.gz
 
 num_workers: 4

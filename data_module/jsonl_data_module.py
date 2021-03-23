@@ -4,26 +4,27 @@ from typing import List, Optional, Tuple
 import dgl
 import torch
 from commode_utils.common import download_dataset
+from commode_utils.vocabulary import build_from_scratch
 from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
-from data_module.jsonl_dataset import JsonlASTDataset
-from utils.vocabulary import Vocabulary
+from data_module.jsonl_dataset import JsonlASTDataset, JsonlTypedASTDataset
+from utils.vocabulary import Vocabulary, TypedVocabulary
 
 
-class JsonlDataModule(LightningDataModule):
-    _vocabulary_file = "vocabulary.pkl"
+class JsonlASTDatamodule(LightningDataModule):
     _train = "train"
     _val = "val"
     _test = "test"
+
+    _vocabulary: Optional[Vocabulary] = None
 
     def __init__(self, config: DictConfig, data_folder: str):
         super().__init__()
         self._config = config
         self._data_folder = data_folder
         self._dataset_dir = path.join(data_folder, config.name)
-        self._vocabulary: Optional[Vocabulary] = None
 
     def prepare_data(self):
         if path.exists(self._dataset_dir):
@@ -34,8 +35,8 @@ class JsonlDataModule(LightningDataModule):
         download_dataset(self._config.url, self._dataset_dir, self._config.name)
 
     def setup(self, stage: Optional[str] = None):
-        if not path.exists(path.join(self._dataset_dir, Vocabulary.vocab_file)):
-            Vocabulary.build_from_scratch(path.join(self._dataset_dir, f"{self._config.name}.{self._train}.jsonl"))
+        if not path.exists(path.join(self._dataset_dir, Vocabulary.vocab_filename)):
+            build_from_scratch(path.join(self._dataset_dir, f"{self._config.name}.{self._train}.jsonl"), Vocabulary)
         self._vocabulary = Vocabulary(self._config, self._data_folder)
 
     @staticmethod
@@ -75,3 +76,27 @@ class JsonlDataModule(LightningDataModule):
         if self._vocabulary is None:
             raise RuntimeError(f"Setup data module for initializing vocabulary")
         return self._vocabulary
+
+
+class JsonlTypedASTDatamodule(JsonlASTDatamodule):
+    _vocabulary: Optional[TypedVocabulary] = None
+
+    def setup(self, stage: Optional[str] = None):
+        if not path.exists(path.join(self._dataset_dir, TypedVocabulary.vocab_filename)):
+            build_from_scratch(
+                path.join(self._dataset_dir, f"{self._config.name}.{self._train}.jsonl"), TypedVocabulary
+            )
+        self._vocabulary = TypedVocabulary(self._config, self._data_folder)
+
+    def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
+        if self._vocabulary is None:
+            raise RuntimeError(f"Setup vocabulary before creating data loaders")
+        holdout_file = path.join(self._dataset_dir, f"{self._config.name}.{holdout}.jsonl")
+        dataset = JsonlTypedASTDataset(holdout_file, self._vocabulary, self._config)
+        return DataLoader(
+            dataset,
+            self._config.batch_size,
+            shuffle=shuffle,
+            num_workers=self._config.num_workers,
+            collate_fn=self._collate_batch,
+        )
