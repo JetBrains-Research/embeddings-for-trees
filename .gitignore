@@ -19,3 +19,6 @@ notebooks/
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Ignore test configs
+config/**/*_test.yaml

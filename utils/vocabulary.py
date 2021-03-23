@@ -31,8 +31,8 @@ class Vocabulary:
     vocab_file = "vocabulary.pkl"
     _log_file = "bad_samples.log"
 
-    def __init__(self, config: DictConfig):
-        vocabulary_file = path.join(config.data_folder, config.dataset, self.vocab_file)
+    def __init__(self, config: DictConfig, data_folder: str):
+        vocabulary_file = path.join(data_folder, config.name, self.vocab_file)
         if not exists(vocabulary_file):
             raise ValueError(f"Can't find vocabulary file ({vocabulary_file})")
         with open(vocabulary_file, "rb") as f_in:

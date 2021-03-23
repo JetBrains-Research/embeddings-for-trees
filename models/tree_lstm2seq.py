@@ -34,8 +34,8 @@ class TreeLSTM2Seq(LightningModule):
         )
 
         self._embedding = self._get_embedding()
-        self._encoder = TreeLSTM(config)
-        self._decoder = LSTMDecoder(config, vocabulary)
+        self._encoder = TreeLSTM(config.model)
+        self._decoder = LSTMDecoder(config.model, vocabulary)
 
     @property
     def config(self) -> DictConfig:
@@ -46,13 +46,21 @@ class TreeLSTM2Seq(LightningModule):
         return self._vocabulary
 
     def _get_embedding(self) -> torch.nn.Module:
-        return NodeEmbedding(self._config, self._vocabulary)
+        return NodeEmbedding(self._config.model, self._vocabulary)
 
     # ========== Main PyTorch-Lightning hooks ==========
 
     def configure_optimizers(self) -> Tuple[List[Optimizer], List[_LRScheduler]]:
-        optimizer = Adam(self.parameters(), lr=self._config.learning_rate, weight_decay=self._config.weight_decay)
-        scheduler = LambdaLR(optimizer, lr_lambda=lambda epoch: self._config.lr_decay_gamma ** epoch)
+        optimizer = Adam(
+            self.parameters(),
+            lr=self._config.trainer.learning_rate,
+            weight_decay=self._config.trainer.weight_decay,
+        )
+
+        def scheduler_lambda(epoch: int) -> int:
+            return self._config.trainer.lr_decay_gamma ** epoch
+
+        scheduler = LambdaLR(optimizer, lr_lambda=scheduler_lambda)
         return [optimizer], [scheduler]
 
     def forward(  # type: ignore

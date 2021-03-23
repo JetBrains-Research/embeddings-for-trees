@@ -11,4 +11,4 @@ class TypedTreeLSTM2Seq(TreeLSTM2Seq):
         super().__init__(config, vocabulary)
 
     def _get_embedding(self) -> torch.nn.Module:
-        return TypedNodeEmbedding(self._config, self._vocabulary)
+        return TypedNodeEmbedding(self._config.model, self._vocabulary)

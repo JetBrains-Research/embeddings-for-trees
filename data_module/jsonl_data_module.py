@@ -3,12 +3,12 @@ from typing import List, Optional, Tuple
 
 import dgl
 import torch
+from commode_utils.common import download_dataset
 from omegaconf import DictConfig
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader
 
 from data_module.jsonl_dataset import JsonlASTDataset
-from utils.common import download_dataset
 from utils.vocabulary import Vocabulary
 
 
@@ -18,41 +18,25 @@ class JsonlDataModule(LightningDataModule):
     _val = "val"
     _test = "test"
 
-    _known_datasets = {
-        "java-test-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-test-asts.tar.gz",
-        "java-small-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-asts.tar.gz",
-        "java-full-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/code-summarization/java-full-asts.tar.gz",
-        "java-test-typed-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-test-typed-asts.tar.gz",
-        "java-small-typed-asts": "https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz",
-    }
-
-    def __init__(self, config: DictConfig):
+    def __init__(self, config: DictConfig, data_folder: str):
         super().__init__()
         self._config = config
-        self._dataset_dir = path.join(config.data_folder, config.dataset)
+        self._data_folder = data_folder
+        self._dataset_dir = path.join(data_folder, config.name)
         self._vocabulary: Optional[Vocabulary] = None
 
     def prepare_data(self):
         if path.exists(self._dataset_dir):
             print(f"Dataset is already downloaded")
             return
-        print(f"Could not find dataset {self._config.dataset} in {self._config.data_folder}. Try to download it.")
-        if self._config.dataset not in self._known_datasets:
-            print(
-                f"Unknown dataset name ({self._config.dataset}).\n"
-                f"Try one of the following: {', '.join(self._known_datasets.keys())}"
-            )
-            return
-        download_dataset(
-            self._known_datasets[self._config.dataset],
-            self._dataset_dir,
-            self._config.dataset,
-        )
+        if "url" not in self._config:
+            raise ValueError(f"Config doesn't contain url for {self._config.name}, download it manually")
+        download_dataset(self._config.url, self._dataset_dir, self._config.name)
 
     def setup(self, stage: Optional[str] = None):
         if not path.exists(path.join(self._dataset_dir, Vocabulary.vocab_file)):
-            Vocabulary.build_from_scratch(path.join(self._dataset_dir, f"{self._config.dataset}.{self._train}.jsonl"))
-        self._vocabulary = Vocabulary(self._config)
+            Vocabulary.build_from_scratch(path.join(self._dataset_dir, f"{self._config.name}.{self._train}.jsonl"))
+        self._vocabulary = Vocabulary(self._config, self._data_folder)
 
     @staticmethod
     def _collate_batch(sample_list: List[Tuple[torch.Tensor, dgl.DGLGraph]]) -> Tuple[torch.Tensor, dgl.DGLGraph]:
@@ -62,7 +46,7 @@ class JsonlDataModule(LightningDataModule):
     def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
-        holdout_file = path.join(self._dataset_dir, f"{self._config.dataset}.{holdout}.jsonl")
+        holdout_file = path.join(self._dataset_dir, f"{self._config.name}.{holdout}.jsonl")
         dataset = JsonlASTDataset(holdout_file, self._vocabulary, self._config)
         return DataLoader(
             dataset,
