@@ -7,4 +7,4 @@ mypy==0.812
 hydra-core==1.0.6
 omegaconf==2.0.6
 dgl==0.6.0.post1
-commode-utils==0.1.1rc1
+commode-utils==0.2.0
