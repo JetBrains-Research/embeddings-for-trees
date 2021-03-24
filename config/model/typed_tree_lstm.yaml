@@ -11,5 +11,3 @@ encoder_size: 128
 decoder_size: 320
 decoder_num_layers: 1
 rnn_dropout: 0.5
-
-teacher_forcing: 1

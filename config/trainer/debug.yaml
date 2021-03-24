@@ -5,6 +5,8 @@ weight_decay: 0
 lr_decay_gamma: 0.95
 clip_norm: 5
 
+teacher_forcing: 1
+
 n_epochs: 5
 
 patience: 10

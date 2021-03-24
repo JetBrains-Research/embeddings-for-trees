@@ -3,12 +3,13 @@ from typing import Tuple, List, Dict
 import dgl
 import torch
 from commode_utils.metrics import SequentialF1Score, ClassificationMetrics
+from commode_utils.modules import LSTMDecoderStep, Decoder
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from torch.optim import Optimizer, Adam
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 
-from models.parts import NodeEmbedding, LSTMDecoder, TreeLSTM
+from models.parts import NodeEmbedding, TreeLSTM
 from utils.vocabulary import Vocabulary
 
 
@@ -38,7 +39,8 @@ class TreeLSTM2Seq(LightningModule):
 
         self._embedding = self._get_embedding()
         self._encoder = TreeLSTM(config.model)
-        self._decoder = LSTMDecoder(config.model, vocabulary)
+        self._decoder_step = LSTMDecoderStep(config.model, self._vocabulary)
+        self._decoder = Decoder(self._decoder_step, self._vocabulary, config.trainer.teacher_forcing)
 
     @property
     def config(self) -> DictConfig:
