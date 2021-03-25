@@ -17,4 +17,4 @@ log_every_step: 10
 
 progress_bar_refresh_rate: 1
 
-log_offline: true
+log_offline: false
