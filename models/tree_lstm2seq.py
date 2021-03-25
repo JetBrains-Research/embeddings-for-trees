@@ -26,7 +26,7 @@ class TreeLSTM2Seq(LightningModule):
         pad_idx = vocabulary.label_to_id[vocabulary.PAD]
         ignore_idx = [
             vocabulary.label_to_id[i]
-            for i in [vocabulary.UNK, vocabulary.EOS, vocabulary.SOS]
+            for i in [vocabulary.PAD, vocabulary.UNK, vocabulary.EOS, vocabulary.SOS]
             if i in vocabulary.label_to_id
         ]
         self._train_metrics = SequentialF1Score(mask_after_pad=True, pad_idx=pad_idx, ignore_idx=ignore_idx)
@@ -62,7 +62,7 @@ class TreeLSTM2Seq(LightningModule):
             weight_decay=self._config.trainer.weight_decay,
         )
 
-        def scheduler_lambda(epoch: int) -> int:
+        def scheduler_lambda(epoch: int) -> float:
             return self._config.trainer.lr_decay_gamma ** epoch
 
         scheduler = LambdaLR(optimizer, lr_lambda=scheduler_lambda)
