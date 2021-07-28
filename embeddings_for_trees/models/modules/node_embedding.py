@@ -3,8 +3,8 @@ import torch
 from omegaconf import DictConfig
 from torch import nn
 
-from utils.common import TOKEN, NODE, TYPE
-from utils.vocabulary import Vocabulary, TypedVocabulary
+from embeddings_for_trees.utils.common import TOKEN, NODE, TYPE
+from embeddings_for_trees.data.vocabulary import Vocabulary, TypedVocabulary
 
 
 class NodeEmbedding(nn.Module):
