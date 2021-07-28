@@ -1,7 +1,6 @@
 .idea/
 .ipynb_checkpoints/
 
-data/
 logs/
 wandb/
 checkpoints/
@@ -19,6 +18,3 @@ notebooks/
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Ignore test configs
-config/**/*_test.yaml
