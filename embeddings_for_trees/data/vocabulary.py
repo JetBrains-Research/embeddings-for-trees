@@ -10,6 +10,9 @@ from embeddings_for_trees.utils.common import AST
 
 
 class Vocabulary(BaseVocabulary):
+
+    NODE = "nodeType"
+
     @staticmethod
     def process_raw_sample(raw_sample: str, counters: Dict[str, CounterType[str]]):
         try:
@@ -27,7 +30,7 @@ class Vocabulary(BaseVocabulary):
 
 class TypedVocabulary(Vocabulary):
 
-    TYPE = "type"
+    TYPE = "tokenType"
 
     def __init__(
         self,

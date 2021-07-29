@@ -117,9 +117,11 @@ class JsonlASTDataset(Dataset):
         if self._is_train and not self._is_suitable_tree(graph):
             return None
         graph = self._set_graph_features(graph, nodes)
-        assert graph.num_edges() > 0
-        assert graph.num_nodes() > 0
-        assert graph.num_nodes() == graph.num_edges() + 1
+        assert graph.num_edges() > 0, index
+        assert graph.num_nodes() > 0, index
+        assert (
+            graph.num_nodes() == graph.num_edges() + 1
+        ), f"index: {index}, # edges: {graph.num_edges()}, # nodes: {graph.num_nodes()}"
         return label, graph
 
     def _print_tree(self, tree: dgl.DGLGraph, symbol: str = ".."):
@@ -141,9 +143,10 @@ class JsonlASTDataset(Dataset):
 
 
 class JsonlTypedASTDataset(JsonlASTDataset):
+    _vocab: TypedVocabulary
+
     def __init__(self, data_file: str, vocabulary: TypedVocabulary, config: DictConfig, is_train: bool):
         super().__init__(data_file, vocabulary, config, is_train)
-        self._vocab: TypedVocabulary
         self._type_unk = self._vocab.type_to_id[vocabulary.UNK]
 
     def _set_graph_features(self, graph: dgl.DGLGraph, nodes: List[Dict]) -> dgl.DGLGraph:

@@ -6,10 +6,10 @@ SEPARATOR = "|"
 
 # data storage keys
 LABEL = "label"
-AST = "AST"
-NODE = "node"
+AST = "tree"
+NODE = "nodeType"
 TOKEN = "token"
-TYPE = "type"
+TYPE = "tokenType"
 CHILDREN = "children"
 
 

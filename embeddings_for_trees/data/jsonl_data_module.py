@@ -38,7 +38,7 @@ class JsonlASTDatamodule(LightningDataModule):
     def setup(self, stage: Optional[str] = None):
         if not path.exists(path.join(self._data_folder, Vocabulary.vocab_filename)):
             print("Can't find vocabulary, collect it from train holdout")
-            build_from_scratch(path.join(self._data_folder, f"{self._name}.{self._train}.jsonl"), Vocabulary)
+            build_from_scratch(path.join(self._data_folder, f"{self._train}.jsonl"), Vocabulary)
         vocabulary_path = path.join(self._data_folder, Vocabulary.vocab_filename)
         self._vocabulary = Vocabulary(vocabulary_path, self._config.max_labels, self._config.max_tokens)
 
@@ -50,7 +50,7 @@ class JsonlASTDatamodule(LightningDataModule):
     def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
-        holdout_file = path.join(self._data_folder, f"{self._name}.{holdout}.jsonl")
+        holdout_file = path.join(self._data_folder, f"{holdout}.jsonl")
         dataset = JsonlASTDataset(holdout_file, self._vocabulary, self._config, holdout == self._train)
         batch_size = self._config.batch_size if holdout == self._train else self._config.test_batch_size
         return DataLoader(
@@ -84,7 +84,7 @@ class JsonlTypedASTDatamodule(JsonlASTDatamodule):
     def setup(self, stage: Optional[str] = None):
         if not path.exists(path.join(self._data_folder, Vocabulary.vocab_filename)):
             print("Can't find vocabulary, collect it from train holdout")
-            build_from_scratch(path.join(self._data_folder, f"{self._name}.{self._train}.jsonl"), TypedVocabulary)
+            build_from_scratch(path.join(self._data_folder, f"{self._train}.jsonl"), TypedVocabulary)
         vocabulary_path = path.join(self._data_folder, Vocabulary.vocab_filename)
         self._vocabulary = TypedVocabulary(
             vocabulary_path, self._config.max_labels, self._config.max_tokens, self._config.max_types
@@ -93,7 +93,7 @@ class JsonlTypedASTDatamodule(JsonlASTDatamodule):
     def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
-        holdout_file = path.join(self._data_folder, f"{self._name}.{holdout}.jsonl")
+        holdout_file = path.join(self._data_folder, f"{holdout}.jsonl")
         dataset = JsonlTypedASTDataset(holdout_file, self._vocabulary, self._config, holdout == self._train)
         batch_size = self._config.batch_size if holdout == self._train else self._config.test_batch_size
         return DataLoader(
