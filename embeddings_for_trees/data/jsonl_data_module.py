@@ -81,6 +81,12 @@ class JsonlASTDatamodule(LightningDataModule):
 class JsonlTypedASTDatamodule(JsonlASTDatamodule):
     _vocabulary: Optional[TypedVocabulary] = None
 
+    @property
+    def vocabulary(self) -> TypedVocabulary:
+        if self._vocabulary is None:
+            raise RuntimeError(f"Setup data module for initializing vocabulary")
+        return self._vocabulary
+
     def setup(self, stage: Optional[str] = None):
         if not path.exists(path.join(self._data_folder, Vocabulary.vocab_filename)):
             print("Can't find vocabulary, collect it from train holdout")

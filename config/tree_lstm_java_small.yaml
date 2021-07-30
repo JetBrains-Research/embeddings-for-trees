@@ -1,6 +1,6 @@
 data_folder: ../data/embeddings-for-trees/java-small-typed-asts
 
-resume_from_checkpoint: null
+checkpoint: null
 
 seed: 7
 log_offline: false

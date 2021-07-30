@@ -52,7 +52,7 @@ def train(model: LightningModule, data_module: LightningDataModule, config: Dict
             upload_checkpoint_callback,
             print_epoch_result_callback,
         ],
-        resume_from_checkpoint=config.resume_from_checkpoint,
+        resume_from_checkpoint=config.get("checkpoint", None),
     )
 
     trainer.fit(model=model, datamodule=data_module)

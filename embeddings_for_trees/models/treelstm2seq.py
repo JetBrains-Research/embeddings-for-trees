@@ -25,6 +25,7 @@ class TreeLSTM2Seq(LightningModule):
         teacher_forcing: float = 0.0,
     ):
         super().__init__()
+        self.save_hyperparameters()
         self._model_config = model_config
         self.__optim_config = optimizer_config
         self._vocabulary = vocabulary
