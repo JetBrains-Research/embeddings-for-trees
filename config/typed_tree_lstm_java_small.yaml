@@ -9,7 +9,7 @@ progress_bar_refresh_rate: 1
 print_config: true
 
 data:
-  url: https://s3-eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz
+  url: https://s3.eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz
 
   num_workers: 4
 
