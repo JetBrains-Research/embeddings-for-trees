@@ -8,7 +8,7 @@ from commode_utils.modules import LSTMDecoderStep, Decoder
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities.types import EPOCH_OUTPUT
-from torch.optim import Optimizer, Adam
+from torch.optim import Optimizer, Adam, AdamW
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 from torchmetrics import MetricCollection, Metric
 
@@ -49,7 +49,7 @@ class TreeLSTM2Seq(LightningModule):
             decoder_step, len(vocabulary.label_to_id), vocabulary.label_to_id[vocabulary.SOS], teacher_forcing
         )
 
-        self.__loss = SequenceCrossEntropyLoss(self.__pad_idx)
+        self.__loss = SequenceCrossEntropyLoss(self.__pad_idx, reduction="sum")
 
     @property
     def vocabulary(self) -> Vocabulary:
@@ -61,7 +61,7 @@ class TreeLSTM2Seq(LightningModule):
     # ========== Main PyTorch-Lightning hooks ==========
 
     def configure_optimizers(self) -> Tuple[List[Optimizer], List[_LRScheduler]]:
-        optimizer = Adam(
+        optimizer = AdamW(
             self.parameters(),
             lr=self.__optim_config.lr,
             weight_decay=self.__optim_config.weight_decay,
