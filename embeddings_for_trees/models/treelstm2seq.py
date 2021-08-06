@@ -8,12 +8,12 @@ from commode_utils.modules import LSTMDecoderStep, Decoder
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities.types import EPOCH_OUTPUT
-from torch.optim import Optimizer, Adam, AdamW
+from torch.optim import Optimizer, AdamW
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
 from torchmetrics import MetricCollection, Metric
 
-from embeddings_for_trees.models.modules import NodeEmbedding, TreeLSTM
 from embeddings_for_trees.data.vocabulary import Vocabulary
+from embeddings_for_trees.models.modules import NodeEmbedding, TreeLSTM
 
 
 class TreeLSTM2Seq(LightningModule):
@@ -49,7 +49,7 @@ class TreeLSTM2Seq(LightningModule):
             decoder_step, len(vocabulary.label_to_id), vocabulary.label_to_id[vocabulary.SOS], teacher_forcing
         )
 
-        self.__loss = SequenceCrossEntropyLoss(self.__pad_idx, reduction="sum")
+        self.__loss = SequenceCrossEntropyLoss(self.__pad_idx, reduction="batch-mean")
 
     @property
     def vocabulary(self) -> Vocabulary:
