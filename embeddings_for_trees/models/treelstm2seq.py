@@ -90,7 +90,7 @@ class TreeLSTM2Seq(LightningModule):
         labels, graph = batch
         # [seq length; batch size; vocab size]
         logits = self(graph, labels.shape[0], labels) if step == "train" else self(graph, labels.shape[0])
-        loss = self.__loss(logits, labels)
+        loss = self.__loss(logits[1:], labels[1:])
 
         with torch.no_grad():
             prediction = logits.argmax(-1)
