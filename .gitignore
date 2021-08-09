@@ -8,6 +8,7 @@ checkpoints/
 notebooks/
 .hydra/
 lightning_logs/
+files/
 
 *.txt
 *.pt
