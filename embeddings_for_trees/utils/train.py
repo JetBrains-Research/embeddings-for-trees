@@ -22,16 +22,17 @@ def train(model: LightningModule, data_module: LightningDataModule, config: Dict
     # define model checkpoint callback
     checkpoint_callback = ModelCheckpoint(
         dirpath=wandb_logger.experiment.dir,
-        filename="{epoch:02d}-{val_loss:.4f}",
-        monitor="val_loss",
+        filename="{epoch:02d}-val_loss={val/loss:.4f}",
+        monitor="val/loss",
         every_n_epochs=params.save_every_epoch,
         save_top_k=-1,
+        auto_insert_metric_name=False,
     )
     upload_checkpoint_callback = UploadCheckpointCallback(wandb_logger.experiment.dir)
     # define early stopping callback
-    early_stopping_callback = EarlyStopping(patience=params.patience, monitor="val_loss", verbose=True, mode="min")
+    early_stopping_callback = EarlyStopping(patience=params.patience, monitor="val/loss", verbose=True, mode="min")
     # define callback for printing intermediate result
-    print_epoch_result_callback = PrintEpochResultCallback(split_symbol="_", after_test=False)
+    print_epoch_result_callback = PrintEpochResultCallback(after_test=False)
     # use gpu if it exists
     gpu = 1 if torch.cuda.is_available() else None
     # define learning rate logger

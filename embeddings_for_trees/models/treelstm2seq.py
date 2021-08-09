@@ -125,10 +125,10 @@ class TreeLSTM2Seq(LightningModule):
             mean_loss = torch.stack(losses).mean()
             metric = self.__metrics[f"{step}_f1"].compute()
             log = {
-                f"{step}_loss": mean_loss,
-                f"{step}_f1": metric.f1_score,
-                f"{step}_precision": metric.precision,
-                f"{step}_recall": metric.recall,
+                f"{step}/loss": mean_loss,
+                f"{step}/f1": metric.f1_score,
+                f"{step}/precision": metric.precision,
+                f"{step}/recall": metric.recall,
             }
         self.log_dict(log, on_step=False, on_epoch=True)
 
