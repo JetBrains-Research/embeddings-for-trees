@@ -1,13 +1,14 @@
 .idea/
 .ipynb_checkpoints/
 
-data/
 logs/
 wandb/
 checkpoints/
 .tmp/
 notebooks/
 .hydra/
+lightning_logs/
+files/
 
 *.txt
 *.pt

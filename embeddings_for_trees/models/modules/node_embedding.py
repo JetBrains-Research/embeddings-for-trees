@@ -3,8 +3,8 @@ import torch
 from omegaconf import DictConfig
 from torch import nn
 
-from utils.common import PAD, TOKEN, NODE, TYPE
-from utils.vocabulary import Vocabulary
+from embeddings_for_trees.utils.common import TOKEN, NODE, TYPE
+from embeddings_for_trees.data.vocabulary import Vocabulary, TypedVocabulary
 
 
 class NodeEmbedding(nn.Module):
@@ -12,10 +12,10 @@ class NodeEmbedding(nn.Module):
         super().__init__()
 
         self._token_embedding = nn.Embedding(
-            len(vocabulary.token_to_id), config.embedding_size, padding_idx=vocabulary.token_to_id[PAD]
+            len(vocabulary.token_to_id), config.embedding_size, padding_idx=vocabulary.token_to_id[vocabulary.PAD]
         )
         self._node_embedding = nn.Embedding(
-            len(vocabulary.node_to_id), config.embedding_size, padding_idx=vocabulary.node_to_id[PAD]
+            len(vocabulary.node_to_id), config.embedding_size, padding_idx=vocabulary.node_to_id[vocabulary.PAD]
         )
 
     def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
@@ -28,10 +28,10 @@ class NodeEmbedding(nn.Module):
 
 
 class TypedNodeEmbedding(NodeEmbedding):
-    def __init__(self, config: DictConfig, vocabulary: Vocabulary):
+    def __init__(self, config: DictConfig, vocabulary: TypedVocabulary):
         super().__init__(config, vocabulary)
         self._type_embedding = nn.Embedding(
-            len(vocabulary.type_to_id), config.embedding_size, padding_idx=vocabulary.type_to_id[PAD]
+            len(vocabulary.type_to_id), config.embedding_size, padding_idx=vocabulary.type_to_id[vocabulary.PAD]
         )
 
     def forward(self, graph: dgl.DGLGraph) -> torch.Tensor:
