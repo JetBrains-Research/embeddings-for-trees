@@ -24,7 +24,7 @@ data:
   max_tree_depth: 20
 
   batch_size: 512
-  test_batch_size: 1024
+  test_batch_size: 768
 
 model:
   # Encoder
