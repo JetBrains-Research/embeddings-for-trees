@@ -114,7 +114,8 @@ class JsonlASTDataset(Dataset):
 
         label = self._get_label(sample[LABEL])
         graph, nodes = self._build_graph(sample[AST])
-        if self._is_train and not self._is_suitable_tree(graph):
+        # We should filter out big trees even for validation because of OOM error.
+        if not self._is_suitable_tree(graph):
             return None
         graph = self._set_graph_features(graph, nodes)
         assert graph.num_edges() > 0, index
