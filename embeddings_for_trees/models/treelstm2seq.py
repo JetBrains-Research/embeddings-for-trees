@@ -130,6 +130,7 @@ class TreeLSTM2Seq(LightningModule):
                 f"{step}/precision": metric.precision,
                 f"{step}/recall": metric.recall,
             }
+            self.__metrics[f"{step}_f1"].reset()
         self.log_dict(log, on_step=False, on_epoch=True)
 
     def training_epoch_end(self, step_outputs: EPOCH_OUTPUT):
