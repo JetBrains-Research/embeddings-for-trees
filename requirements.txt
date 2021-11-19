@@ -1,6 +1,6 @@
 torch==1.10.0
 pytorch-lightning==1.5.2
-dgl==0.7.2
+dgl
 torchmetrics==0.6.0
 
 tqdm==4.62.3
