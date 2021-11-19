@@ -3,19 +3,23 @@ data_folder: ../data/embeddings-for-trees/java-test-typed-asts
 checkpoint: null
 
 seed: 7
-log_offline: true
 # Training in notebooks (e.g. Google Colab) may crash with too small value
 progress_bar_refresh_rate: 1
 print_config: true
 
+wandb:
+  project: Test project
+  group: Test group
+  offline: true
+
 data:
   num_workers: 0
 
-  max_labels: null
+  labels_count: 10
   max_label_parts: 7
-  max_tokens: null
+  tokens_count: 1000
   max_token_parts: 5
-  max_types: null
+  types_count: 1000
   max_type_parts: 5
 
   max_tree_nodes: 250
@@ -41,6 +45,7 @@ optimizer:
   decay_gamma: 0.95
 
 train:
+  gpu: 0
   n_epochs: 5
   patience: 10
   clip_norm: 10

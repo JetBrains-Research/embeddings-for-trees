@@ -27,8 +27,6 @@ def train_typed_treelstm(config: DictConfig):
 
     # Load data module
     data_module = JsonlTypedASTDatamodule(config.data, config.data_folder)
-    data_module.prepare_data()
-    data_module.setup()
 
     # Load model
     typed_treelstm2seq = TypedTreeLSTM2Seq(
@@ -43,8 +41,6 @@ def test_typed_treelstm(config: DictConfig):
 
     # Load data module
     data_module = JsonlTypedASTDatamodule(config.data, config.data_folder)
-    data_module.prepare_data()
-    data_module.setup()
 
     # Load model
     typed_treelstm2seq = TypedTreeLSTM2Seq.load_from_checkpoint(config.checkpoint, map_location=torch.device("cpu"))

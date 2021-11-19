@@ -3,7 +3,7 @@ from typing import Tuple, List, Dict
 import dgl
 import torch
 from commode_utils.losses import SequenceCrossEntropyLoss
-from commode_utils.metrics import SequentialF1Score, ClassificationMetrics
+from commode_utils.metrics import SequentialF1Score, ClassificationMetrics, ChrF
 from commode_utils.modules import LSTMDecoderStep, Decoder
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
@@ -40,6 +40,10 @@ class TreeLSTM2Seq(LightningModule):
             f"{holdout}_f1": SequentialF1Score(pad_idx=self.__pad_idx, eos_idx=eos_idx, ignore_idx=ignore_idx)
             for holdout in ["train", "val", "test"]
         }
+        id2label = {v: k for k, v in vocabulary.label_to_id.items()}
+        metrics.update(
+            {f"{holdout}_chrf": ChrF(id2label, ignore_idx + [self.__pad_idx, eos_idx]) for holdout in ["val", "test"]}
+        )
         self.__metrics = MetricCollection(metrics)
 
         self.__embedding = self._get_embedding()
@@ -78,35 +82,38 @@ class TreeLSTM2Seq(LightningModule):
         batched_trees: dgl.DGLGraph,
         output_length: int,
         target_sequence: torch.Tensor = None,
-    ) -> torch.Tensor:
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         batched_trees.ndata["x"] = self.__embedding(batched_trees)
+        trees = dgl.unbatch(batched_trees)
         encoded_nodes = self.__encoder(batched_trees)
-        output_logits = self.__decoder(encoded_nodes, batched_trees.batch_num_nodes(), output_length, target_sequence)
-        return output_logits
+        output_logits, attention_weights = self.__decoder(
+            encoded_nodes, batched_trees.batch_num_nodes(), output_length, target_sequence
+        )
+        return output_logits, attention_weights
 
     # ========== Model step ==========
 
     def _shared_step(self, batch: Tuple[torch.Tensor, dgl.DGLGraph], step: str) -> Dict:
         labels, graph = batch
         # [seq length; batch size; vocab size]
-        logits = self(graph, labels.shape[0], labels) if step == "train" else self(graph, labels.shape[0])
-        loss = self.__loss(logits[1:], labels[1:])
+        logits, _ = self(graph, labels.shape[0], labels) if step == "train" else self(graph, labels.shape[0])
+        result = {f"{step}/loss": self.__loss(logits[1:], labels[1:])}
 
         with torch.no_grad():
             prediction = logits.argmax(-1)
             metric: ClassificationMetrics = self.__metrics[f"{step}_f1"](prediction, labels)
+            result.update(
+                {f"{step}/f1": metric.f1_score, f"{step}/precision": metric.precision, f"{step}/recall": metric.recall}
+            )
+            if step != "train":
+                result[f"{step}/chrf"] = self.__metrics[f"{step}_chrf"](prediction, labels)
 
-        return {
-            f"{step}/loss": loss,
-            f"{step}/f1": metric.f1_score,
-            f"{step}/precision": metric.precision,
-            f"{step}/recall": metric.recall,
-        }
+        return result
 
     def training_step(self, batch: Tuple[torch.Tensor, dgl.DGLGraph], batch_idx: int) -> Dict:  # type: ignore
         result = self._shared_step(batch, "train")
         self.log_dict(result, on_step=True, on_epoch=False)
-        self.log("f1", result["train/f1"], prog_bar=True, logger=False)
+        self.log("f1", result["train/f1"], prog_bar=True, logger=False, batch_size=batch[0].shape[1])
         return result["train/loss"]
 
     def validation_step(self, batch: Tuple[torch.Tensor, dgl.DGLGraph], batch_idx: int) -> Dict:  # type: ignore
@@ -131,6 +138,9 @@ class TreeLSTM2Seq(LightningModule):
                 f"{step}/recall": metric.recall,
             }
             self.__metrics[f"{step}_f1"].reset()
+            if step != "train":
+                log[f"{step}/chrf"] = self.__metrics[f"{step}_chrf"].compute()
+                self.__metrics[f"{step}_chrf"].reset()
         self.log_dict(log, on_step=False, on_epoch=True)
 
     def training_epoch_end(self, step_outputs: EPOCH_OUTPUT):

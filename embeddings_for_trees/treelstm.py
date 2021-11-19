@@ -27,8 +27,6 @@ def train_treelstm(config: DictConfig):
 
     # Load data module
     data_module = JsonlASTDatamodule(config.data, config.data_folder)
-    data_module.prepare_data()
-    data_module.setup()
 
     # Load model
     treelstm2seq = TreeLSTM2Seq(config.model, config.optimizer, data_module.vocabulary, config.train.teacher_forcing)
@@ -41,8 +39,6 @@ def test_treelstm(config: DictConfig):
 
     # Load data module
     data_module = JsonlASTDatamodule(config.data, config.data_folder)
-    data_module.prepare_data()
-    data_module.setup()
 
     # Load model
     treelstm2seq = TreeLSTM2Seq.load_from_checkpoint(config.checkpoint, map_location=torch.device("cpu"))

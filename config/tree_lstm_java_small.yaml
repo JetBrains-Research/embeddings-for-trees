@@ -3,19 +3,26 @@ data_folder: ../data/embeddings-for-trees/java-small-typed-asts
 checkpoint: null
 
 seed: 7
-log_offline: false
 # Training in notebooks (e.g. Google Colab) may crash with too small value
 progress_bar_refresh_rate: 1
 print_config: true
+
+wandb:
+  project: TreeLSTM -- java-small
+  group: null
+  offline: true
+
 
 data:
   url: https://s3.eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz
 
   num_workers: 4
 
-  max_labels: 9000
+  # 98.49% coverage
+  labels_count: 10
   max_label_parts: 7
-  max_tokens: 45000
+  # 97.44% coverage
+  tokens_count: 1000
   max_token_parts: 5
 
   max_tree_nodes: 250
@@ -41,6 +48,7 @@ optimizer:
   decay_gamma: 0.95
 
 train:
+  gpu: [0]
   n_epochs: 10
   patience: 3
   clip_norm: 5

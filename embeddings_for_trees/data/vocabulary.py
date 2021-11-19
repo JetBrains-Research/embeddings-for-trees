@@ -35,16 +35,15 @@ class TypedVocabulary(Vocabulary):
     def __init__(
         self,
         vocabulary_file: str,
-        max_labels: Optional[int] = None,
-        max_tokens: Optional[int] = None,
-        max_types: Optional[int] = None,
+        labels_count: Optional[int] = None,
+        tokens_count: Optional[int] = None,
+        types_count: Optional[int] = None,
     ):
-        super().__init__(vocabulary_file, max_labels, max_tokens)
+        super().__init__(vocabulary_file, labels_count, tokens_count)
 
         self._type_to_id = {self.PAD: 0, self.UNK: 1, self.SOS: 2, self.EOS: 3}
-        self._type_to_id.update(
-            (token[0], i + 4) for i, token in enumerate(self._counters[self.TYPE].most_common(max_types))
-        )
+        types = self._extract_tokens_by_count(self._counters[self.TYPE], types_count)
+        self._type_to_id.update((_t, i + 4) for i, _t in enumerate(types))
 
     @property
     def type_to_id(self) -> Dict[str, int]:

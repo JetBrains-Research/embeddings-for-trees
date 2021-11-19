@@ -19,13 +19,12 @@ class JsonlASTDatamodule(LightningDataModule):
     _val = "val"
     _test = "test"
 
-    _vocabulary: Optional[Vocabulary] = None
-
     def __init__(self, config: DictConfig, data_folder: str):
         super().__init__()
         self._config = config
         self._data_folder = data_folder
         self._name = basename(self._data_folder)
+        self._vocabulary = self.setup_vocabulary()
 
     def prepare_data(self):
         if path.exists(self._data_folder):
@@ -35,12 +34,12 @@ class JsonlASTDatamodule(LightningDataModule):
             raise ValueError(f"Config doesn't contain url for, can't download it automatically")
         download_dataset(self._config.url, self._data_folder, self._name)
 
-    def setup(self, stage: Optional[str] = None):
+    def setup_vocabulary(self) -> Vocabulary:
         if not path.exists(path.join(self._data_folder, Vocabulary.vocab_filename)):
             print("Can't find vocabulary, collect it from train holdout")
             build_from_scratch(path.join(self._data_folder, f"{self._train}.jsonl"), Vocabulary)
         vocabulary_path = path.join(self._data_folder, Vocabulary.vocab_filename)
-        self._vocabulary = Vocabulary(vocabulary_path, self._config.max_labels, self._config.max_tokens)
+        return Vocabulary(vocabulary_path, self._config.labels_count, self._config.tokens_count)
 
     @staticmethod
     def _collate_batch(sample_list: List[Tuple[torch.Tensor, dgl.DGLGraph]]) -> Tuple[torch.Tensor, dgl.DGLGraph]:
@@ -79,7 +78,7 @@ class JsonlASTDatamodule(LightningDataModule):
 
 
 class JsonlTypedASTDatamodule(JsonlASTDatamodule):
-    _vocabulary: Optional[TypedVocabulary] = None
+    _vocabulary: TypedVocabulary
 
     @property
     def vocabulary(self) -> TypedVocabulary:
@@ -87,13 +86,13 @@ class JsonlTypedASTDatamodule(JsonlASTDatamodule):
             raise RuntimeError(f"Setup data module for initializing vocabulary")
         return self._vocabulary
 
-    def setup(self, stage: Optional[str] = None):
+    def setup_vocabulary(self) -> TypedVocabulary:
         if not path.exists(path.join(self._data_folder, Vocabulary.vocab_filename)):
             print("Can't find vocabulary, collect it from train holdout")
             build_from_scratch(path.join(self._data_folder, f"{self._train}.jsonl"), TypedVocabulary)
         vocabulary_path = path.join(self._data_folder, Vocabulary.vocab_filename)
-        self._vocabulary = TypedVocabulary(
-            vocabulary_path, self._config.max_labels, self._config.max_tokens, self._config.max_types
+        return TypedVocabulary(
+            vocabulary_path, self._config.labels_count, self._config.tokens_count, self._config.types_count
         )
 
     def _shared_dataloader(self, holdout: str, shuffle: bool) -> DataLoader:
