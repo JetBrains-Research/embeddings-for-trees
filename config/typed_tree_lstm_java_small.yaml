@@ -10,7 +10,7 @@ print_config: true
 wandb:
   project: TreeLSTM -- java-small
   group: typed
-  offline: true
+  offline: false
 
 data:
   url: https://s3.eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-small-typed-asts.tar.gz
@@ -51,9 +51,9 @@ optimizer:
 
 train:
   gpu: [0]
-  n_epochs: 10
-  patience: 3
-  clip_norm: 5
+  n_epochs: 15
+  patience: 15
+  clip_norm: 10
   teacher_forcing: 1.0
 
   val_every_epoch: 1
