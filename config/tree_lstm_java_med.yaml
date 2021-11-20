@@ -3,28 +3,32 @@ data_folder: ../data/embeddings-for-trees/java-med-typed-asts
 checkpoint: null
 
 seed: 7
-log_offline: false
 # Training in notebooks (e.g. Google Colab) may crash with too small value
 progress_bar_refresh_rate: 1
 print_config: true
+
+wandb:
+  project: TreeLSTM -- java-small
+  group: null
+  offline: false
 
 data:
   url: https://s3.eu-west-1.amazonaws.com/datasets.ml.labs.aws.intellij.net/java-ast-methods/java-med-typed-asts.tar.gz
 
   num_workers: 4
 
-  # each label part occurs more than 5 times
-  max_labels: 12946
+  # 99.19% coverage
+  labels_count: 10
   max_label_parts: 7
-  # each token part occurs more than 5 times
-  max_tokens: 31772
+  # 98.75% coverage
+  tokens_count: 1000
   max_token_parts: 5
 
   max_tree_nodes: 250
   max_tree_depth: 20
 
   batch_size: 512
-  test_batch_size: 768
+  test_batch_size: 1024
 
 model:
   # Encoder
@@ -43,9 +47,10 @@ optimizer:
   decay_gamma: 0.95
 
 train:
-  n_epochs: 5
-  patience: 5
-  clip_norm: 5
+  gpu: [0]
+  n_epochs: 10
+  patience: 10
+  clip_norm: 10
   teacher_forcing: 1.0
 
   val_every_epoch: 1
