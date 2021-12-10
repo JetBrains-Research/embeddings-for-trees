@@ -4,6 +4,9 @@ from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning import seed_everything, Trainer, LightningModule, LightningDataModule
 from pytorch_lightning.callbacks import EarlyStopping, LearningRateMonitor, TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
+from torch import use_deterministic_algorithms
+
+from embeddings_for_trees.models.treelstm2seq_ptrnet import TreeLSTM2SeqPointers
 
 
 def train(model: LightningModule, data_module: LightningDataModule, config: DictConfig):
@@ -49,5 +52,7 @@ def train(model: LightningModule, data_module: LightningDataModule, config: Dict
         resume_from_checkpoint=config.get("checkpoint", None),
     )
 
+    if isinstance(model, TreeLSTM2SeqPointers):
+        use_deterministic_algorithms(False)
     trainer.fit(model=model, datamodule=data_module)
     trainer.test(model=model, datamodule=data_module)
