@@ -31,12 +31,7 @@ class TreeLSTM2SeqPointers(LightningModule):
 
         self._embedding = NodeEmbedding(model_config, vocabulary)
         self._encoder = TreeLSTM(model_config)
-        self._decoder = PointerDecoder(
-            model_config,
-            self._embedding._token_embedding,
-            vocabulary.token_to_id,
-            vocabulary.token_to_id[vocabulary.SOS],
-        )
+        self._decoder = PointerDecoder(model_config, self._embedding._token_embedding, vocabulary.token_to_id)
 
         token2id = vocabulary.token_to_id
         pad_idx = token2id[vocabulary.PAD]

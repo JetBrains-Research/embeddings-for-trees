@@ -7,18 +7,20 @@ from commode_utils.training import cut_into_segments
 from omegaconf import DictConfig
 from torch import nn, Tensor
 
+from embeddings_for_trees.data.vocabulary import Vocabulary
 from embeddings_for_trees.utils.common import TOKEN
 
 
 class PointerDecoder(nn.Module):
     LSTM_STATE = Tuple[Tensor, Tensor]
 
+    _threshold_cf = 2.0
+
     def __init__(
         self,
         config: DictConfig,
         token_embeddings: nn.Embedding,
         token_to_id: Dict[str, int],
-        token_sos_id: int,
     ):
         super().__init__()
         self._token_embeddings = token_embeddings
@@ -34,7 +36,8 @@ class PointerDecoder(nn.Module):
         )
 
         self._n_tokens = len(token_to_id)
-        self._sos_token = token_sos_id
+        self._sos_token = token_to_id[Vocabulary.SOS]
+        self._pad_token = token_to_id[Vocabulary.PAD]
 
     def _init_lstm_state(self, encoder_output: Tensor, attention_mask: Tensor) -> LSTM_STATE:
         lstm_initial_state: torch.Tensor = encoder_output.sum(dim=1)  # [batch size; encoder size]
@@ -91,9 +94,13 @@ class PointerDecoder(nn.Module):
                 leaves = tree.in_degrees() == 0
                 token_ids = tree.ndata[TOKEN][leaves][:, 0]
                 probabilities = current_pointer[i, : leaves.shape[0]][leaves]
-                ids, ids_mask = torch.unique(token_ids, return_inverse=True)
-                for j, _id in enumerate(ids):
-                    output[step, i, _id] = probabilities[ids_mask == j].sum()
+
+                probability_threshold = 1.0 / (self._threshold_cf * leaves.sum())
+                probabilities[probabilities < probability_threshold] = 0
+
+                output[step, i].put_(token_ids, probabilities, accumulate=True)
+
+                output[step, i, self._pad_token] = 1 - probabilities.sum()
 
             current_input = output[step].argmax(dim=-1)
         return output
