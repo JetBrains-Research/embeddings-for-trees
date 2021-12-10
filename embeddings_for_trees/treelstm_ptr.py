@@ -35,6 +35,7 @@ def train_treelstm_ptr(config: DictConfig):
     # Load model
     treelstm2seq_ptr = TreeLSTM2SeqPointers(config.model, config.optimizer, data_module.vocabulary)
 
+    torch.use_deterministic_algorithms(False)
     train(treelstm2seq_ptr, data_module, config)
 
 
