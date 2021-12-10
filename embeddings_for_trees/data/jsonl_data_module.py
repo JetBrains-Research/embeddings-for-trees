@@ -19,12 +19,13 @@ class JsonlASTDatamodule(LightningDataModule):
     _val = "val"
     _test = "test"
 
-    def __init__(self, config: DictConfig, data_folder: str):
+    def __init__(self, config: DictConfig, data_folder: str, is_pointer: bool = False):
         super().__init__()
         self._config = config
         self._data_folder = data_folder
         self._name = basename(self._data_folder)
         self._vocabulary = self.setup_vocabulary()
+        self._is_pointer = is_pointer
 
     def prepare_data(self):
         if path.exists(self._data_folder):
@@ -50,7 +51,9 @@ class JsonlASTDatamodule(LightningDataModule):
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
         holdout_file = path.join(self._data_folder, f"{holdout}.jsonl")
-        dataset = JsonlASTDataset(holdout_file, self._vocabulary, self._config, holdout == self._train)
+        dataset = JsonlASTDataset(
+            holdout_file, self._vocabulary, self._config, holdout == self._train, self._is_pointer
+        )
         batch_size = self._config.batch_size if holdout == self._train else self._config.test_batch_size
         return DataLoader(
             dataset, batch_size, shuffle=shuffle, num_workers=self._config.num_workers, collate_fn=self._collate_batch
@@ -99,7 +102,9 @@ class JsonlTypedASTDatamodule(JsonlASTDatamodule):
         if self._vocabulary is None:
             raise RuntimeError(f"Setup vocabulary before creating data loaders")
         holdout_file = path.join(self._data_folder, f"{holdout}.jsonl")
-        dataset = JsonlTypedASTDataset(holdout_file, self._vocabulary, self._config, holdout == self._train)
+        dataset = JsonlTypedASTDataset(
+            holdout_file, self._vocabulary, self._config, holdout == self._train, self._is_pointer
+        )
         batch_size = self._config.batch_size if holdout == self._train else self._config.test_batch_size
         return DataLoader(
             dataset, batch_size, shuffle=shuffle, num_workers=self._config.num_workers, collate_fn=self._collate_batch

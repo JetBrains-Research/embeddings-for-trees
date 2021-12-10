@@ -15,9 +15,9 @@ wandb:
 data:
   num_workers: 0
 
-  labels_count: 10
+  labels_count: 1
   max_label_parts: 7
-  tokens_count: 1000
+  tokens_count: 1
   max_token_parts: 5
 
   max_tree_nodes: 250
@@ -25,6 +25,8 @@ data:
 
   batch_size: 5
   test_batch_size: 10
+
+  split_leaves: true
 
 model:
   # Encoder

@@ -3,110 +3,96 @@ from typing import Tuple, List, Dict
 import dgl
 import torch
 from commode_utils.losses import SequenceCrossEntropyLoss
-from commode_utils.metrics import SequentialF1Score, ClassificationMetrics, ChrF
-from commode_utils.modules import LSTMDecoderStep, Decoder
+from commode_utils.metrics import SequentialF1Score, ChrF, ClassificationMetrics
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
 from pytorch_lightning.utilities.types import EPOCH_OUTPUT
-from torch.optim import Optimizer, AdamW
+from torch.optim import AdamW, Optimizer
 from torch.optim.lr_scheduler import _LRScheduler, LambdaLR
-from torchmetrics import MetricCollection, Metric
+from torchmetrics import Metric, MetricCollection
 
 from embeddings_for_trees.data.vocabulary import Vocabulary
-from embeddings_for_trees.models.modules import NodeEmbedding, TreeLSTM
-from embeddings_for_trees.utils.common import TOKEN
+from embeddings_for_trees.models.modules import TreeLSTM, NodeEmbedding
+from embeddings_for_trees.models.modules.pointer_decoder import PointerDecoder
 
 
-class TreeLSTM2Seq(LightningModule):
+class TreeLSTM2SeqPointers(LightningModule):
     def __init__(
         self,
         model_config: DictConfig,
         optimizer_config: DictConfig,
         vocabulary: Vocabulary,
-        teacher_forcing: float = 0.0,
     ):
         super().__init__()
         self.save_hyperparameters()
         self._model_config = model_config
-        self.__optim_config = optimizer_config
+        self._optim_config = optimizer_config
         self._vocabulary = vocabulary
 
-        if vocabulary.SOS not in vocabulary.label_to_id:
-            raise ValueError(f"Can't find SOS token in label to id vocabulary")
+        self._embedding = NodeEmbedding(model_config, vocabulary)
+        self._encoder = TreeLSTM(model_config)
+        self._decoder = PointerDecoder(
+            model_config,
+            self._embedding._token_embedding,
+            vocabulary.token_to_id,
+            vocabulary.token_to_id[vocabulary.SOS],
+        )
 
-        self.__pad_idx = vocabulary.label_to_id[vocabulary.PAD]
-        eos_idx = vocabulary.label_to_id[vocabulary.EOS]
-        ignore_idx = [vocabulary.label_to_id[vocabulary.SOS], vocabulary.label_to_id[vocabulary.UNK]]
+        token2id = vocabulary.token_to_id
+        pad_idx = token2id[vocabulary.PAD]
+        self._loss = SequenceCrossEntropyLoss(pad_idx, reduction="batch-mean")
+
+        eos_idx = token2id[vocabulary.EOS]
+        ignore_idx = [token2id[vocabulary.SOS], token2id[vocabulary.UNK]]
         metrics: Dict[str, Metric] = {
-            f"{holdout}_f1": SequentialF1Score(pad_idx=self.__pad_idx, eos_idx=eos_idx, ignore_idx=ignore_idx)
+            f"{holdout}_f1": SequentialF1Score(pad_idx=pad_idx, eos_idx=eos_idx, ignore_idx=ignore_idx)
             for holdout in ["train", "val", "test"]
         }
-        id2label = {v: k for k, v in vocabulary.label_to_id.items()}
+        id2token = {v: k for k, v in token2id.items()}
         metrics.update(
-            {f"{holdout}_chrf": ChrF(id2label, ignore_idx + [self.__pad_idx, eos_idx]) for holdout in ["val", "test"]}
+            {f"{holdout}_chrf": ChrF(id2token, ignore_idx + [pad_idx, eos_idx]) for holdout in ["val", "test"]}
         )
-        self.__metrics = MetricCollection(metrics)
-
-        self.__embedding = self._get_embedding()
-        self.__encoder = TreeLSTM(model_config)
-        decoder_step = LSTMDecoderStep(model_config, len(vocabulary.label_to_id), self.__pad_idx)
-        self.__decoder = Decoder(
-            decoder_step, len(vocabulary.label_to_id), vocabulary.label_to_id[vocabulary.SOS], teacher_forcing
-        )
-
-        self.__loss = SequenceCrossEntropyLoss(self.__pad_idx, reduction="batch-mean")
-
-    @property
-    def vocabulary(self) -> Vocabulary:
-        return self._vocabulary
-
-    def _get_embedding(self) -> torch.nn.Module:
-        return NodeEmbedding(self._model_config, self._vocabulary)
-
-    # ========== Main PyTorch-Lightning hooks ==========
-
-    def configure_optimizers(self) -> Tuple[List[Optimizer], List[_LRScheduler]]:
-        optimizer = AdamW(
-            self.parameters(),
-            lr=self.__optim_config.lr,
-            weight_decay=self.__optim_config.weight_decay,
-        )
-
-        def scheduler_lambda(epoch: int) -> float:
-            return self.__optim_config.decay_gamma ** epoch
-
-        scheduler = LambdaLR(optimizer, lr_lambda=scheduler_lambda)
-        return [optimizer], [scheduler]
+        self._metrics = MetricCollection(metrics)
 
     def forward(  # type: ignore
         self,
         batched_trees: dgl.DGLGraph,
         output_length: int,
-        target_sequence: torch.Tensor = None,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        batched_trees.ndata["x"] = self.__embedding(batched_trees)
-        encoded_nodes = self.__encoder(batched_trees)
-        output_logits, attention_weights = self.__decoder(
-            encoded_nodes, batched_trees.batch_num_nodes(), output_length, target_sequence
+    ) -> torch.Tensor:
+        batched_trees.ndata["x"] = self._embedding(batched_trees)
+        encoded_nodes = self._encoder(batched_trees)
+        output_logits = self._decoder(batched_trees, encoded_nodes, output_length)
+        return output_logits
+
+    def configure_optimizers(self) -> Tuple[List[Optimizer], List[_LRScheduler]]:
+        optimizer = AdamW(
+            self.parameters(),
+            lr=self._optim_config.lr,
+            weight_decay=self._optim_config.weight_decay,
         )
-        return output_logits, attention_weights
+
+        def scheduler_lambda(epoch: int) -> float:
+            return self._optim_config.decay_gamma ** epoch
+
+        scheduler = LambdaLR(optimizer, lr_lambda=scheduler_lambda)
+        return [optimizer], [scheduler]
 
     # ========== Model step ==========
 
     def _shared_step(self, batch: Tuple[torch.Tensor, dgl.DGLGraph], step: str) -> Dict:
         labels, graph = batch
         # [seq length; batch size; vocab size]
-        logits, _ = self(graph, labels.shape[0], labels) if step == "train" else self(graph, labels.shape[0])
-        result = {f"{step}/loss": self.__loss(logits[1:], labels[1:])}
+        logits = self(graph, labels.shape[0])
+        result = {f"{step}/loss": self._loss(logits[1:], labels[1:])}
 
         with torch.no_grad():
             prediction = logits.argmax(-1)
-            metric: ClassificationMetrics = self.__metrics[f"{step}_f1"](prediction, labels)
+            metric: ClassificationMetrics = self._metrics[f"{step}_f1"](prediction, labels)
             result.update(
                 {f"{step}/f1": metric.f1_score, f"{step}/precision": metric.precision, f"{step}/recall": metric.recall}
             )
             if step != "train":
-                result[f"{step}/chrf"] = self.__metrics[f"{step}_chrf"](prediction, labels)
+                result[f"{step}/chrf"] = self._metrics[f"{step}_chrf"](prediction, labels)
 
         return result
 
@@ -130,17 +116,17 @@ class TreeLSTM2Seq(LightningModule):
         with torch.no_grad():
             losses = [so if isinstance(so, torch.Tensor) else so["loss"] for so in step_outputs]
             mean_loss = torch.stack(losses).mean()
-            metric = self.__metrics[f"{step}_f1"].compute()
+            metric = self._metrics[f"{step}_f1"].compute()
             log = {
                 f"{step}/loss": mean_loss,
                 f"{step}/f1": metric.f1_score,
                 f"{step}/precision": metric.precision,
                 f"{step}/recall": metric.recall,
             }
-            self.__metrics[f"{step}_f1"].reset()
+            self._metrics[f"{step}_f1"].reset()
             if step != "train":
-                log[f"{step}/chrf"] = self.__metrics[f"{step}_chrf"].compute()
-                self.__metrics[f"{step}_chrf"].reset()
+                log[f"{step}/chrf"] = self._metrics[f"{step}_chrf"].compute()
+                self._metrics[f"{step}_chrf"].reset()
         self.log_dict(log, on_step=False, on_epoch=True)
 
     def training_epoch_end(self, step_outputs: EPOCH_OUTPUT):

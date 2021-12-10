@@ -16,17 +16,17 @@ from embeddings_for_trees.data.vocabulary import Vocabulary, TypedVocabulary
 class JsonlASTDataset(Dataset):
     _log_file = "bad_samples.log"
 
-    def __init__(self, data_file: str, vocabulary: Vocabulary, config: DictConfig, is_train: bool):
+    def __init__(self, data_file: str, vocabulary: Vocabulary, config: DictConfig, is_train: bool, is_pointer: bool):
         if not exists(data_file):
             raise ValueError(f"Can't find file with data: {data_file}")
         self._data_file = data_file
         self._vocab = vocabulary
         self._config = config
         self._is_train = is_train
+        self._is_pointer = is_pointer
 
         self._token_unk = self._vocab.token_to_id[vocabulary.UNK]
         self._node_unk = self._vocab.node_to_id[vocabulary.UNK]
-        self._label_unk = self._vocab.label_to_id[vocabulary.UNK]
 
         self._line_offsets = get_lines_offsets(data_file)
         self._n_samples = len(self._line_offsets)
@@ -54,7 +54,7 @@ class JsonlASTDataset(Dataset):
         nodes: List[Tuple[Optional[int], Dict]] = []  # list of (subtoken, node, parent)
         for n_id, node in enumerate(ast):
             parent_id = node_to_parent.get(n_id, None)
-            if CHILDREN in node and len(CHILDREN) > 0:
+            if (CHILDREN in node and len(node[CHILDREN]) > 0) or not self._config.split_leaves:
                 for c in node[CHILDREN]:
                     node_to_parent[c] = len(nodes)
                 del node[CHILDREN]
@@ -71,14 +71,15 @@ class JsonlASTDataset(Dataset):
         return graph, [node for parent, node in nodes]
 
     def _get_label(self, str_label: str) -> torch.Tensor:
-        label = torch.full((self._config.max_label_parts + 1, 1), self._vocab.label_to_id[self._vocab.PAD])
-        label[0, 0] = self._vocab.label_to_id[self._vocab.SOS]
+        vocab = self._vocab.token_to_id if self._is_pointer else self._vocab.label_to_id
+        label_unk = vocab[self._vocab.UNK]
+
+        label = torch.full((self._config.max_label_parts + 1, 1), vocab[self._vocab.PAD])
+        label[0, 0] = vocab[self._vocab.SOS]
         sublabels = str_label.split(SEPARATOR)[: self._config.max_label_parts]
-        label[1 : len(sublabels) + 1, 0] = torch.tensor(
-            [self._vocab.label_to_id.get(sl, self._label_unk) for sl in sublabels]
-        )
+        label[1 : len(sublabels) + 1, 0] = torch.tensor([vocab.get(sl, label_unk) for sl in sublabels])
         if len(sublabels) < self._config.max_label_parts:
-            label[len(sublabels) + 1, 0] = self._vocab.label_to_id[self._vocab.EOS]
+            label[len(sublabels) + 1, 0] = vocab[self._vocab.EOS]
         return label
 
     def _is_suitable_tree(self, tree: dgl.DGLGraph) -> bool:
@@ -146,8 +147,10 @@ class JsonlASTDataset(Dataset):
 class JsonlTypedASTDataset(JsonlASTDataset):
     _vocab: TypedVocabulary
 
-    def __init__(self, data_file: str, vocabulary: TypedVocabulary, config: DictConfig, is_train: bool):
-        super().__init__(data_file, vocabulary, config, is_train)
+    def __init__(
+        self, data_file: str, vocabulary: TypedVocabulary, config: DictConfig, is_train: bool, is_pointer: bool
+    ):
+        super().__init__(data_file, vocabulary, config, is_train, is_pointer)
         self._type_unk = self._vocab.type_to_id[vocabulary.UNK]
 
     def _set_graph_features(self, graph: dgl.DGLGraph, nodes: List[Dict]) -> dgl.DGLGraph:
