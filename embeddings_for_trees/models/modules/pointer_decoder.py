@@ -1,4 +1,4 @@
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import dgl
 import torch
@@ -6,6 +6,7 @@ from commode_utils.modules import LuongAttention
 from commode_utils.training import cut_into_segments
 from omegaconf import DictConfig
 from torch import nn, Tensor
+from torch_scatter import scatter
 
 from embeddings_for_trees.data.vocabulary import Vocabulary
 from embeddings_for_trees.utils.common import TOKEN
@@ -14,16 +15,22 @@ from embeddings_for_trees.utils.common import TOKEN
 class PointerDecoder(nn.Module):
     LSTM_STATE = Tuple[Tensor, Tensor]
 
-    _threshold_cf = 2.0
+    _threshold_cf = 1.0
 
     def __init__(
         self,
         config: DictConfig,
-        token_embeddings: nn.Embedding,
         token_to_id: Dict[str, int],
+        token_embeddings: Optional[nn.Embedding] = None,
     ):
         super().__init__()
-        self._token_embeddings = token_embeddings
+        self._n_tokens = len(token_to_id)
+        self._sos_token = token_to_id[Vocabulary.SOS]
+        self._pad_token = token_to_id[Vocabulary.PAD]
+        self._eos_token = token_to_id[Vocabulary.EOS]
+        self._token_embeddings = token_embeddings or nn.Embedding(
+            self._n_tokens, config.embedding_size, padding_idx=self._pad_token
+        )
         self._attention = LuongAttention(config.decoder_size)
 
         self._decoder_num_layers = config.decoder_num_layers
@@ -34,10 +41,7 @@ class PointerDecoder(nn.Module):
             dropout=config.rnn_dropout if config.decoder_num_layers > 1 else 0,
             batch_first=True,
         )
-
-        self._n_tokens = len(token_to_id)
-        self._sos_token = token_to_id[Vocabulary.SOS]
-        self._pad_token = token_to_id[Vocabulary.PAD]
+        self._dropout = nn.Dropout(config.rnn_dropout)
 
     def _init_lstm_state(self, encoder_output: Tensor, attention_mask: Tensor) -> LSTM_STATE:
         lstm_initial_state: torch.Tensor = encoder_output.sum(dim=1)  # [batch size; encoder size]
@@ -56,10 +60,13 @@ class PointerDecoder(nn.Module):
 
         # hidden -- [n layers; batch size; decoder size]
         # output -- [batch size; 1; decoder size]
-        _, (h_new, c_new) = self._decoder_lstm(embedded, (h_prev, c_prev))
+        output, (h_new, c_new) = self._decoder_lstm(embedded, (h_prev, c_prev))
+
+        # [batch size; decoder size]
+        output = self._dropout(output).squeeze(1)
 
         # [batch size; max nodes]
-        encoder_tokens_probability = self._attention(h_new[-1], encoder_output, attention_mask)
+        encoder_tokens_probability = self._attention(output, encoder_output, attention_mask)
         return encoder_tokens_probability, (h_new, c_new)
 
     def forward(
@@ -67,22 +74,26 @@ class PointerDecoder(nn.Module):
         batched_trees: dgl.DGLGraph,
         encoder_states: Tensor,
         output_len: int,
+        target_sequence: Optional[Tensor] = None,
     ):
         trees = dgl.unbatch(batched_trees)
         # encoder output -- [batch size; max nodes; encoder dim]
         # attention mask -- [batch size; max nodes]
         batched_states, mask = cut_into_segments(encoder_states, batched_trees.batch_num_nodes(), -1e9)
 
-        # Leaves with 0 in-degree are leaves (since topological sort traverse from leaves to roots).
+        h, c = self._init_lstm_state(batched_states, mask)
+
+        # Nodes with 0 in-degree are leaves (since topological sort traverse from leaves to roots).
         for i, tree in enumerate(trees):
             leaves = tree.in_degrees() == 0
             mask[i, : leaves.shape[0]][~leaves] = -1e9
+        # 0 node correspond to root, treat it like EOS
+        mask[0, :] = 0
 
         # [output len; batch size; n tokens]
         output = encoder_states.new_zeros((output_len, len(trees), self._n_tokens))
         output[0, :, self._sos_token] = 1
 
-        h, c = self._init_lstm_state(batched_states, mask)
         # [batch size]
         current_input = encoder_states.new_full((len(trees),), self._sos_token, dtype=torch.long)
 
@@ -95,12 +106,15 @@ class PointerDecoder(nn.Module):
                 token_ids = tree.ndata[TOKEN][leaves][:, 0]
                 probabilities = current_pointer[i, : leaves.shape[0]][leaves]
 
-                probability_threshold = 1.0 / (self._threshold_cf * leaves.sum())
-                probabilities[probabilities < probability_threshold] = 0
+                # probability_threshold = 1.0 / (self._threshold_cf * leaves.sum())
+                # probabilities[probabilities < probability_threshold] = 0
 
-                output[step, i].put_(token_ids, probabilities, accumulate=True)
+                scatter(probabilities, token_ids, reduce="sum", out=output[step, i])
 
-                output[step, i, self._pad_token] = 1 - probabilities.sum()
+                output[step, i, self._eos_token] = current_pointer[i, 0]
 
-            current_input = output[step].argmax(dim=-1)
+            if target_sequence is not None:
+                current_input = target_sequence[step]
+            else:
+                current_input = output[step].argmax(dim=-1)
         return output

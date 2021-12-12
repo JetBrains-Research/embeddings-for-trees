@@ -14,7 +14,6 @@ from torchmetrics import MetricCollection, Metric
 
 from embeddings_for_trees.data.vocabulary import Vocabulary
 from embeddings_for_trees.models.modules import NodeEmbedding, TreeLSTM
-from embeddings_for_trees.utils.common import TOKEN
 
 
 class TreeLSTM2Seq(LightningModule):

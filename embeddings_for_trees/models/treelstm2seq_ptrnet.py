@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 
 import dgl
 import torch
@@ -31,7 +31,7 @@ class TreeLSTM2SeqPointers(LightningModule):
 
         self._embedding = NodeEmbedding(model_config, vocabulary)
         self._encoder = TreeLSTM(model_config)
-        self._decoder = PointerDecoder(model_config, self._embedding._token_embedding, vocabulary.token_to_id)
+        self._decoder = PointerDecoder(model_config, vocabulary.token_to_id)
 
         token2id = vocabulary.token_to_id
         pad_idx = token2id[vocabulary.PAD]
@@ -50,13 +50,11 @@ class TreeLSTM2SeqPointers(LightningModule):
         self._metrics = MetricCollection(metrics)
 
     def forward(  # type: ignore
-        self,
-        batched_trees: dgl.DGLGraph,
-        output_length: int,
+        self, batched_trees: dgl.DGLGraph, output_length: int, target_sequence: Optional[torch.Tensor] = None
     ) -> torch.Tensor:
         batched_trees.ndata["x"] = self._embedding(batched_trees)
         encoded_nodes = self._encoder(batched_trees)
-        output_logits = self._decoder(batched_trees, encoded_nodes, output_length)
+        output_logits = self._decoder(batched_trees, encoded_nodes, output_length, target_sequence)
         return output_logits
 
     def configure_optimizers(self) -> Tuple[List[Optimizer], List[_LRScheduler]]:
@@ -77,7 +75,8 @@ class TreeLSTM2SeqPointers(LightningModule):
     def _shared_step(self, batch: Tuple[torch.Tensor, dgl.DGLGraph], step: str) -> Dict:
         labels, graph = batch
         # [seq length; batch size; vocab size]
-        logits = self(graph, labels.shape[0])
+        pass_labels = labels if step == "train" else None
+        logits = self(graph, labels.shape[0], pass_labels)
         result = {f"{step}/loss": self._loss(logits[1:], labels[1:])}
 
         with torch.no_grad():
