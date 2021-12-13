@@ -2,7 +2,6 @@ from typing import Tuple, List, Dict, Optional
 
 import dgl
 import torch
-from commode_utils.losses import SequenceCrossEntropyLoss
 from commode_utils.metrics import SequentialF1Score, ChrF, ClassificationMetrics
 from omegaconf import DictConfig
 from pytorch_lightning import LightningModule
@@ -35,7 +34,7 @@ class TreeLSTM2SeqPointers(LightningModule):
 
         token2id = vocabulary.token_to_id
         pad_idx = token2id[vocabulary.PAD]
-        self._loss = SequenceCrossEntropyLoss(pad_idx, reduction="batch-mean")
+        self._loss = torch.nn.NLLLoss(ignore_index=pad_idx)
 
         eos_idx = token2id[vocabulary.EOS]
         ignore_idx = [token2id[vocabulary.SOS], token2id[vocabulary.UNK]]
@@ -77,7 +76,11 @@ class TreeLSTM2SeqPointers(LightningModule):
         # [seq length; batch size; vocab size]
         pass_labels = labels if step == "train" else None
         logits = self(graph, labels.shape[0], pass_labels)
-        result = {f"{step}/loss": self._loss(logits[1:], labels[1:])}
+
+        log_prob = (logits + 1e-9).log()
+        loss = self._loss(log_prob[1:].permute(1, 2, 0), labels[1:].permute(1, 0))
+
+        result = {f"{step}/loss": loss}
 
         with torch.no_grad():
             prediction = logits.argmax(-1)

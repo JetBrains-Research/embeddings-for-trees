@@ -43,6 +43,13 @@ class PointerDecoder(nn.Module):
         )
         self._dropout = nn.Dropout(config.rnn_dropout)
 
+        self._ignore_pointer_idx = [
+            token_to_id[it] for it in ["EMPTY", "<E>", "<UNK>", "METHOD_NAME", "<STR>", "<INT>"] if it in token_to_id
+        ]
+        self._ignore_pointer_idx = torch.tensor(self._ignore_pointer_idx, requires_grad=False)
+
+        self._id_to_token = {v: k for k, v in token_to_id.items()}
+
     def _init_lstm_state(self, encoder_output: Tensor, attention_mask: Tensor) -> LSTM_STATE:
         lstm_initial_state: torch.Tensor = encoder_output.sum(dim=1)  # [batch size; encoder size]
         segment_sizes: torch.Tensor = (attention_mask == 0).sum(dim=1, keepdim=True)  # [batch size; 1]
@@ -84,11 +91,18 @@ class PointerDecoder(nn.Module):
         h, c = self._init_lstm_state(batched_states, mask)
 
         # Nodes with 0 in-degree are leaves (since topological sort traverse from leaves to roots).
+        batch_data = []
         for i, tree in enumerate(trees):
             leaves = tree.in_degrees() == 0
-            mask[i, : leaves.shape[0]][~leaves] = -1e9
-        # 0 node correspond to root, treat it like EOS
-        mask[0, :] = 0
+            token_ids = tree.ndata[TOKEN][:, 0]
+            bad_ids = torch.isin(token_ids, self._ignore_pointer_idx)
+
+            pointer_mask = leaves & (~bad_ids)
+            mask[i, : leaves.shape[0]][~pointer_mask] = -1e9
+
+            # print([self._id_to_token[it.item()] for it in tree.ndata[TOKEN][pointer_mask, 0]])
+
+            batch_data.append((i, tree, pointer_mask))
 
         # [output len; batch size; n tokens]
         output = encoder_states.new_zeros((output_len, len(trees), self._n_tokens))
@@ -101,17 +115,16 @@ class PointerDecoder(nn.Module):
             # [batch size; max nodes]
             current_pointer, (h, c) = self._single_step(current_input, batched_states, mask, (h, c))
 
-            for i, tree in enumerate(trees):
-                leaves = tree.in_degrees() == 0
-                token_ids = tree.ndata[TOKEN][leaves][:, 0]
-                probabilities = current_pointer[i, : leaves.shape[0]][leaves]
+            for i, tree, pointer_mask in batch_data:
+                token_ids = tree.ndata[TOKEN][pointer_mask, 0]
+                probabilities = current_pointer[i, : pointer_mask.shape[0]][pointer_mask]
 
-                # probability_threshold = 1.0 / (self._threshold_cf * leaves.sum())
-                # probabilities[probabilities < probability_threshold] = 0
+                probability_threshold = 1.0 / (self._threshold_cf * pointer_mask.sum())
+                probabilities[probabilities < probability_threshold] = 0
 
                 scatter(probabilities, token_ids, reduce="sum", out=output[step, i])
 
-                output[step, i, self._eos_token] = current_pointer[i, 0]
+                output[step, i, self._eos_token] = 1 - probabilities.sum()
 
             if target_sequence is not None:
                 current_input = target_sequence[step]
