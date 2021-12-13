@@ -43,10 +43,10 @@ class PointerDecoder(nn.Module):
         )
         self._dropout = nn.Dropout(config.rnn_dropout)
 
-        self._ignore_pointer_idx = [
+        ignore__idx = [
             token_to_id[it] for it in ["EMPTY", "<E>", "<UNK>", "METHOD_NAME", "<STR>", "<INT>"] if it in token_to_id
         ]
-        self._ignore_pointer_idx = torch.tensor(self._ignore_pointer_idx, requires_grad=False)
+        self._ignore_pointer_idx = torch.tensor(ignore__idx, requires_grad=False)
 
         self._id_to_token = {v: k for k, v in token_to_id.items()}
 
