@@ -46,7 +46,7 @@ class PointerDecoder(nn.Module):
         ignore__idx = [
             token_to_id[it] for it in ["EMPTY", "<E>", "<UNK>", "METHOD_NAME", "<STR>", "<INT>"] if it in token_to_id
         ]
-        self._ignore_pointer_idx = torch.tensor(ignore__idx, requires_grad=False)
+        self._ignore_pointer_idx = nn.Parameter(torch.tensor(ignore__idx), requires_grad=False)
 
         self._id_to_token = {v: k for k, v in token_to_id.items()}
 
