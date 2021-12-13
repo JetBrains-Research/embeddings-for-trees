@@ -43,7 +43,7 @@ def test_treelstm(config: DictConfig):
     # Load model
     treelstm2seq = TreeLSTM2Seq.load_from_checkpoint(config.checkpoint, map_location=torch.device("cpu"))
 
-    test(treelstm2seq, data_module, config.seed)
+    test(treelstm2seq, data_module, config.seed, config.train.gpu)
 
 
 if __name__ == "__main__":
