@@ -54,7 +54,7 @@ class JsonlASTDataset(Dataset):
         nodes: List[Tuple[Optional[int], Dict]] = []  # list of (subtoken, node, parent)
         for n_id, node in enumerate(ast):
             parent_id = node_to_parent.get(n_id, None)
-            if (CHILDREN in node and len(node[CHILDREN]) > 0) or not self._config.split_leaves:
+            if (CHILDREN in node and len(node[CHILDREN]) > 0) or not self._config.get("split_leaves", False):
                 for c in node[CHILDREN]:
                     node_to_parent[c] = len(nodes)
                 del node[CHILDREN]
