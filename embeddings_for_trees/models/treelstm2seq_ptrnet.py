@@ -77,7 +77,7 @@ class TreeLSTM2SeqPointers(LightningModule):
         pass_labels = labels if step == "train" else None
         logits = self(graph, labels.shape[0], pass_labels)
 
-        log_prob = (logits + 1e-9).log()
+        log_prob = (logits + 1e-3).log()
         loss = self._loss(log_prob[1:].permute(1, 2, 0), labels[1:].permute(1, 0))
 
         result = {f"{step}/loss": loss}
