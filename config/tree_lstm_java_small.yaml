@@ -30,6 +30,7 @@ data:
 
   batch_size: 512
   test_batch_size: 1024
+  split_leaves: false
 
 model:
   # Encoder

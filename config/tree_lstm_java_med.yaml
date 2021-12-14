@@ -8,7 +8,7 @@ progress_bar_refresh_rate: 1
 print_config: true
 
 wandb:
-  project: TreeLSTM -- java-small
+  project: TreeLSTM -- java-med
   group: null
   offline: false
 
@@ -29,6 +29,7 @@ data:
 
   batch_size: 512
   test_batch_size: 1024
+  split_leaves: false
 
 model:
   # Encoder
