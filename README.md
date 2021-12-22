@@ -24,9 +24,32 @@ List of some useful tools for preprocessing source code into a dataset with ASTs
   tool for processing PSI trees from IntelliJ IDEA and creating labeled dataset from them.
 
 ## Model zoo
-List of supported algorithms of tree embeddings with links to wiki guides:
+This section contains information about implemented models.
 
-- [TreeLSTM](https://github.com/JetBrains-Research/embeddings-for-trees/wiki/TreeLSTM-guide)
+### TreeLSTM
+
+PyTorch reimplementation of ChildSum version of TreeLSTM presented by Tai et al. in
+["Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks"](https://arxiv.org/abs/1503.00075).
+
+There are 3 different variantions of these model:
+1. Classic — ChildSum TreeLSTM model for code AST with LSTM+attention decoder that was wisely used in other works
+To train or test model use:
+```shell
+python -m embeddings_for_trees.treelstm train/test -c $CONFIG_PATH
+```
+2. Typed TreeLSTM — the same classic model, but works with typed AST that were introduced in [`PSIMiner`](https://arxiv.org/abs/2103.12778)
+To train or test model use:
+```shell
+python -m embeddings_for_trees.typed_treelstm train/test -c $CONFIG_PATH
+```
+3. TreeLSTM with pointers — ChildSum TreeLSTM model with pointer network to AST leaves for decoding
+To train or test model use:
+```shell
+python -m embeddings_for_trees.treelstm_ptr train/test -c $CONFIG_PATH
+```
+
+For config examples see [`config`](`./config`) directory.
+Classic model and model with pointer network share configurations, while typed model requires specification for token types vocabulary.
 
 ## Contribution
 
